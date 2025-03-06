@@ -7,7 +7,7 @@ import (
 
 	"github.com/base/base-bench/benchmark/config"
 	"github.com/base/base-bench/benchmark/flags"
-	"github.com/base/base-bench/service"
+	runner "github.com/base/base-bench/runner"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
@@ -53,7 +53,7 @@ func Main(version string) cliapp.LifecycleAction {
 		oplog.SetGlobalLogHandler(l.Handler())
 		opservice.ValidateEnvVars(flags.EnvVarPrefix, flags.Flags, l)
 
-		s := service.NewService(version, cfg, l)
+		s := runner.NewService(version, cfg, l)
 
 		return s, nil
 	}

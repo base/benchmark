@@ -1,4 +1,4 @@
-package service
+package config
 
 import (
 	"errors"
@@ -72,6 +72,9 @@ type BenchmarkParam struct {
 func (bp *BenchmarkParam) Check() error {
 	if bp.Value == nil && bp.Values == nil {
 		return errors.New("value or values is required")
+	}
+	if bp.Value != nil && bp.Values != nil {
+		return errors.New("value and values cannot both be specified")
 	}
 	return nil
 }
