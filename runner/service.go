@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -72,6 +74,7 @@ func (s *service) Start(ctx context.Context) error {
 		rootDir := s.config.RootDir()
 
 		for _, params := range matrix {
+			genesisTime := time.Now()
 			s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
 			// create temp directory for this test
@@ -90,8 +93,8 @@ func (s *service) Start(ctx context.Context) error {
 			}
 
 			// write chain cfg
-			chainCfg := params.ChainConfig()
-			err = json.NewEncoder(chainCfgFile).Encode(chainCfg)
+			genesis := params.Genesis(genesisTime)
+			err = json.NewEncoder(chainCfgFile).Encode(genesis.Config)
 			if err != nil {
 				return errors.Wrap(err, "failed to write chain config")
 			}
@@ -100,6 +103,23 @@ func (s *service) Start(ctx context.Context) error {
 			err = os.Mkdir(dataDirPath, 0755)
 			if err != nil {
 				return errors.Wrap(err, "failed to create data directory")
+			}
+
+			var jwtSecret [32]byte
+			_, err = rand.Read(jwtSecret[:])
+			if err != nil {
+				return errors.Wrap(err, "failed to generate jwt secret")
+			}
+
+			jwtSecretPath := path.Join(testDir, "jwt_secret")
+			jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY, 0644)
+			if err != nil {
+				return errors.Wrap(err, "failed to open jwt secret file")
+			}
+
+			_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
+			if err != nil {
+				return errors.Wrap(err, "failed to write jwt secret")
 			}
 
 			defer func() {
@@ -125,7 +145,7 @@ func (s *service) Start(ctx context.Context) error {
 
 			client := clients.NewClient(nodeType, logger, &options)
 
-			err = client.Run(chainCfgPath, dataDirPath)
+			err = client.Run(chainCfgPath, jwtSecretPath, dataDirPath)
 			if err != nil {
 				return errors.Wrap(err, "failed to start client")
 			}
@@ -152,10 +172,13 @@ func (s *service) Start(ctx context.Context) error {
 				log.Error("RPC never became available")
 			}
 
-			benchmark := network.NewNetworkBenchmark()
-			benchmark.Run(ctx)
+			benchmark := network.NewNetworkBenchmark(params, clientRPC, genesis)
+			err = benchmark.Run(ctx)
+			if err != nil {
+				log.Error("failed to run benchmark", "err", err)
+			}
 
-			_, _ = benchmark.CollectResults()
+			// _, _ = benchmark.CollectResults()
 
 			client.Stop()
 		}

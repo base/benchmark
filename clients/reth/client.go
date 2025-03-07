@@ -1,12 +1,15 @@
 package reth
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
 
+	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
@@ -19,8 +22,9 @@ type RethClient struct {
 	logger  log.Logger
 	options *types.ClientOptions
 
-	client  *ethclient.Client
-	process *exec.Cmd
+	client     *ethclient.Client
+	authClient *client.RPC
+	process    *exec.Cmd
 
 	stdout *logger.LogWriter
 	stderr *logger.LogWriter
@@ -33,7 +37,7 @@ func NewRethClient(logger log.Logger, options *types.ClientOptions) types.Execut
 	}
 }
 
-func (r *RethClient) Run(chainCfgPath string, dataDir string) error {
+func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error {
 	args := make([]string, 0)
 	args = append(args, "node")
 	args = append(args, "--color", "never")
@@ -44,6 +48,8 @@ func (r *RethClient) Run(chainCfgPath string, dataDir string) error {
 	args = append(args, "--http")
 	args = append(args, "--http.port", "8545")
 	args = append(args, "--http.api", "eth,net,web3")
+	args = append(args, "--authrpc.port", "8551")
+	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
 
 	if r.stdout != nil {
 		_ = r.stdout.Close()
@@ -72,6 +78,17 @@ func (r *RethClient) Run(chainCfgPath string, dataDir string) error {
 	}
 
 	r.client = ethclient.NewClient(rpcClient)
+
+	l2Node, err := client.NewRPC(ctx, r.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(cfg.L2EngineJWTSecret))))
+	if err != nil {
+		return err
+	}
+
+	if err != nil {
+		return errors.Wrap(err, "failed to dial rpc")
+	}
+
+	r.authClient = l2Node
 	return nil
 }
 

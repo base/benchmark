@@ -27,10 +27,11 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 }
 
 type CommonOptions struct {
+	JWTSecret string
 }
 
 type ExecutionClient interface {
-	Run(chainCfgPath string, dataDir string) error
+	Run(chainCfgPath string, jwtSecretPath string, dataDir string) error
 	Stop()
 	Client() *ethclient.Client
 }

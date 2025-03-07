@@ -3,9 +3,11 @@ package benchmark
 import (
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/base/base-bench/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -45,45 +47,53 @@ func (p Params) ClientOptions(prevClientOptions types.ClientOptions) types.Clien
 	return prevClientOptions
 }
 
-func (p Params) ChainConfig() params.ChainConfig {
+func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 	zero := uint64(0)
 	fifty := uint64(50)
-	return params.ChainConfig{
-		ChainID: big.NewInt(13371337),
-		// Ethereum forks in proof-of-work era.
-		HomesteadBlock:      big.NewInt(0),
-		EIP150Block:         big.NewInt(0),
-		EIP155Block:         big.NewInt(0),
-		EIP158Block:         big.NewInt(0),
-		ByzantiumBlock:      big.NewInt(0),
-		ConstantinopleBlock: big.NewInt(0),
-		PetersburgBlock:     big.NewInt(0),
-		IstanbulBlock:       big.NewInt(0),
-		MuirGlacierBlock:    big.NewInt(0),
-		BerlinBlock:         big.NewInt(0),
-		LondonBlock:         big.NewInt(0),
-		ArrowGlacierBlock:   big.NewInt(0),
-		GrayGlacierBlock:    big.NewInt(0),
-		MergeNetsplitBlock:  big.NewInt(0),
-		// Ethereum forks in proof-of-stake era.
-		TerminalTotalDifficulty: big.NewInt(1),
-		ShanghaiTime:            new(uint64),
-		CancunTime:              new(uint64),
-		PragueTime:              nil,
-		VerkleTime:              nil,
-		// OP-Stack forks are disabled, since we use this for L1.
-		BedrockBlock: big.NewInt(0),
-		RegolithTime: &zero,
-		CanyonTime:   &zero,
-		EcotoneTime:  &zero,
-		FjordTime:    &zero,
-		GraniteTime:  &zero,
-		HoloceneTime: &zero,
-		InteropTime:  &zero,
-		Optimism: &params.OptimismConfig{
-			EIP1559Elasticity:        10,
-			EIP1559Denominator:       50,
-			EIP1559DenominatorCanyon: &fifty,
+	return core.Genesis{
+		Nonce:      0,
+		Timestamp:  uint64(genesisTime.Unix()),
+		ExtraData:  []byte{},
+		GasLimit:   40e9,
+		Difficulty: big.NewInt(1),
+		Alloc:      core.DefaultGenesisBlock().Alloc,
+		Config: &params.ChainConfig{
+			ChainID: big.NewInt(13371337),
+			// Ethereum forks in proof-of-work era.
+			HomesteadBlock:      big.NewInt(0),
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+			ArrowGlacierBlock:   big.NewInt(0),
+			GrayGlacierBlock:    big.NewInt(0),
+			MergeNetsplitBlock:  big.NewInt(0),
+			// Ethereum forks in proof-of-stake era.
+			TerminalTotalDifficulty: big.NewInt(1),
+			ShanghaiTime:            new(uint64),
+			CancunTime:              new(uint64),
+			PragueTime:              nil,
+			VerkleTime:              nil,
+			// OP-Stack forks are disabled, since we use this for L1.
+			BedrockBlock: big.NewInt(0),
+			RegolithTime: &zero,
+			CanyonTime:   &zero,
+			EcotoneTime:  &zero,
+			FjordTime:    &zero,
+			GraniteTime:  &zero,
+			HoloceneTime: &zero,
+			InteropTime:  &zero,
+			Optimism: &params.OptimismConfig{
+				EIP1559Elasticity:        10,
+				EIP1559Denominator:       50,
+				EIP1559DenominatorCanyon: &fifty,
+			},
 		},
 	}
 }
