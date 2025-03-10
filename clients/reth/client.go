@@ -2,6 +2,7 @@ package reth
 
 import (
 	"context"
+	"encoding/hex"
 	"os"
 	"os/exec"
 	"strings"
@@ -23,7 +24,7 @@ type RethClient struct {
 	options *types.ClientOptions
 
 	client     *ethclient.Client
-	authClient *client.RPC
+	authClient client.RPC
 	process    *exec.Cmd
 
 	stdout *logger.LogWriter
@@ -47,9 +48,30 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	// todo: make this dynamic eventually
 	args = append(args, "--http")
 	args = append(args, "--http.port", "8545")
-	args = append(args, "--http.api", "eth,net,web3")
+	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.port", "8551")
 	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
+	args = append(args, "-vvvv")
+
+	// read jwt secret
+	jwtSecretStr, err := os.ReadFile(jwtSecretPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to read jwt secret")
+	}
+
+	jwtSecretBytes, err := hex.DecodeString(string(jwtSecretStr))
+
+	if err != nil {
+		return err
+	}
+
+	if len(jwtSecretBytes) != 32 {
+		return errors.New("jwt secret must be 32 bytes")
+	}
+
+	jwtSecret := [32]byte{}
+
+	copy(jwtSecret[:], jwtSecretBytes[:])
 
 	if r.stdout != nil {
 		_ = r.stdout.Close()
@@ -67,7 +89,7 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	r.process = exec.Command(r.options.RethBin, args...)
 	r.process.Stdout = r.stdout
 	r.process.Stderr = r.stderr
-	err := r.process.Start()
+	err = r.process.Start()
 	if err != nil {
 		return err
 	}
@@ -79,16 +101,31 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 
 	r.client = ethclient.NewClient(rpcClient)
 
-	l2Node, err := client.NewRPC(ctx, r.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(cfg.L2EngineJWTSecret))))
+	ready := false
+
+	// retry for 5 seconds
+	for i := 0; i < 5; i++ {
+		num, err := r.client.BlockNumber(ctx)
+		if err == nil {
+			r.logger.Info("RPC is available", "blockNumber", num)
+			ready = true
+			break
+		}
+		log.Debug("RPC not available yet", "err", err)
+		time.Sleep(1 * time.Second)
+	}
+
+	if !ready {
+		log.Error("RPC never became available")
+	}
+
+	l2Node, err := client.NewRPC(ctx, r.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
 	if err != nil {
 		return err
 	}
 
-	if err != nil {
-		return errors.Wrap(err, "failed to dial rpc")
-	}
-
 	r.authClient = l2Node
+
 	return nil
 }
 
@@ -118,4 +155,8 @@ func (r *RethClient) Stop() {
 
 func (r *RethClient) Client() *ethclient.Client {
 	return r.client
+}
+
+func (r *RethClient) AuthClient() client.RPC {
+	return r.authClient
 }

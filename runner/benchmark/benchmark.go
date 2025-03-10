@@ -7,6 +7,7 @@ import (
 
 	"github.com/base/base-bench/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -50,10 +51,11 @@ func (p Params) ClientOptions(prevClientOptions types.ClientOptions) types.Clien
 func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 	zero := uint64(0)
 	fifty := uint64(50)
+	fmt.Println("HERE", eip1559.EncodeHolocene1559Params(50, 10))
 	return core.Genesis{
 		Nonce:      0,
 		Timestamp:  uint64(genesisTime.Unix()),
-		ExtraData:  []byte{},
+		ExtraData:  eip1559.EncodeHoloceneExtraData(50, 10),
 		GasLimit:   40e9,
 		Difficulty: big.NewInt(1),
 		Alloc:      core.DefaultGenesisBlock().Alloc,
@@ -78,7 +80,7 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 			TerminalTotalDifficulty: big.NewInt(1),
 			ShanghaiTime:            new(uint64),
 			CancunTime:              new(uint64),
-			PragueTime:              nil,
+			PragueTime:              new(uint64),
 			VerkleTime:              nil,
 			// OP-Stack forks are disabled, since we use this for L1.
 			BedrockBlock: big.NewInt(0),
@@ -88,6 +90,7 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 			FjordTime:    &zero,
 			GraniteTime:  &zero,
 			HoloceneTime: &zero,
+			IsthmusTime:  &zero,
 			InteropTime:  &zero,
 			Optimism: &params.OptimismConfig{
 				EIP1559Elasticity:        10,

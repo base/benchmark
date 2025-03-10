@@ -94,7 +94,7 @@ func (s *service) Start(ctx context.Context) error {
 
 			// write chain cfg
 			genesis := params.Genesis(genesisTime)
-			err = json.NewEncoder(chainCfgFile).Encode(genesis.Config)
+			err = json.NewEncoder(chainCfgFile).Encode(genesis)
 			if err != nil {
 				return errors.Wrap(err, "failed to write chain config")
 			}
@@ -112,7 +112,7 @@ func (s *service) Start(ctx context.Context) error {
 			}
 
 			jwtSecretPath := path.Join(testDir, "jwt_secret")
-			jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY, 0644)
+			jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
 			if err != nil {
 				return errors.Wrap(err, "failed to open jwt secret file")
 			}
@@ -120,6 +120,10 @@ func (s *service) Start(ctx context.Context) error {
 			_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
 			if err != nil {
 				return errors.Wrap(err, "failed to write jwt secret")
+			}
+
+			if err = jwtSecretFile.Close(); err != nil {
+				return err
 			}
 
 			defer func() {
@@ -145,7 +149,7 @@ func (s *service) Start(ctx context.Context) error {
 
 			client := clients.NewClient(nodeType, logger, &options)
 
-			err = client.Run(chainCfgPath, jwtSecretPath, dataDirPath)
+			err = client.Run(ctx, chainCfgPath, jwtSecretPath, dataDirPath)
 			if err != nil {
 				return errors.Wrap(err, "failed to start client")
 			}
@@ -153,26 +157,9 @@ func (s *service) Start(ctx context.Context) error {
 
 			// Wait for RPC to become available
 			clientRPC := client.Client()
+			authClient := client.AuthClient()
 
-			ready := false
-
-			// retry for 5 seconds
-			for i := 0; i < 5; i++ {
-				num, err := clientRPC.BlockNumber(ctx)
-				if err == nil {
-					s.log.Info("RPC is available", "blockNumber", num)
-					ready = true
-					break
-				}
-				log.Debug("RPC not available yet", "err", err)
-				time.Sleep(1 * time.Second)
-			}
-
-			if !ready {
-				log.Error("RPC never became available")
-			}
-
-			benchmark := network.NewNetworkBenchmark(params, clientRPC, genesis)
+			benchmark := network.NewNetworkBenchmark(params, clientRPC, authClient, genesis)
 			err = benchmark.Run(ctx)
 			if err != nil {
 				log.Error("failed to run benchmark", "err", err)

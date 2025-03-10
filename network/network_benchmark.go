@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -12,19 +13,22 @@ type Metrics interface{}
 type Logs interface{}
 
 type NetworkBenchmark struct {
-	client    *ethclient.Client
+	client     *ethclient.Client
+	authClient client.RPC
+
 	params    benchmark.Params
-	jwtSecret string
+	jwtSecret [32]byte
 
 	cl *FakeConsensusClient
 }
 
-func NewNetworkBenchmark(params benchmark.Params, client *ethclient.Client, genesis core.Genesis, jwtSecret string) *NetworkBenchmark {
+func NewNetworkBenchmark(params benchmark.Params, client *ethclient.Client, authClient client.RPC, genesis core.Genesis) *NetworkBenchmark {
 	genesisHash := genesis.ToBlock().Hash()
 	return &NetworkBenchmark{
-		client: client,
-		params: params,
-		cl:     NewFakeConsensusClient(client, genesisHash, jwtSecret),
+		client:     client,
+		authClient: authClient,
+		params:     params,
+		cl:         NewFakeConsensusClient(client, authClient, genesisHash, genesis.Timestamp),
 	}
 }
 

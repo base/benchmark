@@ -1,8 +1,11 @@
 package types
 
 import (
+	"context"
+
 	gethoptions "github.com/base/base-bench/clients/geth/options"
 	rethoptions "github.com/base/base-bench/clients/reth/options"
+	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/urfave/cli/v2"
 )
@@ -31,9 +34,10 @@ type CommonOptions struct {
 }
 
 type ExecutionClient interface {
-	Run(chainCfgPath string, jwtSecretPath string, dataDir string) error
+	Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error
 	Stop()
-	Client() *ethclient.Client
+	Client() *ethclient.Client // TODO: switch to *client.RPC
+	AuthClient() client.RPC
 }
 
 type Client uint
