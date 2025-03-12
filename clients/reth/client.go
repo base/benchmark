@@ -114,6 +114,11 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 			break
 		}
 		log.Debug("RPC not available yet", "err", err)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
 		time.Sleep(1 * time.Second)
 	}
 

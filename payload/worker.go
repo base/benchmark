@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
-	"crypto/rand"
+	"fmt"
 	"math/big"
 	"time"
+
+	"math/rand"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/btcsuite/btcd/btcec/v2"
@@ -16,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
 )
 
@@ -42,7 +45,7 @@ type TransferOnlyPayloadWorker struct {
 	prefundAmount    *big.Int
 }
 
-const numAccounts = 1000
+const numAccounts = 2
 
 func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error) {
 	client, err := ethclient.Dial(elRPCURL)
@@ -75,8 +78,9 @@ func (t *TransferOnlyPayloadWorker) generateAccounts() error {
 	t.accountNonces = make(map[common.Address]uint64)
 	t.accountBalances = make(map[common.Address]*big.Int)
 
+	src := rand.New(rand.NewSource(100))
 	for i := 0; i < numAccounts; i++ {
-		key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		key, err := ecdsa.GenerateKey(elliptic.P256(), src)
 		if err != nil {
 			return err
 		}
@@ -92,7 +96,7 @@ func (t *TransferOnlyPayloadWorker) generateAccounts() error {
 
 func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	// 21000 * numAccounts
-	gasCost := new(big.Int).Mul(big.NewInt(21000), big.NewInt(numAccounts))
+	gasCost := new(big.Int).Mul(big.NewInt(22000*params.GWei), big.NewInt(numAccounts))
 	// (prefundAmount - gasCost) / numAccounts
 	perAccount := new(big.Int).Div(new(big.Int).Sub(t.prefundAmount, gasCost), big.NewInt(numAccounts))
 
@@ -101,6 +105,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	nonce := uint64(0)
 
 	results := make([]interface{}, numAccounts)
+	var lastTxHash common.Hash
 
 	// prefund accounts
 	for i := 0; i < numAccounts; i++ {
@@ -121,15 +126,20 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 			Args:   []interface{}{hexutil.Encode(marshaledTx)},
 			Result: &results[i],
 		})
+		lastTxHash = transferTx.Hash()
 	}
 
 	// create batches of 50 txs
-	batches := make([][]rpc.BatchElem, 0, numAccounts/50)
+	batches := make([][]rpc.BatchElem, 0, (numAccounts+49)/50)
 	for i := 0; i < numAccounts; i += 50 {
-		batches = append(batches, sendCalls[i:i+50])
+		batches = append(batches, sendCalls[i:min(i+50, len(sendCalls))])
 	}
 
 	for _, batch := range batches {
+		if len(batch) == 0 {
+			continue
+		}
+
 		callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		defer cancel()
 		if err := t.client.Client().BatchCallContext(callCtx, batch); err != nil {
@@ -146,6 +156,15 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 		t.log.Info("Sent batch of transactions", "numTransactions", len(batch))
 	}
 
+	time.Sleep(5 * time.Second)
+
+	receipt, err := t.waitForReceipt(ctx, lastTxHash)
+	if err != nil {
+		return err
+	}
+
+	t.log.Info("Last receipt", "status", receipt.Status)
+
 	t.log.Info("Prefunded accounts", "numAccounts", len(t.accountAddresses), "perAccount", perAccount)
 
 	// update account amounts
@@ -156,52 +175,129 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	return nil
 }
 
-// func (t *TransferOnlyPayloadWorker) generateTransfers(gasLimit uint64) []*types.Transaction {
-// 	gasUsed := 0
-// 	transactions := make([]*types.Transaction, 0, numAccounts)
-// 	acctIdx := 0
-// 	for {
-// 		// 21000 gas per transfer
-// 		acctIdx = (acctIdx + 1) % numAccounts
+func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	maxTimeout := time.Now().Add(10 * time.Second)
+	for {
+		receipt, err := t.client.TransactionReceipt(ctx, txHash)
+		if err != nil {
+			t.log.Error("Failed to get receipt", "err", err)
+		}
+		if receipt != nil {
+			return receipt, nil
+		}
+		if time.Now().After(maxTimeout) {
+			return nil, fmt.Errorf("timed out waiting for receipt")
+		}
+		time.Sleep(1 * time.Second)
+	}
+}
 
-// 	}
-// }
+func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64) error {
+	gasUsed := uint64(0)
+	sendCalls := make([]rpc.BatchElem, 0, numAccounts)
+	acctIdx := 0
+
+	fakeResults := make([]interface{}, 0)
+
+	for gasUsed < gasLimit {
+
+		transferTx, err := t.createTransferTx(t.accounts[acctIdx], t.accountNonces[t.accountAddresses[acctIdx]], t.accountAddresses[(acctIdx+1)%numAccounts], big.NewInt(1))
+		if err != nil {
+			t.log.Error("Failed to create transfer transaction", "err", err)
+			return err
+		}
+
+		marshaledTx, err := transferTx.MarshalBinary()
+		if err != nil {
+			return err
+		}
+
+		fakeResults = append(fakeResults, nil)
+		result := fakeResults[len(fakeResults)-1]
+
+		sendCalls = append(sendCalls, rpc.BatchElem{
+			Method: "eth_sendRawTransaction",
+			Args:   []interface{}{hexutil.Encode(marshaledTx)},
+			Result: &result,
+		})
+
+		gasUsed += 21000
+		t.accountNonces[t.accountAddresses[acctIdx]]++
+		// 21000 gas per transfer
+		acctIdx = (acctIdx + 1) % numAccounts
+	}
+
+	t.log.Debug("created transactions", "numTransactions", len(sendCalls))
+
+	// create batches of 50 txs
+	batches := make([][]rpc.BatchElem, 0, (len(sendCalls)+49)/50)
+	for i := 0; i < len(sendCalls); i += 50 {
+		batches = append(batches, sendCalls[i:min(i+50, len(sendCalls))])
+	}
+
+	t.log.Debug("sending batches", "numBatches", len(batches))
+	txIdx := 0
+
+	for _, batch := range batches {
+		callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		if err := t.client.Client().BatchCallContext(callCtx, batch); err != nil {
+			return err
+		}
+
+		for i, call := range batch {
+			if call.Error != nil {
+				t.log.Debug("Failed to send transaction", "err", call.Error, "result", call.Result, "addrFrom", t.accountAddresses[txIdx+i])
+				return call.Error
+			}
+		}
+
+		txIdx += len(batch)
+
+		allStatuses := ""
+		for _, call := range sendCalls {
+			allStatuses += fmt.Sprintf("%v ", call.Result)
+		}
+		t.log.Debug("all statuses", "statuses", allStatuses)
+
+		t.log.Info("Sent batch of transactions", "numTransactions", len(batch))
+	}
+
+	t.log.Debug("sent transactions", "numTransactions", len(sendCalls))
+
+	return nil
+}
 
 func (t *TransferOnlyPayloadWorker) Start(ctx context.Context) error {
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
 
-	// go func() {
-	// 	ticker := time.NewTicker(1 * time.Second)
-	// 	defer ticker.Stop()
-
-	// 	for {
-	// 		select {
-	// 		case <-ctx.Done():
-	// 			return
-	// 		default:
-	// 			err = t.loop()
-	// 		}
-	// 	}
-	// }()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+			}
+			err := t.loop(ctx)
+			if err != nil {
+				return
+			}
+		}
+	}()
 	return nil
 }
 
 func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
-	// ChainID    *big.Int
-	// Nonce      uint64
-	// GasTipCap  *big.Int // a.k.a. maxPriorityFeePerGas
-	// GasFeeCap  *big.Int // a.k.a. maxFeePerGas
-	// Gas        uint64
-	// To         *common.Address `rlp:"nil"` // nil means contract creation
-	// Value      *big.Int
-	// Data       []byte
-	// AccessList AccessList
+	t.log.Debug("sending tx", "from", crypto.PubkeyToAddress(fromPriv.PublicKey), "to", toAddr, "nonce", nonce, "amount", amount)
+
 	txdata := &types.DynamicFeeTx{
 		ChainID:   t.chainID,
 		Nonce:     nonce,
 		To:        &toAddr,
 		Gas:       21000,
-		GasFeeCap: big.NewInt(5000000000),
-		GasTipCap: big.NewInt(0),
+		GasFeeCap: new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(1)),
+		GasTipCap: big.NewInt(1),
 		Value:     amount,
 	}
 	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
@@ -210,6 +306,10 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 	return tx, nil
 }
 
-func (t *TransferOnlyPayloadWorker) loop() {
-
+func (t *TransferOnlyPayloadWorker) loop(ctx context.Context) error {
+	if err := t.sendTxs(ctx, 1000000); err != nil {
+		t.log.Error("Failed to send transactions", "err", err)
+		return err
+	}
+	return nil
 }

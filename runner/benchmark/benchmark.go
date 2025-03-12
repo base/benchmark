@@ -55,10 +55,9 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 	zero := uint64(0)
 	fifty := uint64(50)
 
-	allocs := core.DefaultGenesisBlock()
-
+	allocs := make(gethTypes.GenesisAlloc)
 	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-	allocs.Alloc[common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")] = gethTypes.Account{
+	allocs[common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")] = gethTypes.Account{
 		Balance: new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether)), // 100,000 ETH
 	}
 
@@ -68,7 +67,7 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 		ExtraData:  eip1559.EncodeHoloceneExtraData(50, 10),
 		GasLimit:   40e9,
 		Difficulty: big.NewInt(1),
-		Alloc:      allocs.Alloc,
+		Alloc:      allocs,
 		Config: &params.ChainConfig{
 			ChainID: big.NewInt(13371337),
 			// Ethereum forks in proof-of-work era.

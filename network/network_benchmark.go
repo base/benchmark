@@ -47,7 +47,7 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *e
 		// TODO: pass this in somehow
 		worker: worker,
 		params: benchParams,
-		cl:     NewFakeConsensusClient(client, authClient, genesisHash, genesis.Timestamp),
+		cl:     NewFakeConsensusClient(log, client, authClient, genesisHash, genesis.Timestamp),
 	}, nil
 }
 
