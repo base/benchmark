@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/base/base-bench/clients/types"
-	"github.com/base/base-bench/runner/config"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
@@ -32,7 +31,7 @@ const (
 	MaxTotalParams = 24
 )
 
-func NewParamsFromValues(assignments map[config.ParamType]string, transactionPayloads []TransactionPayload) Params {
+func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads []TransactionPayload) Params {
 	params := Params{
 		NodeType:           "geth",
 		TransactionPayload: transactionPayloads,
@@ -40,7 +39,7 @@ func NewParamsFromValues(assignments map[config.ParamType]string, transactionPay
 
 	for k, v := range assignments {
 		switch k {
-		case config.ParamTypeNode:
+		case ParamTypeNode:
 			params.NodeType = v
 		}
 	}
@@ -120,19 +119,19 @@ func parseTransactionPayloads(payloads []string) ([]TransactionPayload, error) {
 	return txPayloads, nil
 }
 
-func NewParamsMatrixFromConfig(c config.BenchmarkMatrix) (ParamsMatrix, error) {
+func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 	var txPayloadOptions []TransactionPayload
 
-	seenParams := make(map[config.ParamType]bool)
+	seenParams := make(map[ParamType]bool)
 
 	// Multiple payloads can run in a single benchmark
-	paramsExceptPayload := make([]config.BenchmarkParam, 0, len(c.Variables))
+	paramsExceptPayload := make([]Param, 0, len(c.Variables))
 	for _, p := range c.Variables {
 		if seenParams[p.ParamType] {
 			return nil, fmt.Errorf("duplicate param type %s", p.ParamType)
 		}
 		seenParams[p.ParamType] = true
-		if p.ParamType == config.ParamTypeTxWorkload {
+		if p.ParamType == ParamTypeTxWorkload {
 			var params []string
 			if p.Values != nil {
 				params = *p.Values
@@ -184,7 +183,7 @@ func NewParamsMatrixFromConfig(c config.BenchmarkMatrix) (ParamsMatrix, error) {
 
 	params := make(ParamsMatrix, totalParams)
 	for i := 0; i < totalParams; i++ {
-		valueSelections := make(map[config.ParamType]string)
+		valueSelections := make(map[ParamType]string)
 		for j, p := range paramsExceptPayload {
 			valueSelections[p.ParamType] = valuesByParam[j][currentParams[j]]
 		}

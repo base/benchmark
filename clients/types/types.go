@@ -37,6 +37,7 @@ type ExecutionClient interface {
 	Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error
 	Stop()
 	Client() *ethclient.Client // TODO: switch to *client.RPC
+	ClientURL() string         // needed for external transaction payload workers
 	AuthClient() client.RPC
 }
 

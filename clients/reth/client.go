@@ -24,6 +24,7 @@ type RethClient struct {
 	options *types.ClientOptions
 
 	client     *ethclient.Client
+	clientURL  string
 	authClient client.RPC
 	process    *exec.Cmd
 
@@ -94,7 +95,8 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 		return err
 	}
 
-	rpcClient, err := rpc.Dial("http://127.0.0.1:8545")
+	r.clientURL = "http://127.0.0.1:8545"
+	rpcClient, err := rpc.Dial(r.clientURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial rpc")
 	}
@@ -104,7 +106,7 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	ready := false
 
 	// retry for 5 seconds
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 50; i++ {
 		num, err := r.client.BlockNumber(ctx)
 		if err == nil {
 			r.logger.Info("RPC is available", "blockNumber", num)
@@ -155,6 +157,10 @@ func (r *RethClient) Stop() {
 
 func (r *RethClient) Client() *ethclient.Client {
 	return r.client
+}
+
+func (r *RethClient) ClientURL() string {
+	return r.clientURL
 }
 
 func (r *RethClient) AuthClient() client.RPC {

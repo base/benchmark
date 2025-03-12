@@ -147,9 +147,12 @@ func (s *service) Start(ctx context.Context) error {
 			options := s.config.ClientOptions()
 			options = params.ClientOptions(options)
 
+			clientCtx, cancelClient := context.WithCancel(ctx)
+			defer cancelClient()
+
 			client := clients.NewClient(nodeType, logger, &options)
 
-			err = client.Run(ctx, chainCfgPath, jwtSecretPath, dataDirPath)
+			err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)
 			if err != nil {
 				return errors.Wrap(err, "failed to start client")
 			}
@@ -158,15 +161,18 @@ func (s *service) Start(ctx context.Context) error {
 			// Wait for RPC to become available
 			clientRPC := client.Client()
 			authClient := client.AuthClient()
+			clientRPCURL := client.ClientURL()
 
-			benchmark := network.NewNetworkBenchmark(params, clientRPC, authClient, genesis)
-			err = benchmark.Run(ctx)
+			benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, genesis)
+			if err != nil {
+				return errors.Wrap(err, "failed to create benchmark")
+			}
+			err = benchmark.Run(clientCtx)
 			if err != nil {
 				log.Error("failed to run benchmark", "err", err)
 			}
 
-			// _, _ = benchmark.CollectResults()
-
+			cancelClient()
 			client.Stop()
 		}
 
