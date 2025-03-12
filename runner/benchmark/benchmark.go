@@ -7,8 +7,10 @@ import (
 
 	"github.com/base/base-bench/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
+	gethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -16,15 +18,17 @@ type TransactionPayload struct {
 	Type string
 }
 
-// Represents a single run of a benchmark with a new network
+// Params is the parameters for a single benchmark run.
 type Params struct {
 	NodeType           string
 	TransactionPayload []TransactionPayload
 }
 
+// ParamsMatrix is a list of params that can be run in parallel.
 type ParamsMatrix []Params
 
 const (
+	// MaxTotalParams is the maximum number of benchmarks that can be run in parallel.
 	MaxTotalParams = 24
 )
 
@@ -51,14 +55,21 @@ func (p Params) ClientOptions(prevClientOptions types.ClientOptions) types.Clien
 func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 	zero := uint64(0)
 	fifty := uint64(50)
-	fmt.Println("HERE", eip1559.EncodeHolocene1559Params(50, 10))
+
+	allocs := core.DefaultGenesisBlock()
+
+	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+	allocs.Alloc[common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")] = gethTypes.Account{
+		Balance: new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether)), // 100,000 ETH
+	}
+
 	return core.Genesis{
 		Nonce:      0,
 		Timestamp:  uint64(genesisTime.Unix()),
 		ExtraData:  eip1559.EncodeHoloceneExtraData(50, 10),
 		GasLimit:   40e9,
 		Difficulty: big.NewInt(1),
-		Alloc:      core.DefaultGenesisBlock().Alloc,
+		Alloc:      allocs.Alloc,
 		Config: &params.ChainConfig{
 			ChainID: big.NewInt(13371337),
 			// Ethereum forks in proof-of-work era.
@@ -109,7 +120,7 @@ func parseTransactionPayloads(payloads []string) ([]TransactionPayload, error) {
 	return txPayloads, nil
 }
 
-func NewParamsMatrixFromConfig(c config.BenchmarkConfig) (ParamsMatrix, error) {
+func NewParamsMatrixFromConfig(c config.BenchmarkMatrix) (ParamsMatrix, error) {
 	var txPayloadOptions []TransactionPayload
 
 	seenParams := make(map[config.ParamType]bool)
@@ -171,8 +182,6 @@ func NewParamsMatrixFromConfig(c config.BenchmarkConfig) (ParamsMatrix, error) {
 
 	currentParams := make([]int, len(dimensions))
 
-	// Generate all possible combinations of values
-	// for each parameter
 	params := make(ParamsMatrix, totalParams)
 	for i := 0; i < totalParams; i++ {
 		valueSelections := make(map[config.ParamType]string)

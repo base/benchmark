@@ -46,13 +46,13 @@ func NewService(version string, cfg config.Config, log log.Logger) Service {
 	}
 }
 
-func readBenchmarkConfig(path string) ([]config.BenchmarkConfig, error) {
+func readBenchmarkConfig(path string) ([]benchmark.Matrix, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
 	}
 
-	var config []config.BenchmarkConfig
+	var config []benchmark.Matrix
 	err = yaml.NewDecoder(file).Decode(&config)
 	return config, err
 }

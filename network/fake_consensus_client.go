@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/client"
@@ -19,8 +18,10 @@ type FakeConsensusClient struct {
 	client     *ethclient.Client
 	authClient client.RPC
 
-	headBlockHash    common.Hash
-	genesisTimestamp uint64
+	headBlockHash common.Hash
+	lastTimestamp uint64
+
+	currentPayloadID *engine.PayloadID
 }
 
 func NewFakeConsensusClient(client *ethclient.Client, authClient client.RPC, genesisHash common.Hash, genesisTimestamp uint64) *FakeConsensusClient {
@@ -28,11 +29,12 @@ func NewFakeConsensusClient(client *ethclient.Client, authClient client.RPC, gen
 		client:           client,
 		authClient:       authClient,
 		headBlockHash:    genesisHash,
-		genesisTimestamp: genesisTimestamp,
+		lastTimestamp:    genesisTimestamp,
+		currentPayloadID: nil,
 	}
 }
 
-func (f *FakeConsensusClient) Propose(ctx context.Context) error {
+func (f *FakeConsensusClient) updateForkChoice(ctx context.Context) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
 		HeadBlockHash:      f.headBlockHash,
 		SafeBlockHash:      f.headBlockHash,
@@ -44,8 +46,10 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 10))
 
+	timestamp := max(f.lastTimestamp+1, uint64(time.Now().Unix()))
+
 	payloadAttrs := eth.PayloadAttributes{
-		Timestamp:             eth.Uint64Quantity(f.genesisTimestamp + 2),
+		Timestamp:             eth.Uint64Quantity(timestamp),
 		PrevRandao:            eth.Bytes32{},
 		SuggestedFeeRecipient: common.Address{'C'},
 		Withdrawals:           &types.Withdrawals{},
@@ -62,29 +66,61 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu, payloadAttrs)
 
 	if err != nil {
-		fmt.Printf("%#+v\n", err)
-		return errors.Wrap(err, "failed to propose block")
+		return nil, errors.Wrap(err, "failed to propose block")
 	}
 
-	// wait 2 seconds
-	time.Sleep(200 * time.Millisecond)
+	f.lastTimestamp = timestamp
+	return resp.PayloadID, nil
+}
 
-	fmt.Println(resp)
-
-	ctx, cancel = context.WithTimeout(ctx, time.Second*5)
+func (f *FakeConsensusClient) getBuiltPayload(ctx context.Context, payloadID engine.PayloadID) (*engine.ExecutableData, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
-	err = f.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", *resp.PayloadID)
+	err := f.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", payloadID)
 	if err != nil {
-		return errors.Wrap(err, "failed to get payload")
+		return nil, errors.Wrap(err, "failed to get payload")
 	}
 
-	fmt.Printf("success: %#v", payloadResp)
+	return payloadResp.ExecutionPayload, nil
+}
+
+func (f *FakeConsensusClient) Propose(ctx context.Context) error {
+	payloadID, err := f.updateForkChoice(ctx)
+	if err != nil {
+		return err
+	}
+
+	f.currentPayloadID = payloadID
+
+	// wait 2 seconds
+	time.Sleep(2000 * time.Millisecond)
+
+	payload, err := f.getBuiltPayload(ctx, *f.currentPayloadID)
+	if err != nil {
+		return err
+	}
+	f.headBlockHash = payload.BlockHash
+
 	return nil
 }
 
 func (f *FakeConsensusClient) Start(ctx context.Context) error {
-	return f.Propose(ctx)
+	// min block time
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			err := f.Propose(ctx)
+			if err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (f *FakeConsensusClient) Stop() {

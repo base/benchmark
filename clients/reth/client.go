@@ -51,7 +51,7 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.port", "8551")
 	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
-	args = append(args, "-vvvv")
+	args = append(args, "-vvv")
 
 	// read jwt secret
 	jwtSecretStr, err := os.ReadFile(jwtSecretPath)

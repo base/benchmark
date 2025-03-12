@@ -1,26 +1,28 @@
-package config
+package benchmark
 
 import (
 	"errors"
 	"fmt"
 )
 
-type BenchmarkMetric uint
+// Metric represents a metric that can be benchmarked. Each metric
+// corresponds to a different type of benchmark.
+type Metric uint
 
 const (
-	BenchmarkExecutionSpeed BenchmarkMetric = iota
+	BenchmarkExecutionSpeed Metric = iota
 	BenchmarkOpProgram
 )
 
-func (b BenchmarkMetric) String() string {
+func (b Metric) String() string {
 	return [...]string{"execution-speed", "op-program"}[b]
 }
 
-func (b BenchmarkMetric) MarshalText() ([]byte, error) {
+func (b Metric) MarshalText() ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
-func (b *BenchmarkMetric) UnmarshalText(text []byte) error {
+func (b *Metric) UnmarshalText(text []byte) error {
 	switch string(text) {
 	case "execution-speed":
 		*b = BenchmarkExecutionSpeed
@@ -32,6 +34,8 @@ func (b *BenchmarkMetric) UnmarshalText(text []byte) error {
 	return nil
 }
 
+// ParamType is an enum that specifies what variables can be specified in
+// a benchmark configuration.
 type ParamType uint
 
 const (
@@ -62,14 +66,16 @@ func (b *ParamType) UnmarshalText(text []byte) error {
 	return nil
 }
 
-type BenchmarkParam struct {
+// Param is a single dimension of a benchmark matrix. It can be a
+// single value or a list of values.
+type Param struct {
 	Name      *string   `yaml:"name"`
 	ParamType ParamType `yaml:"type"`
 	Value     *string   `yaml:"value"`
 	Values    *[]string `yaml:"values"`
 }
 
-func (bp *BenchmarkParam) Check() error {
+func (bp *Param) Check() error {
 	if bp.Value == nil && bp.Values == nil {
 		return errors.New("value or values is required")
 	}
@@ -79,14 +85,16 @@ func (bp *BenchmarkParam) Check() error {
 	return nil
 }
 
-type BenchmarkConfig struct {
-	Name        string            `yaml:"name"`
-	Description string            `yaml:"desciption"`
-	Benchmark   []BenchmarkMetric `yaml:"benchmark"`
-	Variables   []BenchmarkParam  `yaml:"variables"`
+// Matrix is the user-facing YAML configuration for specifying a
+// matrix of benchmark runs.
+type Matrix struct {
+	Name        string   `yaml:"name"`
+	Description string   `yaml:"desciption"`
+	Benchmark   []Metric `yaml:"benchmark"`
+	Variables   []Param  `yaml:"variables"`
 }
 
-func (bc *BenchmarkConfig) Check() error {
+func (bc *Matrix) Check() error {
 	if bc.Name == "" {
 		return errors.New("name is required")
 	}
