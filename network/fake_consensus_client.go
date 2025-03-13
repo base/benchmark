@@ -19,7 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 )
 
@@ -172,29 +171,41 @@ func (f *FakeConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 
 	f.log.Debug("Built payload", "parent_hash", payloadResp.ExecutionPayload.ParentHash, "stateRoot", payloadResp.ExecutionPayload.StateRoot)
 
-	// get block
-	ctx, cancel = context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	receipts, err := f.client.BlockReceipts(ctx, rpc.BlockNumberOrHash{BlockHash: &payloadResp.ExecutionPayload.ParentHash})
-	if err != nil {
-		f.log.Error("Failed to get receipts", "err", err)
-	}
-
-	// print receipts
-	for i, receipt := range receipts {
-		f.log.Debug("Parent receipts", "index", i, "status", receipt.Status, "gasUsed", receipt.GasUsed)
-	}
-
 	return payloadResp.ExecutionPayload, nil
 }
 
+type BasicBlockType struct{}
+
+// HasOptimismWithdrawalsRoot implements types.BlockType.
+func (b BasicBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
+	return true
+}
+
+// IsIsthmus implements types.BlockType.
+func (b BasicBlockType) IsIsthmus(blkTime uint64) bool {
+	return true
+}
+
+var _ types.BlockType = BasicBlockType{}
+
+var (
+	EmptyWithdrawalsRoot = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+)
+
 func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
-	params.WithdrawalsRoot = &common.Hash{}
+	params.WithdrawalsRoot = &EmptyWithdrawalsRoot
+
+	block, err := engine.ExecutableDataToBlockNoHash(*params, []common.Hash{}, &common.Hash{}, [][]byte{}, BasicBlockType{})
+	if err != nil {
+		return errors.Wrap(err, "failed to convert payload to block")
+	}
+
+	params.BlockHash = block.Hash()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err := f.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, common.Hash{}, []common.Hash{})
+	err = f.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, common.Hash{}, []common.Hash{})
 
 	if err != nil {
 		fmt.Printf("%#v\n", err)

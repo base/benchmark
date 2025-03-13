@@ -3,7 +3,6 @@ package payload
 import (
 	"context"
 	"crypto/ecdsa"
-	"crypto/elliptic"
 	"fmt"
 	"math/big"
 	"time"
@@ -45,7 +44,7 @@ type TransferOnlyPayloadWorker struct {
 	prefundAmount    *big.Int
 }
 
-const numAccounts = 2
+const numAccounts = 1000
 
 func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error) {
 	client, err := ethclient.Dial(elRPCURL)
@@ -80,7 +79,7 @@ func (t *TransferOnlyPayloadWorker) generateAccounts() error {
 
 	src := rand.New(rand.NewSource(100))
 	for i := 0; i < numAccounts; i++ {
-		key, err := ecdsa.GenerateKey(elliptic.P256(), src)
+		key, err := ecdsa.GenerateKey(btcec.S256(), src)
 		if err != nil {
 			return err
 		}
@@ -229,10 +228,12 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 
 	t.log.Debug("created transactions", "numTransactions", len(sendCalls))
 
+	batchSize := 1000
+
 	// create batches of 50 txs
-	batches := make([][]rpc.BatchElem, 0, (len(sendCalls)+49)/50)
-	for i := 0; i < len(sendCalls); i += 50 {
-		batches = append(batches, sendCalls[i:min(i+50, len(sendCalls))])
+	batches := make([][]rpc.BatchElem, 0, (len(sendCalls)+batchSize-1)/batchSize)
+	for i := 0; i < len(sendCalls); i += batchSize {
+		batches = append(batches, sendCalls[i:min(i+batchSize, len(sendCalls))])
 	}
 
 	t.log.Debug("sending batches", "numBatches", len(batches))
@@ -245,22 +246,14 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 			return err
 		}
 
-		for i, call := range batch {
+		for _, call := range batch {
 			if call.Error != nil {
-				t.log.Debug("Failed to send transaction", "err", call.Error, "result", call.Result, "addrFrom", t.accountAddresses[txIdx+i])
-				return call.Error
+				t.log.Debug("Failed to send transaction", "err", call.Error, "result", call.Result)
+				// return call.Error
 			}
 		}
 
 		txIdx += len(batch)
-
-		allStatuses := ""
-		for _, call := range sendCalls {
-			allStatuses += fmt.Sprintf("%v ", call.Result)
-		}
-		t.log.Debug("all statuses", "statuses", allStatuses)
-
-		t.log.Info("Sent batch of transactions", "numTransactions", len(batch))
 	}
 
 	t.log.Debug("sent transactions", "numTransactions", len(sendCalls))
@@ -289,8 +282,6 @@ func (t *TransferOnlyPayloadWorker) Start(ctx context.Context) error {
 }
 
 func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
-	t.log.Debug("sending tx", "from", crypto.PubkeyToAddress(fromPriv.PublicKey), "to", toAddr, "nonce", nonce, "amount", amount)
-
 	txdata := &types.DynamicFeeTx{
 		ChainID:   t.chainID,
 		Nonce:     nonce,
@@ -307,7 +298,7 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 }
 
 func (t *TransferOnlyPayloadWorker) loop(ctx context.Context) error {
-	if err := t.sendTxs(ctx, 1000000); err != nil {
+	if err := t.sendTxs(ctx, 21000*10000); err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
 		return err
 	}
