@@ -188,6 +188,22 @@ func (f *FakeConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 	return payloadResp.ExecutionPayload, nil
 }
 
+func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
+	params.WithdrawalsRoot = &common.Hash{}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+	var resp engine.ForkChoiceResponse
+	err := f.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, common.Hash{}, []common.Hash{})
+
+	if err != nil {
+		fmt.Printf("%#v\n", err)
+		return errors.Wrap(err, "newPayload call failed")
+	}
+
+	return nil
+}
+
 func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	payloadID, err := f.updateForkChoice(ctx)
 	if err != nil {
@@ -195,6 +211,11 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	}
 
 	f.currentPayloadID = payloadID
+
+	if f.currentPayloadID == nil {
+		log.Warn("No current payload ID")
+		return nil
+	}
 
 	// wait 2 seconds
 	time.Sleep(2000 * time.Millisecond)
@@ -204,6 +225,11 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 		return err
 	}
 	f.headBlockHash = payload.BlockHash
+
+	err = f.newPayload(ctx, payload)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

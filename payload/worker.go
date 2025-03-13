@@ -176,7 +176,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 }
 
 func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	maxTimeout := time.Now().Add(10 * time.Second)
+	maxTimeout := time.Now().Add(60 * time.Second)
 	for {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {

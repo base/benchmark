@@ -8,4 +8,4 @@
         - tool:tx-fuzz
     - type: node_type
       values:
-        - reth
+        - geth
