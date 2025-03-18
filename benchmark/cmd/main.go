@@ -7,7 +7,7 @@ import (
 
 	"github.com/base/base-bench/benchmark/config"
 	"github.com/base/base-bench/benchmark/flags"
-	runner "github.com/base/base-bench/runner"
+	"github.com/base/base-bench/runner"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
