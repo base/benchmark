@@ -28,12 +28,17 @@ func main() {
 	oplog.SetupDefaults()
 
 	app := cli.NewApp()
-	app.Flags = cliapp.ProtectFlags(flags.Flags)
+	app.Commands = []*cli.Command{
+		{
+			Name:        "run",
+			Flags:       cliapp.ProtectFlags(flags.RunFlags),
+			Action:      Main(Version),
+			Usage:       "run benchmark",
+			Description: "Runs benchmarks according to the specified config.",
+		},
+	}
+	app.Flags = flags.Flags
 	app.Version = opservice.FormatVersion(Version, GitCommit, GitDate, "")
-	app.Name = "base-bench"
-	app.Usage = "Example Service"
-	app.Description = "Example service that uses the Optimism Service Framework."
-	app.Action = Main(Version)
 
 	ctx := ctxinterrupt.WithSignalWaiterMain(context.Background())
 	err := app.RunContext(ctx, os.Args)
@@ -44,7 +49,7 @@ func main() {
 
 func Main(version string) cli.ActionFunc {
 	return func(cliCtx *cli.Context) error {
-		cfg := config.NewCLIConfig(cliCtx)
+		cfg := config.NewRunCmdConfig(cliCtx)
 		if err := cfg.Check(); err != nil {
 			return fmt.Errorf("invalid CLI flags: %w", err)
 		}

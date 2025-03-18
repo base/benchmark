@@ -14,10 +14,10 @@ import (
 	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
 
-	"github.com/base/base-bench/network"
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/network"
 )
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -164,7 +164,7 @@ func (s *service) Run(ctx context.Context) error {
 			clientRPCURL := client.ClientURL()
 
 			// Run benchmark
-			benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, genesis)
+			benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis)
 			if err != nil {
 				log.Error("failed to create benchmark", "err", err)
 				numFailure++

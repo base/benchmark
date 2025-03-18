@@ -5,29 +5,29 @@ import (
 	"fmt"
 )
 
-// Metric represents a metric that can be benchmarked. Each metric
-// corresponds to a different type of benchmark.
-type Metric uint
+// BenchmarkType is the type of benchmark to run, testing either sequencer speed or fault proof program speed.
+type BenchmarkType uint
 
 const (
-	BenchmarkExecutionSpeed Metric = iota
-	BenchmarkOpProgram
+	// BenchmarkSequencerSpeed is a type
+	BenchmarkSequencerSpeed BenchmarkType = iota
+	BenchmarkFaultProofProgram
 )
 
-func (b Metric) String() string {
-	return [...]string{"execution-speed", "op-program"}[b]
+func (b BenchmarkType) String() string {
+	return [...]string{"sequencer", "fault-proof-program"}[b]
 }
 
-func (b Metric) MarshalText() ([]byte, error) {
+func (b BenchmarkType) MarshalText() ([]byte, error) {
 	return []byte(b.String()), nil
 }
 
-func (b *Metric) UnmarshalText(text []byte) error {
+func (b *BenchmarkType) UnmarshalText(text []byte) error {
 	switch string(text) {
-	case "execution-speed":
-		*b = BenchmarkExecutionSpeed
-	case "op-program":
-		*b = BenchmarkOpProgram
+	case "sequencer":
+		*b = BenchmarkSequencerSpeed
+	case "fault-proof-program":
+		*b = BenchmarkFaultProofProgram
 	default:
 		return fmt.Errorf("invalid benchmark metric: %s", string(text))
 	}
@@ -88,10 +88,10 @@ func (bp *Param) Check() error {
 // Matrix is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type Matrix struct {
-	Name        string   `yaml:"name"`
-	Description string   `yaml:"desciption"`
-	Benchmark   []Metric `yaml:"benchmark"`
-	Variables   []Param  `yaml:"variables"`
+	Name        string          `yaml:"name"`
+	Description string          `yaml:"desciption"`
+	Benchmark   []BenchmarkType `yaml:"benchmark"`
+	Variables   []Param         `yaml:"variables"`
 }
 
 func (bc *Matrix) Check() error {

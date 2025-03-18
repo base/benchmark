@@ -21,6 +21,7 @@ type TransactionPayload struct {
 type Params struct {
 	NodeType           string
 	TransactionPayload []TransactionPayload
+	BlockTime          time.Duration
 }
 
 // ParamsMatrix is a list of params that can be run in parallel.
@@ -35,6 +36,7 @@ func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads [
 	params := Params{
 		NodeType:           "geth",
 		TransactionPayload: transactionPayloads,
+		BlockTime:          1 * time.Second,
 	}
 
 	for k, v := range assignments {

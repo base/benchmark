@@ -5,8 +5,8 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/base/base-bench/payload"
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/payload"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -30,8 +30,7 @@ type NetworkBenchmark struct {
 	cl *FakeConsensusClient
 }
 
-func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *ethclient.Client, clientRPCURL string, authClient client.RPC, genesis core.Genesis) (*NetworkBenchmark, error) {
-	genesisHash := genesis.ToBlock().Hash()
+func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *ethclient.Client, clientRPCURL string, authClient client.RPC, genesis *core.Genesis) (*NetworkBenchmark, error) {
 	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
 
 	worker, err := payload.NewTransferPayloadWorker(log, clientRPCURL, benchParams, common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), amount)
@@ -43,10 +42,11 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *e
 		log:        log,
 		client:     client,
 		authClient: authClient,
-		// TODO: pass this in somehow
-		worker: worker,
-		params: benchParams,
-		cl:     NewFakeConsensusClient(log, client, authClient, genesisHash, genesis.Timestamp),
+		worker:     worker,
+		params:     benchParams,
+		cl: NewFakeConsensusClient(log, client, authClient, genesis, FakeConsensusClientOptions{
+			BlockTime: benchParams.BlockTime,
+		}),
 	}, nil
 }
 

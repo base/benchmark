@@ -36,12 +36,14 @@ var (
 )
 
 // Flags contains the list of configuration options available to the binary.
-var Flags = []cli.Flag{
+var Flags = []cli.Flag{}
+
+var RunFlags = []cli.Flag{
 	ConfigFlag,
 	RootDirFlag,
 }
 
 func init() {
 	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
-	Flags = append(Flags, flags.CLIFlags(EnvVarPrefix)...)
+	RunFlags = append(RunFlags, flags.CLIFlags(EnvVarPrefix)...)
 }

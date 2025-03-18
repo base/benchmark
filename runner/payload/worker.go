@@ -152,7 +152,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 			}
 		}
 
-		t.log.Info("Sent batch of transactions", "numTransactions", len(batch))
+		t.log.Debug("Sent batch of transactions", "numTransactions", len(batch))
 	}
 
 	time.Sleep(5 * time.Second)
@@ -162,9 +162,9 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 		return err
 	}
 
-	t.log.Info("Last receipt", "status", receipt.Status)
+	t.log.Debug("Last receipt", "status", receipt.Status)
 
-	t.log.Info("Prefunded accounts", "numAccounts", len(t.accountAddresses), "perAccount", perAccount)
+	t.log.Debug("Prefunded accounts", "numAccounts", len(t.accountAddresses), "perAccount", perAccount)
 
 	// update account amounts
 	for i := 0; i < numAccounts; i++ {

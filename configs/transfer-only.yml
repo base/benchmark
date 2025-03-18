@@ -1,7 +1,7 @@
-- name: Test op-node Performance
+- name: Test op-reth Performance
   description: Reth vs Geth Execution Speed
   benchmark:
-    - execution-speed
+    - sequencer
   variables:
     - type: transaction_workload
       values:

@@ -14,12 +14,14 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
+	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/logger"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// GethClient handles the lifecycle of a geth client.
 type GethClient struct {
 	logger  log.Logger
 	options *config.ClientOptions
@@ -33,6 +35,7 @@ type GethClient struct {
 	stderr *logger.LogWriter
 }
 
+// NewGethClient creates a new client for geth.
 func NewGethClient(logger log.Logger, options *config.ClientOptions) types.ExecutionClient {
 	return &GethClient{
 		logger:  logger,
@@ -40,6 +43,7 @@ func NewGethClient(logger log.Logger, options *config.ClientOptions) types.Execu
 	}
 }
 
+// Run runs the geth client with the given runtime config.
 func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error {
 
 	if g.stdout != nil {
@@ -70,10 +74,15 @@ func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	args = make([]string, 0)
 	args = append(args, "--datadir", dataDir)
 	args = append(args, "--http")
+
+	// TODO: allocate these dynamically eventually
 	args = append(args, "--http.port", "8545")
-	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.port", "8551")
+
+	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
+
+	// TODO: make this configurable
 	args = append(args, "--verbosity", "3")
 
 	jwtSecretStr, err := os.ReadFile(jwtSecretPath)
@@ -111,26 +120,9 @@ func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 
 	g.client = ethclient.NewClient(rpcClient)
 
-	ready := false
-
-	for i := 0; i < 50; i++ {
-		num, err := g.client.BlockNumber(ctx)
-		if err == nil {
-			g.logger.Info("RPC is available", "blockNumber", num)
-			ready = true
-			break
-		}
-		log.Debug("RPC not available yet", "err", err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	if !ready {
-		log.Error("RPC never became available")
+	err = common.WaitForRPC(ctx, g.client)
+	if err != nil {
+		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
 	l2Node, err := client.NewRPC(ctx, g.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))

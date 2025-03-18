@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
+	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/logger"
@@ -104,27 +105,9 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 
 	r.client = ethclient.NewClient(rpcClient)
 
-	ready := false
-
-	// retry for 5 seconds
-	for i := 0; i < 50; i++ {
-		num, err := r.client.BlockNumber(ctx)
-		if err == nil {
-			r.logger.Info("RPC is available", "blockNumber", num)
-			ready = true
-			break
-		}
-		log.Debug("RPC not available yet", "err", err)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		time.Sleep(1 * time.Second)
-	}
-
-	if !ready {
-		log.Error("RPC never became available")
+	err = common.WaitForRPC(ctx, r.client)
+	if err != nil {
+		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
 	l2Node, err := client.NewRPC(ctx, r.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
