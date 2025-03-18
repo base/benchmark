@@ -18,6 +18,7 @@ import (
 type Metrics interface{}
 type Logs interface{}
 
+// NetworkBenchmark handles the lifecycle for a single benchmark run.
 type NetworkBenchmark struct {
 	log log.Logger
 
@@ -30,6 +31,7 @@ type NetworkBenchmark struct {
 	cl *FakeConsensusClient
 }
 
+// NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client.
 func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *ethclient.Client, clientRPCURL string, authClient client.RPC, genesis *core.Genesis) (*NetworkBenchmark, error) {
 	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
 
@@ -50,6 +52,7 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *e
 	}, nil
 }
 
+// Run starts the benchmark by starting the consensus client and the payload worker.
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	errChan := make(chan error)
 
@@ -91,6 +94,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	return nil
 }
 
+// CollectResults collects the metrics and logs from the benchmark run.
 func (nb *NetworkBenchmark) CollectResults() (Metrics, Logs) {
 	return nil, nil
 }

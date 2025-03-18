@@ -135,6 +135,7 @@ func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	return nil
 }
 
+// Stop stops the geth client.
 func (g *GethClient) Stop() {
 	if g.process == nil || g.process.Process == nil {
 		return
@@ -159,14 +160,17 @@ func (g *GethClient) Stop() {
 	g.process = nil
 }
 
+// Client returns the ethclient client.
 func (g *GethClient) Client() *ethclient.Client {
 	return g.client
 }
 
+// ClientURL returns the raw client URL for transaction generators.
 func (g *GethClient) ClientURL() string {
 	return g.clientURL
 }
 
+// AuthClient returns the auth client used for CL communication.
 func (g *GethClient) AuthClient() client.RPC {
 	return g.authClient
 }

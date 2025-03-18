@@ -8,12 +8,15 @@ import (
 	"github.com/base/base-bench/runner/flags"
 )
 
+// ClientOptions is the common options object that gets passed to execution clients.
 type ClientOptions struct {
 	CommonOptions
 	rethoptions.RethOptions
 	gethoptions.GethOptions
 }
 
+// ReadClientOptions reads any client options from the CLI context, but certain params may also be
+// filled in by test params.
 func ReadClientOptions(ctx *cli.Context) ClientOptions {
 	options := ClientOptions{
 		RethOptions: rethoptions.RethOptions{
@@ -27,6 +30,7 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 	return options
 }
 
+// CommonOptions are common client configuration options.
 type CommonOptions struct {
 	JWTSecret string
 }

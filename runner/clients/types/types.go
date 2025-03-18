@@ -7,6 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// ExecutionClient is an abstraction over the different clients that can be used to run the chain like
+// op-reth and op-geth.
 type ExecutionClient interface {
 	Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error
 	Stop()

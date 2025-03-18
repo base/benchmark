@@ -39,6 +39,7 @@ func escapeMessage(s string) string {
 	return s
 }
 
+// NewLogWriter creates a new log writer that writes messages of a subprocess to the provided logger.
 func NewLogWriter(logger log.Logger) *LogWriter {
 	return &LogWriter{
 		logger: logger,
@@ -46,6 +47,7 @@ func NewLogWriter(logger log.Logger) *LogWriter {
 	}
 }
 
+// flushBuffer writes the buffered log line to the logger. This will end in a newline if under the max line size.
 func (lw *LogWriter) flushBuffer() {
 	if len(lw.buffer) == 0 {
 		return
@@ -55,6 +57,7 @@ func (lw *LogWriter) flushBuffer() {
 	lw.buffer = lw.buffer[:0]
 }
 
+// Write writes data to the logger. It will split the data into lines and write each line separately.
 func (lw *LogWriter) Write(p []byte) (n int, err error) {
 	start := 0
 	for i, b := range p {

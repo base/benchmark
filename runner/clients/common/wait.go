@@ -12,6 +12,7 @@ const (
 	RetryInterval = time.Second
 )
 
+// WaitForRPC waits for the ETH EL RPC server to be ready.
 func WaitForRPC(ctx context.Context, client *ethclient.Client) error {
 	ready := false
 	var lastErr error

@@ -21,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// RethClient handles the lifecycle of a reth client.
 type RethClient struct {
 	logger  log.Logger
 	options *config.ClientOptions
@@ -34,6 +35,7 @@ type RethClient struct {
 	stderr *logger.LogWriter
 }
 
+// NewRethClient creates a new client for reth.
 func NewRethClient(logger log.Logger, options *config.ClientOptions) types.ExecutionClient {
 	return &RethClient{
 		logger:  logger,
@@ -41,6 +43,7 @@ func NewRethClient(logger log.Logger, options *config.ClientOptions) types.Execu
 	}
 }
 
+// Run runs the reth client with the given runtime config.
 func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error {
 	args := make([]string, 0)
 	args = append(args, "node")
@@ -120,6 +123,7 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	return nil
 }
 
+// Stop stops the reth client.
 func (r *RethClient) Stop() {
 	if r.process == nil || r.process.Process == nil {
 		return
@@ -144,14 +148,17 @@ func (r *RethClient) Stop() {
 	r.process = nil
 }
 
+// Client returns the ethclient client.
 func (r *RethClient) Client() *ethclient.Client {
 	return r.client
 }
 
+// ClientURL returns the raw client URL for transaction generators.
 func (r *RethClient) ClientURL() string {
 	return r.clientURL
 }
 
+// AuthClient returns the auth client used for CL communication.
 func (r *RethClient) AuthClient() client.RPC {
 	return r.authClient
 }

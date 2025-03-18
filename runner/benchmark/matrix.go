@@ -112,3 +112,108 @@ func (bc *Matrix) Check() error {
 	}
 	return nil
 }
+
+// NewParamsMatrixFromConfig constructs a new ParamsMatrix from a config.
+func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
+	var txPayloadOptions []TransactionPayload
+
+	seenParams := make(map[ParamType]bool)
+
+	// Multiple payloads can run in a single benchmark.
+	paramsExceptPayload := make([]Param, 0, len(c.Variables))
+	for _, p := range c.Variables {
+		if seenParams[p.ParamType] {
+			return nil, fmt.Errorf("duplicate param type %s", p.ParamType)
+		}
+		seenParams[p.ParamType] = true
+		if p.ParamType == ParamTypeTxWorkload {
+			var params []string
+			if p.Values != nil {
+				params = *p.Values
+			} else {
+				params = []string{*p.Value}
+			}
+			options, err := parseTransactionPayloads(params)
+			if err != nil {
+				return nil, err
+			}
+			txPayloadOptions = options
+			continue
+		}
+		paramsExceptPayload = append(paramsExceptPayload, p)
+	}
+
+	// Ensure transaction payload is specified
+	if txPayloadOptions == nil {
+		return nil, fmt.Errorf("no transaction payloads specified")
+	}
+
+	// Calculate the dimensions of the matrix for each param
+	dimensions := make([]int, len(paramsExceptPayload))
+	for i, p := range paramsExceptPayload {
+		if p.Values != nil {
+			dimensions[i] = len(*p.Values)
+		} else {
+			dimensions[i] = 1
+		}
+	}
+
+	// Create a list of values for each param
+	valuesByParam := make([][]string, len(paramsExceptPayload))
+	for i, p := range paramsExceptPayload {
+		if p.Values == nil {
+			valuesByParam[i] = []string{*p.Value}
+		} else {
+			valuesByParam[i] = *p.Values
+		}
+	}
+
+	// Ensure total params is less than the max
+	totalParams := 1
+	for _, d := range dimensions {
+		totalParams *= d
+	}
+
+	if totalParams > MaxTotalParams {
+		return nil, fmt.Errorf("total number of params %d exceeds max %d", totalParams, MaxTotalParams)
+	}
+
+	currentParams := make([]int, len(dimensions))
+
+	// Create the params matrix
+	paramsMatrix := make(ParamsMatrix, totalParams)
+
+	for i := 0; i < totalParams; i++ {
+		valueSelections := make(map[ParamType]string)
+		for j, p := range paramsExceptPayload {
+			valueSelections[p.ParamType] = valuesByParam[j][currentParams[j]]
+		}
+
+		params, err := NewParamsFromValues(valueSelections, txPayloadOptions)
+		if err != nil {
+			return nil, err
+		}
+		paramsMatrix[i] = *params
+
+		done := true
+
+		// Increment current params from the rightmost param
+		for incIdx := len(dimensions) - 1; incIdx >= 0; incIdx-- {
+			// find the next param that is incrementable
+			if currentParams[incIdx] < dimensions[incIdx]-1 {
+				currentParams[incIdx]++
+				done = false
+				break
+			} else {
+				// If this param is currently at the max, reset it to 0 and continue to the next param
+				currentParams[incIdx] = 0
+			}
+		}
+
+		if done {
+			break
+		}
+	}
+
+	return paramsMatrix, nil
+}

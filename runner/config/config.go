@@ -10,6 +10,7 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// Config is the interface for the config of the benchmark runner.
 type Config interface {
 	Check() error
 	LogConfig() oplog.CLIConfig

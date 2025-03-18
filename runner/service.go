@@ -51,6 +51,106 @@ func readBenchmarkConfig(path string) ([]benchmark.Matrix, error) {
 	return config, err
 }
 
+func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir string) error {
+
+	genesisTime := time.Now()
+	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
+
+	// create temp directory for this test
+	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
+	testDir := path.Join(rootDir, testName)
+	err := os.Mkdir(testDir, 0755)
+	if err != nil {
+		return errors.Wrap(err, "failed to create test directory")
+	}
+
+	// write chain config to testDir/chain.json
+	chainCfgPath := path.Join(testDir, "chain.json")
+	chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to open chain config file")
+	}
+
+	// write chain cfg
+	genesis := params.Genesis(genesisTime)
+	err = json.NewEncoder(chainCfgFile).Encode(genesis)
+	if err != nil {
+		return errors.Wrap(err, "failed to write chain config")
+	}
+
+	dataDirPath := path.Join(testDir, "data")
+	err = os.Mkdir(dataDirPath, 0755)
+	if err != nil {
+		return errors.Wrap(err, "failed to create data directory")
+	}
+
+	var jwtSecret [32]byte
+	_, err = rand.Read(jwtSecret[:])
+	if err != nil {
+		return errors.Wrap(err, "failed to generate jwt secret")
+	}
+
+	jwtSecretPath := path.Join(testDir, "jwt_secret")
+	jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to open jwt secret file")
+	}
+
+	_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
+	if err != nil {
+		return errors.Wrap(err, "failed to write jwt secret")
+	}
+
+	if err = jwtSecretFile.Close(); err != nil {
+		return err
+	}
+
+	defer func() {
+		// clean up test directory
+		err = os.RemoveAll(testDir)
+		if err != nil {
+			log.Error("failed to remove test directory", "err", err)
+		}
+	}()
+
+	// TODO: serialize these nicer so we can pass them directly
+	nodeType := clients.Geth
+	switch params.NodeType {
+	case "geth":
+		nodeType = clients.Geth
+	case "reth":
+		nodeType = clients.Reth
+	}
+	logger := s.log.With("nodeType", params.NodeType)
+
+	options := s.config.ClientOptions()
+	options = params.ClientOptions(options)
+
+	clientCtx, cancelClient := context.WithCancel(ctx)
+	defer cancelClient()
+
+	client := clients.NewClient(nodeType, logger, &options)
+	defer client.Stop()
+
+	err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to run EL client")
+	}
+	time.Sleep(2 * time.Second)
+
+	// Wait for RPC to become available
+	clientRPC := client.Client()
+	authClient := client.AuthClient()
+	clientRPCURL := client.ClientURL()
+
+	// Run benchmark
+	benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis)
+	if err != nil {
+		return errors.Wrap(err, "failed to create network benchmark")
+	}
+	return benchmark.Run(clientCtx)
+}
+
 func (s *service) Run(ctx context.Context) error {
 	s.log.Info("Starting")
 
@@ -71,112 +171,13 @@ func (s *service) Run(ctx context.Context) error {
 		rootDir := s.config.RootDir()
 
 		for _, params := range matrix {
-			genesisTime := time.Now()
-			s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
-
-			// create temp directory for this test
-			testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
-			testDir := path.Join(rootDir, testName)
-			err := os.Mkdir(testDir, 0755)
-			if err != nil {
-				return errors.Wrap(err, "failed to create test directory")
-			}
-
-			// write chain config to testDir/chain.json
-			chainCfgPath := path.Join(testDir, "chain.json")
-			chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
-			if err != nil {
-				return errors.Wrap(err, "failed to open chain config file")
-			}
-
-			// write chain cfg
-			genesis := params.Genesis(genesisTime)
-			err = json.NewEncoder(chainCfgFile).Encode(genesis)
-			if err != nil {
-				return errors.Wrap(err, "failed to write chain config")
-			}
-
-			dataDirPath := path.Join(testDir, "data")
-			err = os.Mkdir(dataDirPath, 0755)
-			if err != nil {
-				return errors.Wrap(err, "failed to create data directory")
-			}
-
-			var jwtSecret [32]byte
-			_, err = rand.Read(jwtSecret[:])
-			if err != nil {
-				return errors.Wrap(err, "failed to generate jwt secret")
-			}
-
-			jwtSecretPath := path.Join(testDir, "jwt_secret")
-			jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
-			if err != nil {
-				return errors.Wrap(err, "failed to open jwt secret file")
-			}
-
-			_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
-			if err != nil {
-				return errors.Wrap(err, "failed to write jwt secret")
-			}
-
-			if err = jwtSecretFile.Close(); err != nil {
-				return err
-			}
-
-			defer func() {
-				// clean up test directory
-				err = os.RemoveAll(testDir)
-				if err != nil {
-					log.Error("failed to remove test directory", "err", err)
-				}
-			}()
-
-			// TODO: serialize these nicer so we can pass them directly
-			nodeType := clients.Geth
-			switch params.NodeType {
-			case "geth":
-				nodeType = clients.Geth
-			case "reth":
-				nodeType = clients.Reth
-			}
-			logger := s.log.With("nodeType", params.NodeType)
-
-			options := s.config.ClientOptions()
-			options = params.ClientOptions(options)
-
-			clientCtx, cancelClient := context.WithCancel(ctx)
-			defer cancelClient()
-
-			client := clients.NewClient(nodeType, logger, &options)
-			defer client.Stop()
-
-			err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)
-			if err != nil {
-				log.Error("Failed to start client", "err", err)
-				numFailure++
-				continue
-			}
-			time.Sleep(2 * time.Second)
-
-			// Wait for RPC to become available
-			clientRPC := client.Client()
-			authClient := client.AuthClient()
-			clientRPCURL := client.ClientURL()
-
-			// Run benchmark
-			benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis)
-			if err != nil {
-				log.Error("failed to create benchmark", "err", err)
-				numFailure++
-				continue
-			}
-			err = benchmark.Run(clientCtx)
+			err = s.runTest(ctx, params, rootDir)
 			if err != nil && !errors.Is(err, context.Canceled) {
-				log.Error("failed to run benchmark", "err", err)
+				log.Error("Failed to run test", "err", err)
 				numFailure++
-			} else {
-				numSuccess++
+				continue
 			}
+			numSuccess++
 		}
 	}
 
