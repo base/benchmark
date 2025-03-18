@@ -2,6 +2,7 @@ package types
 
 import (
 	"context"
+	"fmt"
 
 	gethoptions "github.com/base/base-bench/clients/geth/options"
 	rethoptions "github.com/base/base-bench/clients/reth/options"
@@ -47,3 +48,14 @@ const (
 	Reth Client = iota
 	Geth
 )
+
+func ParseClient(s string) (Client, error) {
+	switch s {
+	case "geth":
+		return Geth, nil
+	case "reth":
+		return Reth, nil
+	default:
+		return 0, fmt.Errorf("unknown client type: %s", s)
+	}
+}

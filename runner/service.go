@@ -134,13 +134,9 @@ func (s *service) Start(ctx context.Context) error {
 				}
 			}()
 
-			// TODO: serialize these nicer so we can pass them directly
-			nodeType := types.Geth
-			switch params.NodeType {
-			case "geth":
-				nodeType = types.Geth
-			case "reth":
-				nodeType = types.Reth
+			nodeType, err := types.ParseClient(params.NodeType)
+			if err != nil {
+				return errors.Wrap(err, "invalid node type")
 			}
 			logger := s.log.With("nodeType", params.NodeType)
 
