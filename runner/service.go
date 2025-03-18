@@ -16,10 +16,9 @@ import (
 	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
 
-	"github.com/base/base-bench/clients"
-	"github.com/base/base-bench/clients/types"
 	"github.com/base/base-bench/network"
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/config"
 )
 
@@ -135,12 +134,12 @@ func (s *service) Start(ctx context.Context) error {
 			}()
 
 			// TODO: serialize these nicer so we can pass them directly
-			nodeType := types.Geth
+			nodeType := clients.Geth
 			switch params.NodeType {
 			case "geth":
-				nodeType = types.Geth
+				nodeType = clients.Geth
 			case "reth":
-				nodeType = types.Reth
+				nodeType = clients.Reth
 			}
 			logger := s.log.With("nodeType", params.NodeType)
 

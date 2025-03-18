@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/base/base-bench/benchmark/flags"
-	"github.com/base/base-bench/clients/types"
+	appFlags "github.com/base/base-bench/benchmark/flags"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/urfave/cli/v2"
 )
@@ -14,7 +13,7 @@ import (
 type Config interface {
 	Check() error
 	LogConfig() oplog.CLIConfig
-	ClientOptions() types.ClientOptions
+	ClientOptions() ClientOptions
 	ConfigPath() string
 	RootDir() string
 }
@@ -23,15 +22,15 @@ type config struct {
 	logConfig     oplog.CLIConfig
 	configPath    string
 	rootDir       string
-	clientOptions types.ClientOptions
+	clientOptions ClientOptions
 }
 
 func NewConfig(ctx *cli.Context) Config {
 	return &config{
 		logConfig:     oplog.ReadCLIConfig(ctx),
-		configPath:    ctx.String(flags.ConfigFlagName),
-		rootDir:       ctx.String(flags.RootDirFlagName),
-		clientOptions: types.ReadClientOptions(ctx),
+		configPath:    ctx.String(appFlags.ConfigFlagName),
+		rootDir:       ctx.String(appFlags.RootDirFlagName),
+		clientOptions: ReadClientOptions(ctx),
 	}
 }
 
@@ -59,6 +58,6 @@ func (c *config) LogConfig() oplog.CLIConfig {
 	return c.logConfig
 }
 
-func (c *config) ClientOptions() types.ClientOptions {
+func (c *config) ClientOptions() ClientOptions {
 	return c.clientOptions
 }

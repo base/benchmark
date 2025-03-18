@@ -14,14 +14,15 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
-	"github.com/base/base-bench/clients/logger"
-	"github.com/base/base-bench/clients/types"
+	"github.com/base/base-bench/runner/clients/types"
+	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/logger"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 type GethClient struct {
 	logger  log.Logger
-	options *types.ClientOptions
+	options *config.ClientOptions
 
 	client     *ethclient.Client
 	clientURL  string
@@ -32,7 +33,7 @@ type GethClient struct {
 	stderr *logger.LogWriter
 }
 
-func NewGethClient(logger log.Logger, options *types.ClientOptions) types.ExecutionClient {
+func NewGethClient(logger log.Logger, options *config.ClientOptions) types.ExecutionClient {
 	return &GethClient{
 		logger:  logger,
 		options: options,

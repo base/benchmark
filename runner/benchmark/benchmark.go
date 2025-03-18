@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/base/base-bench/clients/types"
+	"github.com/base/base-bench/runner/config"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
@@ -47,7 +47,7 @@ func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads [
 	return params
 }
 
-func (p Params) ClientOptions(prevClientOptions types.ClientOptions) types.ClientOptions {
+func (p Params) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
 	return prevClientOptions
 }
 

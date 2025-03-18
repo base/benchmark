@@ -1,7 +1,7 @@
 package flags
 
 import (
-	"github.com/base/base-bench/clients/types"
+	"github.com/base/base-bench/runner/flags"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
@@ -43,5 +43,5 @@ var Flags = []cli.Flag{
 
 func init() {
 	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
-	Flags = append(Flags, types.CLIFlags(EnvVarPrefix)...)
+	Flags = append(Flags, flags.CLIFlags(EnvVarPrefix)...)
 }
