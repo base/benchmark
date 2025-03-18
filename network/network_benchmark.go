@@ -2,8 +2,8 @@ package network
 
 import (
 	"context"
+	"errors"
 	"math/big"
-	"sync"
 
 	"github.com/base/base-bench/payload"
 	"github.com/base/base-bench/runner/benchmark"
@@ -25,8 +25,7 @@ type NetworkBenchmark struct {
 	authClient client.RPC
 	worker     payload.Worker
 
-	params    benchmark.Params
-	jwtSecret [32]byte
+	params benchmark.Params
 
 	cl *FakeConsensusClient
 }
@@ -52,13 +51,13 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *e
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	wg := sync.WaitGroup{}
-	wg.Add(2)
 	errChan := make(chan error)
 
+	consensusClientCtx, cancel := context.WithCancel(ctx)
+
 	go func() {
-		err := nb.cl.Start(ctx)
-		if err != nil {
+		err := nb.cl.Start(consensusClientCtx)
+		if err != nil && !errors.Is(err, context.Canceled) {
 			nb.log.Warn("failed to run consensus client", "err", err)
 		}
 		errChan <- err
@@ -72,31 +71,23 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 			return
 		}
 
-		err = nb.worker.Start(ctx)
+		err = nb.worker.Run(ctx)
 		if err != nil {
 			nb.log.Warn("failed to start payload worker", "err", err)
 		}
 		errChan <- err
+
+		// once this finishes, we should cancel the consensus client
+		cancel()
 	}()
 
+	// wait for both to finish or one to fail
 	for i := 0; i < 2; i++ {
-		select {
-		case err := <-errChan:
-			if err != nil {
-				return err
-			}
-		case <-ctx.Done():
-			return ctx.Err()
+		err := <-errChan
+		if err != nil {
+			return err
 		}
 	}
-	return nil
-}
-
-func (nb *NetworkBenchmark) warmNetwork() error {
-	return nil
-}
-
-func (nb *NetworkBenchmark) startPayloadWorker() error {
 	return nil
 }
 

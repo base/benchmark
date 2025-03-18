@@ -33,7 +33,7 @@ func main() {
 	app.Name = "base-bench"
 	app.Usage = "Example Service"
 	app.Description = "Example service that uses the Optimism Service Framework."
-	app.Action = cliapp.LifecycleCmd(Main(Version))
+	app.Action = Main(Version)
 
 	ctx := ctxinterrupt.WithSignalWaiterMain(context.Background())
 	err := app.RunContext(ctx, os.Args)
@@ -42,11 +42,11 @@ func main() {
 	}
 }
 
-func Main(version string) cliapp.LifecycleAction {
-	return func(cliCtx *cli.Context, closeApp context.CancelCauseFunc) (cliapp.Lifecycle, error) {
+func Main(version string) cli.ActionFunc {
+	return func(cliCtx *cli.Context) error {
 		cfg := config.NewCLIConfig(cliCtx)
 		if err := cfg.Check(); err != nil {
-			return nil, fmt.Errorf("invalid CLI flags: %w", err)
+			return fmt.Errorf("invalid CLI flags: %w", err)
 		}
 
 		l := oplog.NewLogger(oplog.AppOut(cliCtx), cfg.LogConfig())
@@ -55,6 +55,6 @@ func Main(version string) cliapp.LifecycleAction {
 
 		s := runner.NewService(version, cfg, l)
 
-		return s, nil
+		return s.Run(cliCtx.Context)
 	}
 }

@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sync/atomic"
 	"time"
 
-	"github.com/ethereum-optimism/optimism/op-service/cliapp"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
@@ -25,16 +23,13 @@ import (
 var ErrAlreadyStopped = errors.New("already stopped")
 
 type Service interface {
-	cliapp.Lifecycle
-	Kill() error
+	Run(ctx context.Context) error
 }
 
 type service struct {
 	config  config.Config
 	version string
 	log     log.Logger
-
-	stopped atomic.Bool
 }
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
@@ -56,13 +51,16 @@ func readBenchmarkConfig(path string) ([]benchmark.Matrix, error) {
 	return config, err
 }
 
-func (s *service) Start(ctx context.Context) error {
+func (s *service) Run(ctx context.Context) error {
 	s.log.Info("Starting")
 
 	config, err := readBenchmarkConfig(s.config.ConfigPath())
 	if err != nil {
 		return errors.Wrap(err, "failed to read benchmark config")
 	}
+
+	numSuccess := 0
+	numFailure := 0
 
 	for _, c := range config {
 		matrix, err := benchmark.NewParamsMatrixFromConfig(c)
@@ -150,10 +148,13 @@ func (s *service) Start(ctx context.Context) error {
 			defer cancelClient()
 
 			client := clients.NewClient(nodeType, logger, &options)
+			defer client.Stop()
 
 			err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)
 			if err != nil {
-				return errors.Wrap(err, "failed to start client")
+				log.Error("Failed to start client", "err", err)
+				numFailure++
+				continue
 			}
 			time.Sleep(2 * time.Second)
 
@@ -162,50 +163,24 @@ func (s *service) Start(ctx context.Context) error {
 			authClient := client.AuthClient()
 			clientRPCURL := client.ClientURL()
 
+			// Run benchmark
 			benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, genesis)
 			if err != nil {
-				return errors.Wrap(err, "failed to create benchmark")
+				log.Error("failed to create benchmark", "err", err)
+				numFailure++
+				continue
 			}
 			err = benchmark.Run(clientCtx)
-			if err != nil {
+			if err != nil && !errors.Is(err, context.Canceled) {
 				log.Error("failed to run benchmark", "err", err)
+				numFailure++
+			} else {
+				numSuccess++
 			}
-
-			cancelClient()
-			client.Stop()
 		}
-
 	}
 
-	return nil
-}
+	s.log.Info("Finished benchmarking", "numSuccess", numSuccess, "numFailure", numFailure)
 
-// Stopped returns if the service as a whole is stopped.
-func (s *service) Stopped() bool {
-	return s.stopped.Load()
-}
-
-// Kill is a convenience method to forcefully, non-gracefully, stop the Service.
-func (s *service) Kill() error {
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	return s.Stop(ctx)
-}
-
-// Stop fully stops the batch-submitter and all its resources gracefully. After stopping, it cannot be restarted.
-// See driver.StopBatchSubmitting to temporarily stop the batch submitter.
-// If the provided ctx is cancelled, the stopping is forced, i.e. the batching work is killed non-gracefully.
-func (s *service) Stop(ctx context.Context) error {
-	if s.stopped.Load() {
-		return ErrAlreadyStopped
-	}
-	s.log.Info("Service stopping")
-
-	// var result error
-
-	// if result == nil {
-	// 	s.stopped.Store(true)
-	// 	s.log.Info("Service stopped")
-	// }
 	return nil
 }

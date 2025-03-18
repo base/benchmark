@@ -23,7 +23,7 @@ import (
 
 type Worker interface {
 	Setup(ctx context.Context) error
-	Start(ctx context.Context) error
+	Run(ctx context.Context) error
 }
 
 type NewWorkerFn func(logger log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error)
@@ -261,23 +261,22 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 	return nil
 }
 
-func (t *TransferOnlyPayloadWorker) Start(ctx context.Context) error {
-	go func() {
-		ticker := time.NewTicker(10 * time.Second)
-		defer ticker.Stop()
+func (t *TransferOnlyPayloadWorker) Run(ctx context.Context) error {
+	numBlocks := 10
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-			}
-			err := t.loop(ctx)
-			if err != nil {
-				return
-			}
+	for i := 0; i < numBlocks; i++ {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
 		}
-	}()
+		err := t.loop(ctx)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -298,7 +297,7 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 }
 
 func (t *TransferOnlyPayloadWorker) loop(ctx context.Context) error {
-	if err := t.sendTxs(ctx, 21000*10000); err != nil {
+	if err := t.sendTxs(ctx, 21000*100); err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
 		return err
 	}
