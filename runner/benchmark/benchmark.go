@@ -3,6 +3,7 @@ package benchmark
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/config"
@@ -22,6 +23,7 @@ type Params struct {
 	NodeType           string
 	TransactionPayload []TransactionPayload
 	BlockTime          time.Duration
+	Env                map[string]string
 }
 
 // ParamsMatrix is a list of params that can be run in parallel.
@@ -32,7 +34,8 @@ const (
 	MaxTotalParams = 24
 )
 
-func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads []TransactionPayload) Params {
+// NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
+func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads []TransactionPayload) (*Params, error) {
 	params := Params{
 		NodeType:           "geth",
 		TransactionPayload: transactionPayloads,
@@ -43,16 +46,28 @@ func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads [
 		switch k {
 		case ParamTypeNode:
 			params.NodeType = v
+		case ParamTypeEnv:
+			entries := strings.Split(v, ";")
+			params.Env = make(map[string]string)
+			for _, entry := range entries {
+				kv := strings.Split(entry, "=")
+				if len(kv) != 2 {
+					return nil, fmt.Errorf("invalid env entry %s", entry)
+				}
+				params.Env[kv[0]] = kv[1]
+			}
 		}
 	}
 
-	return params
+	return &params, nil
 }
 
+// ClientOptions applies any client customization options to the given client options.
 func (p Params) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
 	return prevClientOptions
 }
 
+// Genesis returns the genesis block for a given genesis time.
 func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 	zero := uint64(0)
 	fifty := uint64(50)
@@ -120,12 +135,13 @@ func parseTransactionPayloads(payloads []string) ([]TransactionPayload, error) {
 	return txPayloads, nil
 }
 
+// NewParamsMatrixFromConfig constructs a new ParamsMatrix from a config.
 func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 	var txPayloadOptions []TransactionPayload
 
 	seenParams := make(map[ParamType]bool)
 
-	// Multiple payloads can run in a single benchmark
+	// Multiple payloads can run in a single benchmark.
 	paramsExceptPayload := make([]Param, 0, len(c.Variables))
 	for _, p := range c.Variables {
 		if seenParams[p.ParamType] {
@@ -149,10 +165,12 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 		paramsExceptPayload = append(paramsExceptPayload, p)
 	}
 
+	// Ensure transaction payload is specified
 	if txPayloadOptions == nil {
 		return nil, fmt.Errorf("no transaction payloads specified")
 	}
 
+	// Calculate the dimensions of the matrix for each param
 	dimensions := make([]int, len(paramsExceptPayload))
 	for i, p := range paramsExceptPayload {
 		if p.Values != nil {
@@ -162,6 +180,7 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 		}
 	}
 
+	// Create a list of values for each param
 	valuesByParam := make([][]string, len(paramsExceptPayload))
 	for i, p := range paramsExceptPayload {
 		if p.Values == nil {
@@ -171,6 +190,7 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 		}
 	}
 
+	// Ensure total params is less than the max
 	totalParams := 1
 	for _, d := range dimensions {
 		totalParams *= d
@@ -182,24 +202,32 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 
 	currentParams := make([]int, len(dimensions))
 
-	params := make(ParamsMatrix, totalParams)
+	// Create the params matrix
+	paramsMatrix := make(ParamsMatrix, totalParams)
+
 	for i := 0; i < totalParams; i++ {
 		valueSelections := make(map[ParamType]string)
 		for j, p := range paramsExceptPayload {
 			valueSelections[p.ParamType] = valuesByParam[j][currentParams[j]]
 		}
 
-		params[i] = NewParamsFromValues(valueSelections, txPayloadOptions)
+		params, err := NewParamsFromValues(valueSelections, txPayloadOptions)
+		if err != nil {
+			return nil, err
+		}
+		paramsMatrix[i] = *params
 
 		done := true
 
-		// Increment the current params from the right
+		// Increment current params from the rightmost param
 		for incIdx := len(dimensions) - 1; incIdx >= 0; incIdx-- {
+			// find the next param that is incrementable
 			if currentParams[incIdx] < dimensions[incIdx]-1 {
 				currentParams[incIdx]++
 				done = false
 				break
 			} else {
+				// If this param is currently at the max, reset it to 0 and continue to the next param
 				currentParams[incIdx] = 0
 			}
 		}
@@ -209,7 +237,7 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 		}
 	}
 
-	return params, nil
+	return paramsMatrix, nil
 }
 
 type Benchmark struct {
