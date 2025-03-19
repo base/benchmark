@@ -1,0 +1,18 @@
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on:
+      - default-config-s
+      - xsmall
+      - amd64
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+      - name: Run a one-line script
+        run: echo Hello, world!
