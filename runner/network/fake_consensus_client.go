@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math/big"
+	"net/http"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
@@ -21,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+	"github.com/prometheus/common/expfmt"
 )
 
 // FakeConsensusClientOptions is an object for configuring a FakeConsensusClient.
@@ -229,6 +232,40 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	return nil
 }
 
+// Collects prometheus metrics for the fake consensus client.
+func (f *FakeConsensusClient) CollectMetrics(ctx context.Context) error {
+	resp, err := http.Get("http://localhost:8080/metrics")
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// contentType := resp.Header.Get("Content-Type")
+
+	txtParser := expfmt.TextParser{}
+	metrics, err := txtParser.TextToMetricFamilies(bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+
+	i := 0
+	for _, metric := range metrics {
+		name := metric.GetName()
+
+		if name == "reth_sync_execution_execution_duration" || name == "reth_sync_block_validation_state_root_duration" {
+			f.log.Info("Metric", "name", name)
+
+			f.log.Info("Metric", "values", metric.GetMetric())
+		}
+	}
+	f.log.Info("Metrics", "count", i)
+	return nil
+}
+
 // Start starts the fake consensus client.
 func (f *FakeConsensusClient) Start(ctx context.Context) error {
 	// min block time
@@ -241,6 +278,10 @@ func (f *FakeConsensusClient) Start(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			err := f.Propose(ctx)
+			if err != nil {
+				return err
+			}
+			err = f.CollectMetrics(ctx)
 			if err != nil {
 				return err
 			}
