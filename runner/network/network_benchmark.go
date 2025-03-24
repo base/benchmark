@@ -35,10 +35,14 @@ type NetworkBenchmark struct {
 func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *ethclient.Client, clientRPCURL string, authClient client.RPC, genesis *core.Genesis) (*NetworkBenchmark, error) {
 	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
 
-	worker, err := payload.NewTransferPayloadWorker(log, clientRPCURL, benchParams, common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), amount)
+	mempool, worker, err := payload.NewTransferPayloadWorker(log, clientRPCURL, benchParams, common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), amount)
 	if err != nil {
 		return nil, err
 	}
+
+	consensusClient := NewFakeConsensusClient(log, client, authClient, mempool, genesis, FakeConsensusClientOptions{
+		BlockTime: benchParams.BlockTime,
+	})
 
 	return &NetworkBenchmark{
 		log:        log,
@@ -46,9 +50,7 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *e
 		authClient: authClient,
 		worker:     worker,
 		params:     benchParams,
-		cl: NewFakeConsensusClient(log, client, authClient, genesis, FakeConsensusClientOptions{
-			BlockTime: benchParams.BlockTime,
-		}),
+		cl:         consensusClient,
 	}, nil
 }
 

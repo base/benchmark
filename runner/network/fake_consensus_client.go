@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -38,6 +39,7 @@ type FakeConsensusClient struct {
 	client     *ethclient.Client
 	authClient client.RPC
 	options    FakeConsensusClientOptions
+	mempool    mempool.FakeMempool
 
 	headBlockHash common.Hash
 	lastTimestamp uint64
@@ -46,7 +48,7 @@ type FakeConsensusClient struct {
 }
 
 // NewFakeConsensusClient creates a new consensus client using the given genesis hash and timestamp.
-func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, options FakeConsensusClientOptions) *FakeConsensusClient {
+func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, options FakeConsensusClientOptions) *FakeConsensusClient {
 	genesisHash := genesis.ToBlock().Hash()
 	genesisTimestamp := genesis.Timestamp
 	return &FakeConsensusClient{
@@ -56,6 +58,7 @@ func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient
 		headBlockHash:    genesisHash,
 		lastTimestamp:    genesisTimestamp,
 		options:          options,
+		mempool:          mempool,
 		currentPayloadID: nil,
 	}
 }
@@ -105,15 +108,23 @@ func (f *FakeConsensusClient) generatePayloadAttributes() (*eth.PayloadAttribute
 		return nil, fmt.Errorf("failed to encode L1 info tx: %w", err)
 	}
 
+	txBytes := f.mempool.NextBlock()
+	hexBytes := make([]hexutil.Bytes, len(txBytes))
+	for i, tx := range txBytes {
+		hexBytes[i] = tx
+	}
+
+	f.log.Info("Generated payload attributes", "timestamp", timestamp, "num_txs", len(hexBytes))
+
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),
 		PrevRandao:            eth.Bytes32{},
 		SuggestedFeeRecipient: common.Address{'C'},
 		Withdrawals:           &types.Withdrawals{},
-		Transactions:          []hexutil.Bytes{opaqueL1Tx},
+		Transactions:          append([]hexutil.Bytes{opaqueL1Tx}, hexBytes...),
 		GasLimit:              &gasLimit,
 		ParentBeaconBlockRoot: &common.Hash{},
-		NoTxPool:              false,
+		NoTxPool:              true,
 		EIP1559Params:         &b8,
 	}
 

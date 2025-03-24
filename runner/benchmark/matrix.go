@@ -42,6 +42,7 @@ const (
 	ParamTypeEnv ParamType = iota
 	ParamTypeTxWorkload
 	ParamTypeNode
+	ParamTypeGasLimit
 )
 
 func (b ParamType) String() string {
@@ -60,6 +61,8 @@ func (b *ParamType) UnmarshalText(text []byte) error {
 		*b = ParamTypeTxWorkload
 	case "node_type":
 		*b = ParamTypeNode
+	case "gas_limit":
+		*b = ParamTypeGasLimit
 	default:
 		return fmt.Errorf("invalid benchmark param type: %s", string(text))
 	}

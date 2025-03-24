@@ -10,15 +10,14 @@ import (
 	"math/rand"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type Worker interface {
@@ -42,14 +41,18 @@ type TransferOnlyPayloadWorker struct {
 
 	prefundedAccount *ecdsa.PrivateKey
 	prefundAmount    *big.Int
+
+	mempool *mempool.StaticWorkloadMempool
 }
 
 const numAccounts = 1000
 
-func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error) {
+func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (mempool.FakeMempool, Worker, error) {
+	mempool := mempool.NewStaticWorkloadMempool(params.GasLimit)
+
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	chainID := params.Genesis(time.Now()).Config.ChainID
@@ -58,6 +61,7 @@ func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 	t := &TransferOnlyPayloadWorker{
 		log:              log,
 		client:           client,
+		mempool:          mempool,
 		params:           params,
 		chainID:          chainID,
 		prefundedAccount: priv.ToECDSA(),
@@ -65,10 +69,10 @@ func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 	}
 
 	if err := t.generateAccounts(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return t, nil
+	return mempool, t, nil
 }
 
 func (t *TransferOnlyPayloadWorker) generateAccounts() error {
@@ -99,11 +103,10 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	// (prefundAmount - gasCost) / numAccounts
 	perAccount := new(big.Int).Div(new(big.Int).Sub(t.prefundAmount, gasCost), big.NewInt(numAccounts))
 
-	sendCalls := make([]rpc.BatchElem, 0, numAccounts)
+	sendCalls := make([][]byte, 0, numAccounts)
 
 	nonce := uint64(0)
 
-	results := make([]interface{}, numAccounts)
 	var lastTxHash common.Hash
 
 	// prefund accounts
@@ -120,39 +123,12 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 			return err
 		}
 
-		sendCalls = append(sendCalls, rpc.BatchElem{
-			Method: "eth_sendRawTransaction",
-			Args:   []interface{}{hexutil.Encode(marshaledTx)},
-			Result: &results[i],
-		})
+		sendCalls = append(sendCalls, marshaledTx)
 		lastTxHash = transferTx.Hash()
 	}
 
-	// create batches of 50 txs
-	batches := make([][]rpc.BatchElem, 0, (numAccounts+49)/50)
-	for i := 0; i < numAccounts; i += 50 {
-		batches = append(batches, sendCalls[i:min(i+50, len(sendCalls))])
-	}
-
-	for _, batch := range batches {
-		if len(batch) == 0 {
-			continue
-		}
-
-		callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		if err := t.client.Client().BatchCallContext(callCtx, batch); err != nil {
-			return err
-		}
-
-		for _, call := range sendCalls {
-			if call.Error != nil {
-				t.log.Debug("Failed to send transaction", "err", call.Error, "result", call.Result)
-				return call.Error
-			}
-		}
-
-		t.log.Debug("Sent batch of transactions", "numTransactions", len(batch))
+	for _, tx := range sendCalls {
+		t.mempool.AddTransaction(tx, 21000)
 	}
 
 	time.Sleep(5 * time.Second)
@@ -193,7 +169,7 @@ func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 
 func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64) error {
 	gasUsed := uint64(0)
-	sendCalls := make([]rpc.BatchElem, 0, numAccounts)
+	txs := make([][]byte, 0, numAccounts)
 	acctIdx := 0
 
 	fakeResults := make([]interface{}, 0)
@@ -212,13 +188,8 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 		}
 
 		fakeResults = append(fakeResults, nil)
-		result := fakeResults[len(fakeResults)-1]
 
-		sendCalls = append(sendCalls, rpc.BatchElem{
-			Method: "eth_sendRawTransaction",
-			Args:   []interface{}{hexutil.Encode(marshaledTx)},
-			Result: &result,
-		})
+		txs = append(txs, marshaledTx)
 
 		gasUsed += 21000
 		t.accountNonces[t.accountAddresses[acctIdx]]++
@@ -226,37 +197,9 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 		acctIdx = (acctIdx + 1) % numAccounts
 	}
 
-	t.log.Debug("created transactions", "numTransactions", len(sendCalls))
-
-	batchSize := 1000
-
-	// create batches of 50 txs
-	batches := make([][]rpc.BatchElem, 0, (len(sendCalls)+batchSize-1)/batchSize)
-	for i := 0; i < len(sendCalls); i += batchSize {
-		batches = append(batches, sendCalls[i:min(i+batchSize, len(sendCalls))])
+	for _, tx := range txs {
+		t.mempool.AddTransaction(tx, 21000)
 	}
-
-	t.log.Debug("sending batches", "numBatches", len(batches))
-	txIdx := 0
-
-	for _, batch := range batches {
-		callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		if err := t.client.Client().BatchCallContext(callCtx, batch); err != nil {
-			return err
-		}
-
-		for _, call := range batch {
-			if call.Error != nil {
-				t.log.Debug("Failed to send transaction", "err", call.Error, "result", call.Result)
-				// return call.Error
-			}
-		}
-
-		txIdx += len(batch)
-	}
-
-	t.log.Debug("sent transactions", "numTransactions", len(sendCalls))
 
 	return nil
 }

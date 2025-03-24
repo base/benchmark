@@ -3,6 +3,7 @@ package benchmark
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ type TransactionPayload struct {
 // Params is the parameters for a single benchmark run.
 type Params struct {
 	NodeType           string
+	GasLimit           uint64
 	TransactionPayload []TransactionPayload
 	BlockTime          time.Duration
 	Env                map[string]string
@@ -39,6 +41,7 @@ func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads [
 	params := Params{
 		NodeType:           "geth",
 		TransactionPayload: transactionPayloads,
+		GasLimit:           1e9,
 		BlockTime:          1 * time.Second,
 	}
 
@@ -46,6 +49,12 @@ func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads [
 		switch k {
 		case ParamTypeNode:
 			params.NodeType = v
+		case ParamTypeGasLimit:
+			gasLimit, err := strconv.Atoi(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid gas limit %s", v)
+			}
+			params.GasLimit = uint64(gasLimit)
 		case ParamTypeEnv:
 			entries := strings.Split(v, ";")
 			params.Env = make(map[string]string)
