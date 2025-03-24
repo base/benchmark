@@ -53,7 +53,7 @@ jobs:
         tar -xvf reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz # contains ./reth
         chmod +x ./reth
 
-        git clone git@github.com:ethereum-optimism/op-geth
+        git clone https://github.com/ethereum-optimism/op-geth
         git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
         cd op-geth
         cp $GOBIN/geth .
