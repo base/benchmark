@@ -57,7 +57,8 @@ jobs:
         cd op-geth
         git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
         make geth
-        cp $GOBIN/geth .
+        cp ./build/bin/geth ..
+        cd ..
         chmod +x ./geth
 
         ls -la
