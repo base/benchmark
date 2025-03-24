@@ -28,3 +28,39 @@ jobs:
       id: unit
       run: | 
         go test -v -coverprofile=coverage.out ./... 
+  basic-benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.24
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+
+    - name: Download geth and reth
+      run: | 
+        # https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
+        # d42d9da50b23a0524462503ad839c5bbe418deb1befef3afead548921184b921  /Users/meyer9/Downloads/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz.asc
+        # Install from github.com/ethereum-optimism/op-geth
+
+        wget https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
+        echo "d42d9da50b23a0524462503ad839c5bbe418deb1befef3afead548921184b921  reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz" | shasum -a 256 -c
+        tar -xvf reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz # contains ./reth
+        chmod +x ./reth
+
+        git clone git@github.com:ethereum-optimism/op-geth
+        cd op-geth
+        cp $GOBIN/geth .
+        chmod +x ./geth
+
+        ls -la
+
+    - name: Run Basic Benchmarks
+      id: unit
+      run: | 
+        go run benchmark/cmd/main.go --log.level debug run --config ./configs/basic.yml --root-dir data-dir --reth-bin ./reth --geth-bin ./geth
