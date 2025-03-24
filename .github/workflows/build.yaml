@@ -54,8 +54,8 @@ jobs:
         chmod +x ./reth
 
         git clone https://github.com/ethereum-optimism/op-geth
-        git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
         cd op-geth
+        git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
         cp $GOBIN/geth .
         chmod +x ./geth
 
