@@ -45,11 +45,11 @@ jobs:
     - name: Download geth and reth
       run: | 
         # https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
-        # d42d9da50b23a0524462503ad839c5bbe418deb1befef3afead548921184b921  /Users/meyer9/Downloads/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz.asc
+        # 62e5e435d1e981f97fff76f638fdf7cc4b9dbcbed66fcb10c4be6bd9d0dfd0ba  /Users/meyer9/Downloads/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz.asc
         # Install from github.com/ethereum-optimism/op-geth
 
         wget https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
-        echo "d42d9da50b23a0524462503ad839c5bbe418deb1befef3afead548921184b921  reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz" | shasum -a 256 -c
+        echo "62e5e435d1e981f97fff76f638fdf7cc4b9dbcbed66fcb10c4be6bd9d0dfd0ba  reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz" | shasum -a 256 -c
         tar -xvf reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz # contains ./reth
         chmod +x ./reth
 
