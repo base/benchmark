@@ -1,18 +1,30 @@
+# Go test workflow
+name: test
+
 on:
-  pull_request:
   push:
-    branches:
-      - main
-      - develop
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  build:
-    runs-on:
-      - default-config-s
-      - xsmall
-      - amd64
+  go-test:
+    outputs:
+      COVERAGE: ${{ steps.unit.outputs.coverage }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Check out code
-        uses: actions/checkout@v2
-      - name: Run a one-line script
-        run: echo Hello, world!
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.24
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+
+    - name: Run Unit Tests
+      id: unit
+      run: | 
+        go test -v -coverprofile=coverage.out ./... 
