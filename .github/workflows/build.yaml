@@ -66,4 +66,5 @@ jobs:
     - name: Run Basic Benchmarks
       id: unit
       run: | 
-        go run benchmark/cmd/main.go --log.level debug run --config ./configs/basic.yml --root-dir data-dir --reth-bin ./reth --geth-bin ./geth
+        mkdir ./data-dir
+        go run benchmark/cmd/main.go --log.level debug run --config ./configs/basic.yml --root-dir ./data-dir --reth-bin ./reth --geth-bin ./geth
