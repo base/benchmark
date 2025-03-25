@@ -5,11 +5,10 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"math/big"
-	"net/http"
 	"time"
 
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/client"
@@ -24,7 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-	"github.com/prometheus/common/expfmt"
 )
 
 // FakeConsensusClientOptions is an object for configuring a FakeConsensusClient.
@@ -45,12 +43,19 @@ type FakeConsensusClient struct {
 	lastTimestamp uint64
 
 	currentPayloadID *engine.PayloadID
+	metricsCollector metrics.MetricsCollector
+	metricsWriter    metrics.MetricsWriter
 }
 
 // NewFakeConsensusClient creates a new consensus client using the given genesis hash and timestamp.
 func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, options FakeConsensusClientOptions) *FakeConsensusClient {
 	genesisHash := genesis.ToBlock().Hash()
 	genesisTimestamp := genesis.Timestamp
+
+	// Create metrics collector and writer
+	metricsCollector := metrics.NewRethMetricsCollector(log, client)
+	metricsWriter := metrics.NewFileMetricsWriter("./metrics")
+
 	return &FakeConsensusClient{
 		log:              log,
 		client:           client,
@@ -60,6 +65,8 @@ func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient
 		options:          options,
 		mempool:          mempool,
 		currentPayloadID: nil,
+		metricsCollector: metricsCollector,
+		metricsWriter:    metricsWriter,
 	}
 }
 
@@ -243,40 +250,6 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	return nil
 }
 
-// Collects prometheus metrics for the fake consensus client.
-func (f *FakeConsensusClient) CollectMetrics(ctx context.Context) error {
-	resp, err := http.Get("http://localhost:8080/metrics")
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	// contentType := resp.Header.Get("Content-Type")
-
-	txtParser := expfmt.TextParser{}
-	metrics, err := txtParser.TextToMetricFamilies(bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-
-	i := 0
-	for _, metric := range metrics {
-		name := metric.GetName()
-
-		if name == "reth_sync_execution_execution_duration" || name == "reth_sync_block_validation_state_root_duration" {
-			f.log.Info("Metric", "name", name)
-
-			f.log.Info("Metric", "values", metric.GetMetric())
-		}
-	}
-	f.log.Info("Metrics", "count", i)
-	return nil
-}
-
 // Start starts the fake consensus client.
 func (f *FakeConsensusClient) Start(ctx context.Context) error {
 	for {
@@ -288,9 +261,11 @@ func (f *FakeConsensusClient) Start(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			err = f.CollectMetrics(ctx)
-			if err != nil {
-				return err
+
+			// Collect metrics after each block
+			if err := f.metricsCollector.Collect(ctx); err != nil {
+				f.log.Error("Failed to collect metrics", "error", err)
+				continue
 			}
 		}
 	}
