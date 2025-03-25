@@ -36,14 +36,17 @@ const (
 	MaxTotalParams = 24
 )
 
+var DefaultParams = &Params{
+	NodeType:  "geth",
+	GasLimit:  1e9,
+	BlockTime: 1 * time.Second,
+}
+
 // NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
 func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads []TransactionPayload) (*Params, error) {
-	params := Params{
-		NodeType:           "geth",
-		TransactionPayload: transactionPayloads,
-		GasLimit:           1e9,
-		BlockTime:          1 * time.Second,
-	}
+	params := *DefaultParams
+
+	params.TransactionPayload = transactionPayloads
 
 	for k, v := range assignments {
 		switch k {

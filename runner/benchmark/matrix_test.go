@@ -29,6 +29,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 				{
 					NodeType:           "geth",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}},
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 				},
 			},
@@ -51,11 +52,13 @@ func TestNewMatrixFromConfig(t *testing.T) {
 			want: benchmark.ParamsMatrix{
 				{
 					NodeType:           "geth",
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					BlockTime:          time.Second,
 				},
 				{
 					NodeType:           "erigon",
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					BlockTime:          time.Second,
 				},
@@ -84,24 +87,28 @@ func TestNewMatrixFromConfig(t *testing.T) {
 				{
 					NodeType:           "geth",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "0"},
 				},
 				{
 					NodeType:           "erigon",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "0"},
 				},
 				{
 					NodeType:           "geth",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "1"},
 				},
 				{
 					NodeType:           "erigon",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
+					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "1"},
 				},
@@ -143,6 +150,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := benchmark.NewParamsMatrixFromConfig(tt.config)
+
 			if tt.wantErr {
 				require.Error(t, err)
 				return
