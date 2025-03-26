@@ -1,10 +1,11 @@
-- name: Test op-node Performance
+- name: Test op-reth Performance
   description: Reth vs Geth Execution Speed
   benchmark:
-    - op-program
+    - sequencer
   variables:
     - type: transaction_workload
       values:
-        - tool:transfer-only
         - tool:tx-fuzz
-        - file:mainnet-opcodes.gz
+    - type: node_type
+      values:
+        - reth

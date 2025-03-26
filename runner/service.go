@@ -15,9 +15,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/base/base-bench/runner/benchmark"
-	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/config"
-	"github.com/base/base-bench/runner/network"
 )
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -114,41 +112,43 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	}()
 
 	// TODO: serialize these nicer so we can pass them directly
-	nodeType := clients.Geth
-	switch params.NodeType {
-	case "geth":
-		nodeType = clients.Geth
-	case "reth":
-		nodeType = clients.Reth
-	}
-	logger := s.log.With("nodeType", params.NodeType)
+	// nodeType := clients.Geth
+	// switch params.NodeType {
+	// case "geth":
+	// 	nodeType = clients.Geth
+	// case "reth":
+	// 	nodeType = clients.Reth
+	// }
+	// logger := s.log.With("nodeType", params.NodeType)
 
-	options := s.config.ClientOptions()
-	options = params.ClientOptions(options)
+	// options := s.config.ClientOptions()
+	// options = params.ClientOptions(options)
 
-	clientCtx, cancelClient := context.WithCancel(ctx)
-	defer cancelClient()
+	// clientCtx, cancelClient := context.WithCancel(ctx)
+	// defer cancelClient()
 
-	client := clients.NewClient(nodeType, logger, &options)
-	defer client.Stop()
+	// client := clients.NewClient(nodeType, logger, &options)
+	// defer client.Stop()
 
-	err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)
-	if err != nil {
-		return errors.Wrap(err, "failed to run EL client")
-	}
-	time.Sleep(2 * time.Second)
+	// err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)
+	// if err != nil {
+	// 	return errors.Wrap(err, "failed to run EL client")
+	// }
+	// time.Sleep(2 * time.Second)
+	// TODO:
 
 	// Wait for RPC to become available
-	clientRPC := client.Client()
-	authClient := client.AuthClient()
-	clientRPCURL := client.ClientURL()
+	// clientRPC := client.Client()
+	// authClient := client.AuthClient()
+	// clientRPCURL := client.ClientURL()
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis)
-	if err != nil {
-		return errors.Wrap(err, "failed to create network benchmark")
-	}
-	return benchmark.Run(clientCtx)
+	// benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis)
+	// if err != nil {
+	// 	return errors.Wrap(err, "failed to create network benchmark")
+	// }
+	// return benchmark.Run(clientCtx)
+	return nil
 }
 
 func (s *service) Run(ctx context.Context) error {
