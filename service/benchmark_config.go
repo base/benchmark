@@ -63,22 +63,21 @@ func (b *ParamType) UnmarshalText(text []byte) error {
 }
 
 type BenchmarkParam struct {
-	Name      *string   `yaml:"name"`
 	ParamType ParamType `yaml:"type"`
-	Value     *string   `yaml:"value"`
-	Values    *[]string `yaml:"values"`
+	Value     string    `yaml:"value,omitempty"`
+	Values    []string  `yaml:"values,omitempty"`
 }
 
 func (bp *BenchmarkParam) Check() error {
-	if bp.Value == nil && bp.Values == nil {
-		return errors.New("value or values is required")
+	if bp.Value == "" && len(bp.Values) == 0 {
+		return errors.New("either value or values must be specified")
 	}
 	return nil
 }
 
 type BenchmarkConfig struct {
 	Name        string            `yaml:"name"`
-	Description string            `yaml:"desciption"`
+	Description string            `yaml:"description"`
 	Benchmark   []BenchmarkMetric `yaml:"benchmark"`
 	Variables   []BenchmarkParam  `yaml:"variables"`
 }
@@ -93,10 +92,9 @@ func (bc *BenchmarkConfig) Check() error {
 	if len(bc.Benchmark) == 0 {
 		return errors.New("benchmark is required")
 	}
-	for _, b := range bc.Variables {
-		err := b.Check()
-		if err != nil {
-			return err
+	for _, v := range bc.Variables {
+		if err := v.Check(); err != nil {
+			return fmt.Errorf("invalid variable: %w", err)
 		}
 	}
 	return nil

@@ -4,7 +4,6 @@
     - op-program
   variables:
     - type: transaction_workload
+    - type: node_type
       values:
-        - tool:transfer-only
-        - tool:tx-fuzz
-        - file:mainnet-opcodes.gz
+        - reth
