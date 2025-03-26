@@ -1,0 +1,70 @@
+# Go test workflow
+name: test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  go-test:
+    outputs:
+      COVERAGE: ${{ steps.unit.outputs.coverage }}
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.24
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+
+    - name: Run Unit Tests
+      id: unit
+      run: | 
+        go test -v -coverprofile=coverage.out ./... 
+  # basic-benchmarks:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v3
+
+  #   - name: Set up Go
+  #     uses: actions/setup-go@v3
+  #     with:
+  #       go-version: 1.24
+
+  #   - name: Install project dependencies
+  #     run: | 
+  #       go mod download
+
+  #   - name: Download geth and reth
+  #     run: | 
+  #       # https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
+  #       # 62e5e435d1e981f97fff76f638fdf7cc4b9dbcbed66fcb10c4be6bd9d0dfd0ba  /Users/meyer9/Downloads/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz.asc
+  #       # Install from github.com/ethereum-optimism/op-geth
+
+  #       wget https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
+  #       echo "62e5e435d1e981f97fff76f638fdf7cc4b9dbcbed66fcb10c4be6bd9d0dfd0ba  reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz" | shasum -a 256 -c
+  #       tar -xvf reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz # contains ./reth
+  #       chmod +x ./reth
+
+  #       git clone https://github.com/ethereum-optimism/op-geth
+  #       cd op-geth
+  #       git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+  #       make geth
+  #       cp ./build/bin/geth ..
+  #       cd ..
+  #       chmod +x ./geth
+
+  #       ls -la
+
+  #   - name: Run Basic Benchmarks
+  #     id: unit
+  #     run: | 
+  #       mkdir ./data-dir
+  #       go run benchmark/cmd/main.go --log.level debug run --config ./configs/basic.yml --root-dir ./data-dir --reth-bin ./reth --geth-bin ./geth
