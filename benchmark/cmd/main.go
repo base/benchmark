@@ -7,7 +7,7 @@ import (
 
 	"github.com/base/base-bench/benchmark/config"
 	"github.com/base/base-bench/benchmark/flags"
-	"github.com/base/base-bench/service"
+	"github.com/base/base-bench/runner"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
@@ -28,12 +28,17 @@ func main() {
 	oplog.SetupDefaults()
 
 	app := cli.NewApp()
-	app.Flags = cliapp.ProtectFlags(flags.Flags)
+	app.Commands = []*cli.Command{
+		{
+			Name:        "run",
+			Flags:       cliapp.ProtectFlags(flags.RunFlags),
+			Action:      Main(Version),
+			Usage:       "run benchmark",
+			Description: "Runs benchmarks according to the specified config.",
+		},
+	}
+	app.Flags = flags.Flags
 	app.Version = opservice.FormatVersion(Version, GitCommit, GitDate, "")
-	app.Name = "base-bench"
-	app.Usage = "Example Service"
-	app.Description = "Example service that uses the Optimism Service Framework."
-	app.Action = cliapp.LifecycleCmd(Main(Version))
 
 	ctx := ctxinterrupt.WithSignalWaiterMain(context.Background())
 	err := app.RunContext(ctx, os.Args)
@@ -42,19 +47,19 @@ func main() {
 	}
 }
 
-func Main(version string) cliapp.LifecycleAction {
-	return func(cliCtx *cli.Context, closeApp context.CancelCauseFunc) (cliapp.Lifecycle, error) {
-		cfg := config.NewCLIConfig(cliCtx)
+func Main(version string) cli.ActionFunc {
+	return func(cliCtx *cli.Context) error {
+		cfg := config.NewRunCmdConfig(cliCtx)
 		if err := cfg.Check(); err != nil {
-			return nil, fmt.Errorf("invalid CLI flags: %w", err)
+			return fmt.Errorf("invalid CLI flags: %w", err)
 		}
 
 		l := oplog.NewLogger(oplog.AppOut(cliCtx), cfg.LogConfig())
 		oplog.SetGlobalLogHandler(l.Handler())
 		opservice.ValidateEnvVars(flags.EnvVarPrefix, flags.Flags, l)
 
-		s := service.NewService(version, cfg, l)
+		s := runner.NewService(version, cfg, l)
 
-		return s, nil
+		return s.Run(cliCtx.Context)
 	}
 }

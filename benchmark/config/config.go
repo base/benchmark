@@ -1,26 +1,29 @@
 package config
 
 import (
-	"github.com/base/base-bench/service"
+	runnerconfig "github.com/base/base-bench/runner/config"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/urfave/cli/v2"
 )
 
-type CLIConfig struct {
-	service.Config
+// RunCmdConfig is the config needed by run command.
+type RunCmdConfig struct {
+	runnerconfig.Config
 }
 
-func (c *CLIConfig) Check() error {
-	return nil
+// Check validates the config.
+func (c *RunCmdConfig) Check() error {
+	return c.Config.Check()
 }
 
-func (c *CLIConfig) LogConfig() oplog.CLIConfig {
+// LogConfig returns the log config.
+func (c *RunCmdConfig) LogConfig() oplog.CLIConfig {
 	return c.Config.LogConfig()
 }
 
-// NewCLIConfig parses the Config from the provided flags or environment variables.
-func NewCLIConfig(ctx *cli.Context) *CLIConfig {
-	return &CLIConfig{
-		Config: service.NewConfig(ctx),
+// NewRunCmdConfig parses the RunCmdConfig from the provided flags or environment variables.
+func NewRunCmdConfig(ctx *cli.Context) *RunCmdConfig {
+	return &RunCmdConfig{
+		Config: runnerconfig.NewConfig(ctx),
 	}
 }

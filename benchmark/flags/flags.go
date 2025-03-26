@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"github.com/base/base-bench/runner/flags"
 	"github.com/urfave/cli/v2"
 
 	opservice "github.com/ethereum-optimism/optimism/op-service"
@@ -13,6 +14,11 @@ func prefixEnvVars(name string) []string {
 	return opservice.PrefixEnvVar(EnvVarPrefix, name)
 }
 
+const (
+	ConfigFlagName  = "config"
+	RootDirFlagName = "root-dir"
+)
+
 var (
 	ConfigFlag = &cli.StringFlag{
 		Name:     "config",
@@ -20,13 +26,24 @@ var (
 		EnvVars:  prefixEnvVars("CONFIG"),
 		Required: true,
 	}
+
+	RootDirFlag = &cli.StringFlag{
+		Name:     "root-dir",
+		Usage:    "Root Directory",
+		EnvVars:  prefixEnvVars("ROOT_DIR"),
+		Required: true,
+	}
 )
 
 // Flags contains the list of configuration options available to the binary.
-var Flags = []cli.Flag{
+var Flags = []cli.Flag{}
+
+var RunFlags = []cli.Flag{
 	ConfigFlag,
+	RootDirFlag,
 }
 
 func init() {
 	Flags = append(Flags, oplog.CLIFlags(EnvVarPrefix)...)
+	RunFlags = append(RunFlags, flags.CLIFlags(EnvVarPrefix)...)
 }
