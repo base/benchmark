@@ -131,8 +131,6 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 		t.mempool.AddTransaction(tx, 21000)
 	}
 
-	time.Sleep(5 * time.Second)
-
 	receipt, err := t.waitForReceipt(ctx, lastTxHash)
 	if err != nil {
 		return err
@@ -155,13 +153,12 @@ func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 	for {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
-			t.log.Error("Failed to get receipt", "err", err)
 		}
 		if receipt != nil {
 			return receipt, nil
 		}
 		if time.Now().After(maxTimeout) {
-			return nil, fmt.Errorf("timed out waiting for receipt")
+			return nil, fmt.Errorf("timed out waiting for receipt: %w", err)
 		}
 		time.Sleep(1 * time.Second)
 	}
