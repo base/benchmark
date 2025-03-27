@@ -132,7 +132,26 @@ func (f *FakeConsensusClient) generatePayloadAttributes() (*eth.PayloadAttribute
 	return payloadAttrs, nil
 }
 
-func (f *FakeConsensusClient) updateForkChoice(ctx context.Context) (*eth.PayloadID, error) {
+func (f *FakeConsensusClient) updateForkChoice(ctx context.Context) (*engine.PayloadID, error) {
+	fcu := engine.ForkchoiceStateV1{
+		HeadBlockHash:      f.headBlockHash,
+		SafeBlockHash:      f.headBlockHash,
+		FinalizedBlockHash: f.headBlockHash,
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	defer cancel()
+	var resp engine.ForkChoiceResponse
+	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu)
+
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to propose block")
+	}
+
+	return resp.PayloadID, nil
+}
+
+func (f *FakeConsensusClient) updateForkChoiceAndStartBuilding(ctx context.Context) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
 		HeadBlockHash:      f.headBlockHash,
 		SafeBlockHash:      f.headBlockHash,
@@ -161,7 +180,7 @@ func (f *FakeConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
-	err := f.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", payloadID)
+	err := f.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV3", payloadID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get payload")
 	}
@@ -176,12 +195,12 @@ type basicBlockType struct{}
 
 // HasOptimismWithdrawalsRoot implements types.BlockType.
 func (b basicBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
-	return true
+	return false
 }
 
 // IsIsthmus implements types.BlockType.
 func (b basicBlockType) IsIsthmus(blkTime uint64) bool {
-	return true
+	return false
 }
 
 var _ types.BlockType = basicBlockType{}
@@ -190,11 +209,9 @@ var (
 	EmptyWithdrawalsRoot = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 )
 
-// newPayload calls engine_newPayloadV4 with the given executable data, filling out necessary info.
+// newPayload calls engine_newPayloadV3 with the given executable data, filling out necessary info.
 func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
-	params.WithdrawalsRoot = &EmptyWithdrawalsRoot
-
-	block, err := engine.ExecutableDataToBlockNoHash(*params, []common.Hash{}, &common.Hash{}, [][]byte{}, basicBlockType{})
+	block, err := engine.ExecutableDataToBlockNoHash(*params, []common.Hash{}, &common.Hash{}, nil, basicBlockType{})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload to block")
 	}
@@ -204,7 +221,7 @@ func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err = f.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, common.Hash{}, []common.Hash{})
+	err = f.authClient.CallContext(ctx, &resp, "engine_newPayloadV3", params, []common.Hash{}, common.Hash{})
 
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")
@@ -215,7 +232,7 @@ func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 
 // Propose starts block generation, waits BlockTime, and generates a block.
 func (f *FakeConsensusClient) Propose(ctx context.Context) error {
-	payloadID, err := f.updateForkChoice(ctx)
+	payloadID, err := f.updateForkChoiceAndStartBuilding(ctx)
 	if err != nil {
 		return err
 	}
@@ -237,6 +254,11 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	f.headBlockHash = payload.BlockHash
 
 	err = f.newPayload(ctx, payload)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.updateForkChoice(ctx)
 	if err != nil {
 		return err
 	}
