@@ -44,17 +44,12 @@ type FakeConsensusClient struct {
 
 	currentPayloadID *engine.PayloadID
 	metricsCollector metrics.MetricsCollector
-	metricsWriter    metrics.MetricsWriter
 }
 
 // NewFakeConsensusClient creates a new consensus client using the given genesis hash and timestamp.
-func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, options FakeConsensusClientOptions) *FakeConsensusClient {
+func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, metricsCollector metrics.MetricsCollector, options FakeConsensusClientOptions) *FakeConsensusClient {
 	genesisHash := genesis.ToBlock().Hash()
 	genesisTimestamp := genesis.Timestamp
-
-	// Create metrics collector and writer
-	metricsCollector := metrics.NewRethMetricsCollector(log, client)
-	metricsWriter := metrics.NewFileMetricsWriter("./metrics")
 
 	return &FakeConsensusClient{
 		log:              log,
@@ -66,7 +61,6 @@ func NewFakeConsensusClient(log log.Logger, client *ethclient.Client, authClient
 		mempool:          mempool,
 		currentPayloadID: nil,
 		metricsCollector: metricsCollector,
-		metricsWriter:    metricsWriter,
 	}
 }
 
@@ -255,13 +249,6 @@ func (f *FakeConsensusClient) Start(ctx context.Context) error {
 	// min block time
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
-
-	// Defer writing metrics to file at the end
-	defer func() {
-		if err := f.metricsWriter.Write(f.metricsCollector.GetMetrics()); err != nil {
-			f.log.Error("Failed to write metrics", "error", err)
-		}
-	}()
 
 	for {
 		select {
