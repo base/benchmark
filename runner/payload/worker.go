@@ -131,8 +131,6 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 		t.mempool.AddTransaction(tx, 21000)
 	}
 
-	time.Sleep(5 * time.Second)
-
 	receipt, err := t.waitForReceipt(ctx, lastTxHash)
 	if err != nil {
 		return err
