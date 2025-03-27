@@ -17,6 +17,7 @@ import (
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
 )
 
@@ -62,6 +63,12 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	err := os.Mkdir(testDir, 0755)
 	if err != nil {
 		return errors.Wrap(err, "failed to create test directory")
+	}
+
+	metricsPath := path.Join(testDir, "metrics")
+	err = os.Mkdir(metricsPath, 0755)
+	if err != nil {
+		return errors.Wrap(err, "failed to create metrics directory")
 	}
 
 	// write chain config to testDir/chain.json
@@ -138,17 +145,29 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	}
 	time.Sleep(2 * time.Second)
 
+	// Create metrics collector and writer
+	metricsCollector := metrics.NewRethMetricsCollector(logger, client.Client())
+	metricsWriter := metrics.NewFileMetricsWriter(metricsPath)
+
 	// Wait for RPC to become available
 	clientRPC := client.Client()
 	authClient := client.AuthClient()
 	clientRPCURL := client.ClientURL()
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis)
+	benchmark, err := network.NewNetworkBenchmark(s.log, params, clientRPC, clientRPCURL, authClient, &genesis, metricsCollector)
 	if err != nil {
 		return errors.Wrap(err, "failed to create network benchmark")
 	}
-	return benchmark.Run(clientCtx)
+	err = benchmark.Run(clientCtx)
+	if err != nil {
+		return errors.Wrap(err, "failed to run network benchmark")
+	}
+
+	if err := metricsWriter.Write(metricsCollector.GetMetrics()); err != nil {
+		logger.Error("Failed to write metrics", "error", err)
+	}
+
 	return nil
 }
 
