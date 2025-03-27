@@ -132,26 +132,7 @@ func (f *FakeConsensusClient) generatePayloadAttributes() (*eth.PayloadAttribute
 	return payloadAttrs, nil
 }
 
-func (f *FakeConsensusClient) updateForkChoice(ctx context.Context) (*engine.PayloadID, error) {
-	fcu := engine.ForkchoiceStateV1{
-		HeadBlockHash:      f.headBlockHash,
-		SafeBlockHash:      f.headBlockHash,
-		FinalizedBlockHash: f.headBlockHash,
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	var resp engine.ForkChoiceResponse
-	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to propose block")
-	}
-
-	return resp.PayloadID, nil
-}
-
-func (f *FakeConsensusClient) updateForkChoiceAndStartBuilding(ctx context.Context) (*eth.PayloadID, error) {
+func (f *FakeConsensusClient) updateForkChoice(ctx context.Context) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
 		HeadBlockHash:      f.headBlockHash,
 		SafeBlockHash:      f.headBlockHash,
@@ -232,7 +213,7 @@ func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 
 // Propose starts block generation, waits BlockTime, and generates a block.
 func (f *FakeConsensusClient) Propose(ctx context.Context) error {
-	payloadID, err := f.updateForkChoiceAndStartBuilding(ctx)
+	payloadID, err := f.updateForkChoice(ctx)
 	if err != nil {
 		return err
 	}
@@ -254,11 +235,6 @@ func (f *FakeConsensusClient) Propose(ctx context.Context) error {
 	f.headBlockHash = payload.BlockHash
 
 	err = f.newPayload(ctx, payload)
-	if err != nil {
-		return err
-	}
-
-	_, err = f.updateForkChoice(ctx)
 	if err != nil {
 		return err
 	}
