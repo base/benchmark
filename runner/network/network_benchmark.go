@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/payload"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/common"
@@ -32,7 +33,7 @@ type NetworkBenchmark struct {
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client.
-func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *ethclient.Client, clientRPCURL string, authClient client.RPC, genesis *core.Genesis) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *ethclient.Client, clientRPCURL string, authClient client.RPC, genesis *core.Genesis, metricsCollector metrics.MetricsCollector) (*NetworkBenchmark, error) {
 	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
 
 	mempool, worker, err := payload.NewTransferPayloadWorker(log, clientRPCURL, benchParams, common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), amount)
@@ -40,7 +41,7 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, client *e
 		return nil, err
 	}
 
-	consensusClient := NewFakeConsensusClient(log, client, authClient, mempool, genesis, FakeConsensusClientOptions{
+	consensusClient := NewFakeConsensusClient(log, client, authClient, mempool, genesis, metricsCollector, FakeConsensusClientOptions{
 		BlockTime: benchParams.BlockTime,
 	})
 
