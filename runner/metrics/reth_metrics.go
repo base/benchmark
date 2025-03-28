@@ -34,9 +34,11 @@ func (r *RethMetricsCollector) GetMetrics() []Metrics {
 	return r.metrics
 }
 
-var MetricTypes = map[string]bool{
-	"reth_sync_execution_execution_duration":         true,
-	"reth_sync_block_validation_state_root_duration": true,
+func (r *RethMetricsCollector) GetMetricTypes() map[string]bool {
+	return map[string]bool{
+		"reth_sync_execution_execution_duration":         true,
+		"reth_sync_block_validation_state_root_duration": true,
+	}
 }
 
 func (r *RethMetricsCollector) Collect(ctx context.Context) error {
@@ -67,9 +69,11 @@ func (r *RethMetricsCollector) Collect(ctx context.Context) error {
 	m := NewMetrics()
 	m.BlockNumber = block
 
+	metricTypes := r.GetMetricTypes()
+
 	for _, metric := range metrics {
 		name := metric.GetName()
-		if MetricTypes[name] {
+		if metricTypes[name] {
 			m.AddExecutionMetric(name, metric.GetMetric())
 		}
 	}

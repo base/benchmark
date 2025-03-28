@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"time"
+
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type MetricsCollector interface {
@@ -29,6 +32,25 @@ func NewMetrics() *Metrics {
 
 func (m *Metrics) AddExecutionMetric(name string, value interface{}) {
 	m.ExecutionMetrics[name] = value
+}
+
+func (m *Metrics) GetMetricTypes() map[string]bool {
+	return map[string]bool{
+		"execution": true,
+	}
+}
+
+func NewMetricsCollector(
+	log log.Logger,
+	client *ethclient.Client,
+	clientName string) MetricsCollector {
+	switch clientName {
+	case "geth":
+		return NewGethMetricsCollector(log, client)
+	case "reth":
+		return NewRethMetricsCollector(log, client)
+	}
+	panic(fmt.Sprintf("unknown client: %s", clientName))
 }
 
 type MetricsWriter interface {
