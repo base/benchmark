@@ -118,7 +118,7 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 			TerminalTotalDifficulty: big.NewInt(1),
 			ShanghaiTime:            new(uint64),
 			CancunTime:              new(uint64),
-			PragueTime:              new(uint64),
+			PragueTime:              nil,
 			VerkleTime:              nil,
 			// OP-Stack forks are disabled, since we use this for L1.
 			BedrockBlock: big.NewInt(0),
@@ -128,8 +128,9 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 			FjordTime:    &zero,
 			GraniteTime:  &zero,
 			HoloceneTime: &zero,
-			IsthmusTime:  &zero,
-			InteropTime:  &zero,
+			// Disabled due to reth/geth mismatch
+			IsthmusTime: nil,
+			InteropTime: nil,
 			Optimism: &params.OptimismConfig{
 				EIP1559Elasticity:        10,
 				EIP1559Denominator:       50,
