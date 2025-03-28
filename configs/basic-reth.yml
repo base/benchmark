@@ -1,0 +1,11 @@
+- name: Test op-reth Performance
+  description: Reth Execution Speed
+  benchmark:
+    - sequencer
+  variables:
+    - type: transaction_workload
+      values:
+        - tool:tx-fuzz
+    - type: node_type
+      values:
+        - reth
