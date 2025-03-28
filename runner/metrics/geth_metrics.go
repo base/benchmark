@@ -1,16 +1,13 @@
 package metrics
 
 import (
-	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	dto "github.com/prometheus/client_model/go"
-	"github.com/prometheus/common/expfmt"
 )
 
 type GethMetricsCollector struct {
@@ -29,10 +26,11 @@ func NewGethMetricsCollector(log log.Logger, client *ethclient.Client) *GethMetr
 
 func (g *GethMetricsCollector) GetMetricTypes() map[string]bool {
 	return map[string]bool{
-		"chain_account_commits": true,
-		"chain_head_block":      true,
-		"eth_peer_count":        true,
-		"eth_txpool_pending":    true,
+		"chain/account/commits.count":         true,
+		"chain/account/commits.50-percentile": true,
+		"chain/account/commits.95-percentile": true,
+		"eth/db/chaindata/disk/read":          true,
+		"eth/db/chaindata/disk/write":         true,
 	}
 }
 
@@ -51,15 +49,9 @@ func (g *GethMetricsCollector) Collect(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read metrics response: %w", err)
-	}
-
-	txtParser := expfmt.TextParser{}
-	metrics, err := txtParser.TextToMetricFamilies(bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("failed to parse metrics: %w", err)
+	var metricsData map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&metricsData); err != nil {
+		return fmt.Errorf("failed to decode metrics: %w", err)
 	}
 
 	block, err := g.client.BlockNumber(ctx)
@@ -71,27 +63,15 @@ func (g *GethMetricsCollector) Collect(ctx context.Context) error {
 	m.BlockNumber = block
 
 	metricTypes := g.GetMetricTypes()
-
-	for name, metricFamily := range metrics {
+	for name, value := range metricsData {
 		if !metricTypes[name] {
 			continue
 		}
-
-		for _, metric := range metricFamily.GetMetric() {
-			switch metricFamily.GetType() {
-			case dto.MetricType_COUNTER, dto.MetricType_GAUGE:
-				if counter := metric.GetCounter(); counter != nil {
-					m.AddExecutionMetric(name, counter.GetValue())
-				}
-				if gauge := metric.GetGauge(); gauge != nil {
-					m.AddExecutionMetric(name, gauge.GetValue())
-				}
-			}
+		if v, ok := value.(float64); ok {
+			m.AddExecutionMetric(name, v)
 		}
 	}
 
 	g.metrics = append(g.metrics, *m)
-	g.log.Info("Collected metrics", "block", block)
-
 	return nil
 }
