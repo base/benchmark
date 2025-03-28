@@ -72,6 +72,7 @@ func (w *FileMetricsWriter) Write(metrics []Metrics) error {
 	filename := w.BaseDir + "/metrics_" + timestamp + ".json"
 
 	data, err := json.MarshalIndent(metrics, "", "  ")
+
 	if err != nil {
 		return fmt.Errorf("failed to marshal metrics: %w", err)
 	}
