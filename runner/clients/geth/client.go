@@ -78,6 +78,9 @@ func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 	// TODO: allocate these dynamically eventually
 	args = append(args, "--http.port", "8545")
 	args = append(args, "--authrpc.port", "8551")
+	args = append(args, "--metrics")
+	args = append(args, "--metrics.addr", "localhost")
+	args = append(args, "--metrics.port", "8080")
 
 	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)

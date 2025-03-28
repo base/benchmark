@@ -91,6 +91,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	for i := 0; i < 2; i++ {
 		err := <-errChan
 		if err != nil {
+			close(errChan)
 			return err
 		}
 	}
