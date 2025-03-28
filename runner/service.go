@@ -149,6 +149,12 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	metricsCollector := metrics.NewMetricsCollector(logger, client.Client(), params.NodeType)
 	metricsWriter := metrics.NewFileMetricsWriter(metricsPath)
 
+	defer func() {
+		if err := metricsWriter.Write(metricsCollector.GetMetrics()); err != nil {
+			logger.Error("Failed to write metrics", "error", err)
+		}
+	}()
+
 	// Wait for RPC to become available
 	clientRPC := client.Client()
 	authClient := client.AuthClient()
@@ -162,10 +168,6 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	err = benchmark.Run(clientCtx)
 	if err != nil {
 		return errors.Wrap(err, "failed to run network benchmark")
-	}
-
-	if err := metricsWriter.Write(metricsCollector.GetMetrics()); err != nil {
-		logger.Error("Failed to write metrics", "error", err)
 	}
 
 	return nil
