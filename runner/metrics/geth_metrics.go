@@ -37,7 +37,7 @@ func (g *GethMetricsCollector) GetMetricTypes() map[string]bool {
 }
 
 func (g *GethMetricsCollector) GetMetricsEndpoint() string {
-	return "http://127.0.0.1:6060/debug/metrics/prometheus"
+	return "http://127.0.0.1:8080/debug/metrics"
 }
 
 func (g *GethMetricsCollector) GetMetrics() []Metrics {
