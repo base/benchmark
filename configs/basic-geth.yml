@@ -1,5 +1,5 @@
-- name: Test op-reth Performance
-  description: Reth vs Geth Execution Speed
+- name: Test geth Performance
+  description: Geth Execution Speed
   benchmark:
     - sequencer
   variables:
@@ -8,4 +8,4 @@
         - tool:tx-fuzz
     - type: node_type
       values:
-        - reth
+        - geth
