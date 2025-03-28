@@ -146,7 +146,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	time.Sleep(2 * time.Second)
 
 	// Create metrics collector and writer
-	metricsCollector := metrics.NewRethMetricsCollector(logger, client.Client())
+	metricsCollector := metrics.NewMetricsCollector(logger, client.Client(), params.NodeType)
 	metricsWriter := metrics.NewFileMetricsWriter(metricsPath)
 
 	// Wait for RPC to become available
