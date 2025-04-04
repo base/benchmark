@@ -151,7 +151,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 }
 
 func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	return retry.Do[*types.Receipt](ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
+	return retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
 			return nil, err
