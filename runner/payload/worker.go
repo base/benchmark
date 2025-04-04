@@ -3,7 +3,6 @@ package payload
 import (
 	"context"
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"time"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/btcsuite/btcd/btcec/v2"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -151,20 +151,13 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 }
 
 func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	maxTimeout := time.Now().Add(60 * time.Second)
-	for {
+	return retry.Do[*types.Receipt](ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
-			t.log.Error("Failed to get receipt", "err", err)
+			return nil, err
 		}
-		if receipt != nil {
-			return receipt, nil
-		}
-		if time.Now().After(maxTimeout) {
-			return nil, fmt.Errorf("timed out waiting for receipt")
-		}
-		time.Sleep(1 * time.Second)
-	}
+		return receipt, nil
+	})
 }
 
 func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64) error {
