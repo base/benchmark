@@ -279,15 +279,11 @@ func (f *FakeConsensusClient) CollectMetrics(ctx context.Context) error {
 
 // Start starts the fake consensus client.
 func (f *FakeConsensusClient) Start(ctx context.Context) error {
-	// min block time
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
-		case <-ticker.C:
+		default:
 			err := f.Propose(ctx)
 			if err != nil {
 				return err
