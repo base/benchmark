@@ -95,7 +95,7 @@ jobs:
         go run benchmark/cmd/main.go \
           --log.level debug \
           run \
-          --config ./configs/basic.yml \
+          --config ./configs/basic-reth.yml \
           --root-dir ${{ runner.temp }}/data-dir \
           --output-dir ${{ runner.temp }}/output \
           --reth-bin ${{ runner.temp }}/bin/reth \
