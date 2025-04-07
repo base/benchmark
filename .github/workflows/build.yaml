@@ -47,43 +47,56 @@ jobs:
       run: | 
         go test -v -coverprofile=coverage.out ./... 
     
-  # basic-benchmarks:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - uses: actions/checkout@v3
+  basic-benchmarks:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
 
-  #   - name: Set up Go
-  #     uses: actions/setup-go@v3
-  #     with:
-  #       go-version: 1.24
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.24
 
-  #   - name: Install project dependencies
-  #     run: | 
-  #       go mod download
+    - name: Set up Rust
+      uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
 
-  #   - name: Download geth and reth
-  #     run: | 
-  #       # https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
-  #       # 62e5e435d1e981f97fff76f638fdf7cc4b9dbcbed66fcb10c4be6bd9d0dfd0ba  /Users/meyer9/Downloads/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz.asc
-  #       # Install from github.com/ethereum-optimism/op-geth
+    - name: Install project dependencies
+      run: | 
+        go mod download
 
-  #       wget https://github.com/paradigmxyz/reth/releases/download/v1.3.4/reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz
-  #       echo "62e5e435d1e981f97fff76f638fdf7cc4b9dbcbed66fcb10c4be6bd9d0dfd0ba  reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz" | shasum -a 256 -c
-  #       tar -xvf reth-v1.3.4-x86_64-unknown-linux-gnu.tar.gz # contains ./reth
-  #       chmod +x ./reth
+    - name: Download geth and reth
+      run: | 
+        mkdir -p ${{ runner.temp }}/bin
 
-  #       git clone https://github.com/ethereum-optimism/op-geth
-  #       cd op-geth
-  #       git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
-  #       make geth
-  #       cp ./build/bin/geth ..
-  #       cd ..
-  #       chmod +x ./geth
+        git clone https://github.com/paradigmxyz/reth
+        cd reth
+        git checkout --force fad870e3508adcc150faa4554111368e0e16f43b
+        cargo build --features asm-keccak --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
+        cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
+        cd ..
+        chmod +x ${{ runner.temp }}/bin/reth
 
-  #       ls -la
+        git clone https://github.com/ethereum-optimism/op-geth
+        cd op-geth
+        git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+        make geth
+        cp ./build/bin/geth ${{ runner.temp }}/bin/geth
+        chmod +x ${{ runner.temp }}/bin/geth
+        cd ..
 
-  #   - name: Run Basic Benchmarks
-  #     id: unit
-  #     run: | 
-  #       mkdir ./data-dir
-  #       go run benchmark/cmd/main.go --log.level debug run --config ./configs/basic.yml --root-dir ./data-dir --reth-bin ./reth --geth-bin ./geth
+        echo "binaries compiled:"
+        ls -la ${{ runner.temp }}/bin
+
+    - name: Run Basic Benchmarks
+      id: unit
+      run: | 
+        mkdir ${{ runner.temp }}/data-dir
+        mkdir ${{ runner.temp }}/output
+        go run benchmark/cmd/main.go \
+          --log.level debug \
+          run \
+          --config ./configs/basic.yml \
+          --root-dir ${{ runner.temp }}/data-dir \
+          --output-dir ${{ runner.temp }}/output \
+          --reth-bin ${{ runner.temp }}/bin/reth \
+          --geth-bin ${{ runner.temp }}/bin/geth
