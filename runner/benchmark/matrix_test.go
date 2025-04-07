@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/clients"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +28,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 			},
 			want: benchmark.ParamsMatrix{
 				{
-					NodeType:           "geth",
+					NodeType:           clients.Geth,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
@@ -51,13 +52,13 @@ func TestNewMatrixFromConfig(t *testing.T) {
 			},
 			want: benchmark.ParamsMatrix{
 				{
-					NodeType:           "geth",
+					NodeType:           clients.Geth,
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					BlockTime:          time.Second,
 				},
 				{
-					NodeType:           "reth",
+					NodeType:           clients.Reth,
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					BlockTime:          time.Second,
@@ -85,28 +86,28 @@ func TestNewMatrixFromConfig(t *testing.T) {
 			},
 			want: benchmark.ParamsMatrix{
 				{
-					NodeType:           "geth",
+					NodeType:           clients.Geth,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "0"},
 				},
 				{
-					NodeType:           "reth",
+					NodeType:           clients.Reth,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "0"},
 				},
 				{
-					NodeType:           "geth",
+					NodeType:           clients.Geth,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
 					Env:                map[string]string{"TEST_ENV": "1"},
 				},
 				{
-					NodeType:           "reth",
+					NodeType:           clients.Reth,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
