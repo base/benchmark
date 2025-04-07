@@ -151,6 +151,12 @@ type TestRunMetadata struct {
 	Error    *string `json:"error,omitempty"`
 }
 
+const (
+	ExecutionLayerLogFileName = "el.log"
+	ResultMetadataFileName    = "result.json"
+	CompressedLogsFileName    = "logs.gz"
+)
+
 func (s *service) exportOutput(testName string, returnedError error, testDirs *testDirectories) error {
 	// package up logs from the EL client and write them to the output dir
 	// outputDir/
@@ -163,16 +169,16 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *t
 	testOutputDir := testDirs.outputPath
 
 	// copy metrics.json to output dir
-	metricsPath := path.Join(testDirs.metricsPath, "metrics.json")
-	metricsOutputPath := path.Join(testOutputDir, "metrics.json")
+	metricsPath := path.Join(testDirs.metricsPath, metrics.MetricsFileName)
+	metricsOutputPath := path.Join(testOutputDir, metrics.MetricsFileName)
 	err := os.Rename(metricsPath, metricsOutputPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to move metrics file")
 	}
 
 	// copy logs to output dir gzipped
-	logsPath := path.Join(testDirs.testDirPath, "el.log")
-	logsOutputPath := path.Join(testOutputDir, "logs.gz")
+	logsPath := path.Join(testDirs.testDirPath, ExecutionLayerLogFileName)
+	logsOutputPath := path.Join(testOutputDir, CompressedLogsFileName)
 
 	outFile, err := os.OpenFile(logsOutputPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -213,7 +219,7 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *t
 		Error:    errStr,
 	}
 
-	resultPath := path.Join(testOutputDir, "result.json")
+	resultPath := path.Join(testOutputDir, ResultMetadataFileName)
 	resultFile, err := os.OpenFile(resultPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open result file")
@@ -270,7 +276,7 @@ func (s *service) runTest(ctx context.Context, testName string, params benchmark
 	client := clients.NewClient(nodeType, log, &options)
 	defer client.Stop()
 
-	fileWriter, err := os.OpenFile(path.Join(testDirs.testDirPath, "el.log"), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	fileWriter, err := os.OpenFile(path.Join(testDirs.testDirPath, ExecutionLayerLogFileName), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open log file")
 	}
