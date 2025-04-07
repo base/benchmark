@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/config"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
@@ -21,7 +22,7 @@ type TransactionPayload struct {
 
 // Params is the parameters for a single benchmark run.
 type Params struct {
-	NodeType           string
+	NodeType           clients.Client
 	GasLimit           uint64
 	TransactionPayload []TransactionPayload
 	BlockTime          time.Duration
@@ -51,7 +52,11 @@ func NewParamsFromValues(assignments map[ParamType]string, transactionPayloads [
 	for k, v := range assignments {
 		switch k {
 		case ParamTypeNode:
-			params.NodeType = v
+			cl, err := clients.ParseClient(v)
+			if err != nil {
+				return nil, fmt.Errorf("invalid client %s", v)
+			}
+			params.NodeType = cl
 		case ParamTypeGasLimit:
 			gasLimit, err := strconv.Atoi(v)
 			if err != nil {

@@ -121,13 +121,6 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	}()
 
 	// TODO: serialize these nicer so we can pass them directly
-	nodeType := clients.Geth
-	switch params.NodeType {
-	case "geth":
-		nodeType = clients.Geth
-	case "reth":
-		nodeType = clients.Reth
-	}
 	logger := s.log.With("nodeType", params.NodeType)
 
 	options := s.config.ClientOptions()
@@ -136,7 +129,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	clientCtx, cancelClient := context.WithCancel(ctx)
 	defer cancelClient()
 
-	client := clients.NewClient(nodeType, logger, &options)
+	client := clients.NewClient(params.NodeType, logger, &options)
 	defer client.Stop()
 
 	err = client.Run(clientCtx, chainCfgPath, jwtSecretPath, dataDirPath)

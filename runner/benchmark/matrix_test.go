@@ -45,7 +45,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					},
 					{
 						ParamType: benchmark.ParamTypeNode,
-						Values:    &[]string{"geth", "erigon"},
+						Values:    &[]string{"geth", "reth"},
 					},
 				},
 			},
@@ -57,7 +57,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					BlockTime:          time.Second,
 				},
 				{
-					NodeType:           "erigon",
+					NodeType:           "reth",
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					BlockTime:          time.Second,
@@ -75,7 +75,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					},
 					{
 						ParamType: benchmark.ParamTypeNode,
-						Values:    &[]string{"geth", "erigon"},
+						Values:    &[]string{"geth", "reth"},
 					},
 					{
 						ParamType: benchmark.ParamTypeEnv,
@@ -92,7 +92,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					Env:                map[string]string{"TEST_ENV": "0"},
 				},
 				{
-					NodeType:           "erigon",
+					NodeType:           "reth",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
@@ -106,7 +106,7 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					Env:                map[string]string{"TEST_ENV": "1"},
 				},
 				{
-					NodeType:           "erigon",
+					NodeType:           "reth",
 					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
 					GasLimit:           benchmark.DefaultParams.GasLimit,
 					BlockTime:          time.Second,
