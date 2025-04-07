@@ -141,8 +141,8 @@ func (r *RethClient) Stop() {
 		r.logger.Error("failed to wait for reth", "err", err)
 	}
 
-	r.stdout.Close()
-	r.stderr.Close()
+	_ = r.stdout.Close()
+	_ = r.stderr.Close()
 
 	r.stdout = nil
 	r.stderr = nil

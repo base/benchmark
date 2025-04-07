@@ -163,10 +163,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 	txs := make([][]byte, 0, numAccounts)
 	acctIdx := 0
 
-	fakeResults := make([]interface{}, 0)
-
 	for gasUsed < gasLimit {
-
 		transferTx, err := t.createTransferTx(t.accounts[acctIdx], t.accountNonces[t.accountAddresses[acctIdx]], t.accountAddresses[(acctIdx+1)%numAccounts], big.NewInt(1))
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
@@ -177,8 +174,6 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 		if err != nil {
 			return err
 		}
-
-		fakeResults = append(fakeResults, nil)
 
 		txs = append(txs, marshaledTx)
 

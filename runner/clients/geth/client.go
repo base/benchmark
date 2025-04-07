@@ -155,8 +155,8 @@ func (g *GethClient) Stop() {
 		g.logger.Error("failed to wait for geth", "err", err)
 	}
 
-	g.stdout.Close()
-	g.stderr.Close()
+	_ = g.stdout.Close()
+	_ = g.stderr.Close()
 
 	g.stdout = nil
 	g.stderr = nil

@@ -46,7 +46,9 @@ func (r *RethMetricsCollector) Collect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

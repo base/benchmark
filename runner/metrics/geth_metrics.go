@@ -47,7 +47,9 @@ func (g *GethMetricsCollector) Collect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var metricsData map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&metricsData); err != nil {
