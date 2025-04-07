@@ -3,6 +3,7 @@ package geth
 import (
 	"context"
 	"encoding/hex"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,7 +18,6 @@ import (
 	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
-	"github.com/base/base-bench/runner/logger"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -31,8 +31,8 @@ type GethClient struct {
 	authClient client.RPC
 	process    *exec.Cmd
 
-	stdout *logger.LogWriter
-	stderr *logger.LogWriter
+	stdout io.WriteCloser
+	stderr io.WriteCloser
 }
 
 // NewGethClient creates a new client for geth.
@@ -44,7 +44,10 @@ func NewGethClient(logger log.Logger, options *config.ClientOptions) types.Execu
 }
 
 // Run runs the geth client with the given runtime config.
-func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error {
+func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
+	dataDir := cfg.DataDirPath
+	chainCfgPath := cfg.ChainCfgPath
+	jwtSecretPath := cfg.JwtSecretPath
 
 	if g.stdout != nil {
 		_ = g.stdout.Close()
@@ -54,8 +57,8 @@ func (g *GethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 		_ = g.stderr.Close()
 	}
 
-	g.stdout = logger.NewLogWriter(g.logger)
-	g.stderr = logger.NewLogWriter(g.logger)
+	g.stdout = cfg.Stdout
+	g.stderr = cfg.Stderr
 
 	// first init geth
 	args := make([]string, 0)

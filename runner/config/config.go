@@ -16,13 +16,15 @@ type Config interface {
 	LogConfig() oplog.CLIConfig
 	ClientOptions() ClientOptions
 	ConfigPath() string
-	RootDir() string
+	DataDir() string
+	OutputDir() string
 }
 
 type config struct {
 	logConfig     oplog.CLIConfig
 	configPath    string
-	rootDir       string
+	dataDir       string
+	outputDir     string
 	clientOptions ClientOptions
 }
 
@@ -30,7 +32,8 @@ func NewConfig(ctx *cli.Context) Config {
 	return &config{
 		logConfig:     oplog.ReadCLIConfig(ctx),
 		configPath:    ctx.String(appFlags.ConfigFlagName),
-		rootDir:       ctx.String(appFlags.RootDirFlagName),
+		dataDir:       ctx.String(appFlags.RootDirFlagName),
+		outputDir:     ctx.String(appFlags.OutputDirFlagName),
 		clientOptions: ReadClientOptions(ctx),
 	}
 }
@@ -39,8 +42,12 @@ func (c *config) ConfigPath() string {
 	return c.configPath
 }
 
-func (c *config) RootDir() string {
-	return c.rootDir
+func (c *config) DataDir() string {
+	return c.dataDir
+}
+
+func (c *config) OutputDir() string {
+	return c.outputDir
 }
 
 func (c *config) Check() error {
@@ -52,6 +59,15 @@ func (c *config) Check() error {
 	if _, err := os.Stat(c.configPath); err != nil {
 		return fmt.Errorf("config file does not exist: %w", err)
 	}
+
+	if c.dataDir == "" {
+		return errors.New("data dir is required")
+	}
+
+	if c.outputDir == "" {
+		return errors.New("output dir is required")
+	}
+
 	return nil
 }
 

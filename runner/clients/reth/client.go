@@ -3,6 +3,7 @@ package reth
 import (
 	"context"
 	"encoding/hex"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -17,7 +18,6 @@ import (
 	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
-	"github.com/base/base-bench/runner/logger"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -31,8 +31,8 @@ type RethClient struct {
 	authClient client.RPC
 	process    *exec.Cmd
 
-	stdout *logger.LogWriter
-	stderr *logger.LogWriter
+	stdout io.WriteCloser
+	stderr io.WriteCloser
 }
 
 // NewRethClient creates a new client for reth.
@@ -44,7 +44,11 @@ func NewRethClient(logger log.Logger, options *config.ClientOptions) types.Execu
 }
 
 // Run runs the reth client with the given runtime config.
-func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath string, dataDir string) error {
+func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
+	jwtSecretPath := cfg.JwtSecretPath
+	chainCfgPath := cfg.ChainCfgPath
+	dataDir := cfg.DataDirPath
+
 	args := make([]string, 0)
 	args = append(args, "node")
 	args = append(args, "--color", "never")
@@ -88,8 +92,8 @@ func (r *RethClient) Run(ctx context.Context, chainCfgPath string, jwtSecretPath
 		_ = r.stderr.Close()
 	}
 
-	r.stdout = logger.NewLogWriter(r.logger)
-	r.stderr = logger.NewLogWriter(r.logger)
+	r.stdout = cfg.Stdout
+	r.stderr = cfg.Stderr
 
 	r.logger.Debug("starting reth", "args", strings.Join(args, " "))
 

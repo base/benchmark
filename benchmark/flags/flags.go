@@ -15,8 +15,9 @@ func prefixEnvVars(name string) []string {
 }
 
 const (
-	ConfigFlagName  = "config"
-	RootDirFlagName = "root-dir"
+	ConfigFlagName    = "config"
+	RootDirFlagName   = "root-dir"
+	OutputDirFlagName = "output-dir"
 )
 
 var (
@@ -33,6 +34,13 @@ var (
 		EnvVars:  prefixEnvVars("ROOT_DIR"),
 		Required: true,
 	}
+
+	OutputDirFlag = &cli.StringFlag{
+		Name:     "output-dir",
+		Usage:    "Output Directory",
+		EnvVars:  prefixEnvVars("OUTPUT_DIR"),
+		Required: true,
+	}
 )
 
 // Flags contains the list of configuration options available to the binary.
@@ -41,6 +49,7 @@ var Flags = []cli.Flag{}
 var RunFlags = []cli.Flag{
 	ConfigFlag,
 	RootDirFlag,
+	OutputDirFlag,
 }
 
 func init() {

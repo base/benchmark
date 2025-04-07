@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -94,3 +95,5 @@ func (lw *LogWriter) Close() error {
 	lw.flushBuffer()
 	return nil
 }
+
+var _ io.WriteCloser = (*LogWriter)(nil)

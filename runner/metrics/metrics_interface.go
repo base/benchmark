@@ -68,8 +68,7 @@ func NewFileMetricsWriter(baseDir string) *FileMetricsWriter {
 }
 
 func (w *FileMetricsWriter) Write(metrics []Metrics) error {
-	timestamp := time.Now().Format("20060102_150405")
-	filename := w.BaseDir + "/metrics_" + timestamp + ".json"
+	filename := w.BaseDir + "/metrics.json"
 
 	data, err := json.MarshalIndent(metrics, "", "  ")
 
