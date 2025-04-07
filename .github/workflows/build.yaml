@@ -8,6 +8,25 @@ on:
     branches: [ "main" ]
 
 jobs:
+  go-lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.24
+
+    - name: Install project dependencies
+      run: | 
+        go mod download
+
+    - name: Lint Go
+      uses: golangci/golangci-lint-action@1481404843c368bc19ca9406f87d6e0fc97bdcfd # v7.0.0
+      with:
+        version: v2.0
+
   go-test:
     outputs:
       COVERAGE: ${{ steps.unit.outputs.coverage }}
@@ -23,11 +42,11 @@ jobs:
     - name: Install project dependencies
       run: | 
         go mod download
-
     - name: Run Unit Tests
       id: unit
       run: | 
         go test -v -coverprofile=coverage.out ./... 
+    
   # basic-benchmarks:
   #   runs-on: ubuntu-latest
   #   steps:
