@@ -106,5 +106,6 @@ jobs:
           run \
           --config ./configs/basic-reth.yml \
           --root-dir ${{ runner.temp }}/data-dir \
+          --output-dir ${{ runner.temp }}/output \
           --reth-bin ${{ runner.temp }}/bin/reth \
           --geth-bin ${{ runner.temp }}/bin/geth
