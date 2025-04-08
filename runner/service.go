@@ -58,18 +58,12 @@ func readBenchmarkConfig(path string) ([]benchmark.Matrix, error) {
 }
 
 type testDirectories struct {
-	// chaingCfgPath is the path to the chain config file
-	chainCfgPath string
-	// outputPath is the path to the output directory for this test
-	outputPath string
-	// testDirPath is the path to the test directory where the test will write runtime data
-	testDirPath string
-	// jwtSecretPath is the path to the jwt secret file
+	chainCfgPath  string
+	outputPath    string
+	testDirPath   string
 	jwtSecretPath string
-	// dataDirPath is the path to the data directory for the EL for this test
-	dataDirPath string
-	// metricsPath is the path to the metrics directory for this test
-	metricsPath string
+	dataDirPath   string
+	metricsPath   string
 }
 
 func (s *service) setupTest(ctx context.Context, params benchmark.Params, dataDir string, genesis core.Genesis) (*testDirectories, error) {
@@ -380,6 +374,7 @@ func (s *service) Run(ctx context.Context) error {
 				numFailure++
 				continue
 			}
+			variation++
 			numSuccess++
 		}
 	}
