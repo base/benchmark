@@ -26,7 +26,7 @@ import (
 // RethClient handles the lifecycle of a reth client.
 type RethClient struct {
 	logger  log.Logger
-	options *config.ClientOptions
+	options *config.InternalClientOptions
 
 	client     *ethclient.Client
 	clientURL  string
@@ -38,7 +38,7 @@ type RethClient struct {
 }
 
 // NewRethClient creates a new client for reth.
-func NewRethClient(logger log.Logger, options *config.ClientOptions) types.ExecutionClient {
+func NewRethClient(logger log.Logger, options *config.InternalClientOptions) types.ExecutionClient {
 	return &RethClient{
 		logger:  logger,
 		options: options,
@@ -47,27 +47,23 @@ func NewRethClient(logger log.Logger, options *config.ClientOptions) types.Execu
 
 // Run runs the reth client with the given runtime config.
 func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
-	jwtSecretPath := cfg.JwtSecretPath
-	chainCfgPath := cfg.ChainCfgPath
-	dataDir := cfg.DataDirPath
-
 	args := make([]string, 0)
 	args = append(args, "node")
 	args = append(args, "--color", "never")
-	args = append(args, "--chain", chainCfgPath)
-	args = append(args, "--datadir", dataDir)
+	args = append(args, "--chain", r.options.ChainCfgPath)
+	args = append(args, "--datadir", r.options.DataDirPath)
 
 	// todo: make this dynamic eventually
 	args = append(args, "--http")
 	args = append(args, "--http.port", strconv.Itoa(r.options.RethHttpPort))
 	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.port", strconv.Itoa(r.options.RethAuthRpcPort))
-	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
+	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", strconv.Itoa(r.options.RethMetricsPort))
 	args = append(args, "-vvv")
 
 	// read jwt secret
-	jwtSecretStr, err := os.ReadFile(jwtSecretPath)
+	jwtSecretStr, err := os.ReadFile(r.options.JWTSecretPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to read jwt secret")
 	}
@@ -168,4 +164,8 @@ func (r *RethClient) ClientURL() string {
 // AuthClient returns the auth client used for CL communication.
 func (r *RethClient) AuthClient() client.RPC {
 	return r.authClient
+}
+
+func (r *RethClient) MetricsPort() int {
+	return r.options.RethMetricsPort
 }

@@ -15,6 +15,18 @@ type ClientOptions struct {
 	gethoptions.GethOptions
 }
 
+// InternalClientOptions are options that are set internally by the runner.
+type InternalClientOptions struct {
+	ClientOptions
+
+	JWTSecretPath string
+	ChainCfgPath  string
+	DataDirPath   string
+	TestDirPath   string
+	JWTSecret     string
+	MetricsPath   string
+}
+
 // ReadClientOptions reads any client options from the CLI context, but certain params may also be
 // filled in by test params.
 func ReadClientOptions(ctx *cli.Context) ClientOptions {
@@ -37,6 +49,4 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 }
 
 // CommonOptions are common client configuration options.
-type CommonOptions struct {
-	JWTSecret string
-}
+type CommonOptions struct{}

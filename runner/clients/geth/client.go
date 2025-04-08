@@ -26,7 +26,7 @@ import (
 // GethClient handles the lifecycle of a geth client.
 type GethClient struct {
 	logger  log.Logger
-	options *config.ClientOptions
+	options *config.InternalClientOptions
 
 	client     *ethclient.Client
 	clientURL  string
@@ -38,7 +38,7 @@ type GethClient struct {
 }
 
 // NewGethClient creates a new client for geth.
-func NewGethClient(logger log.Logger, options *config.ClientOptions) types.ExecutionClient {
+func NewGethClient(logger log.Logger, options *config.InternalClientOptions) types.ExecutionClient {
 	return &GethClient{
 		logger:  logger,
 		options: options,
@@ -47,9 +47,6 @@ func NewGethClient(logger log.Logger, options *config.ClientOptions) types.Execu
 
 // Run runs the geth client with the given runtime config.
 func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
-	dataDir := cfg.DataDirPath
-	chainCfgPath := cfg.ChainCfgPath
-	jwtSecretPath := cfg.JwtSecretPath
 
 	if g.stdout != nil {
 		_ = g.stdout.Close()
@@ -64,8 +61,8 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	// first init geth
 	args := make([]string, 0)
-	args = append(args, "--datadir", dataDir)
-	args = append(args, "init", chainCfgPath)
+	args = append(args, "--datadir", g.options.DataDirPath)
+	args = append(args, "init", g.options.ChainCfgPath)
 
 	cmd := exec.CommandContext(ctx, g.options.GethBin, args...)
 	cmd.Stdout = g.stdout
@@ -77,7 +74,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	args = make([]string, 0)
-	args = append(args, "--datadir", dataDir)
+	args = append(args, "--datadir", g.options.DataDirPath)
 	args = append(args, "--http")
 
 	// TODO: allocate these dynamically eventually
@@ -88,12 +85,12 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--metrics.port", strconv.Itoa(g.options.GethMetricsPort))
 
 	args = append(args, "--http.api", "eth,net,web3,miner")
-	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
+	args = append(args, "--authrpc.jwtsecret", g.options.JWTSecretPath)
 
 	// TODO: make this configurable
 	args = append(args, "--verbosity", "3")
 
-	jwtSecretStr, err := os.ReadFile(jwtSecretPath)
+	jwtSecretStr, err := os.ReadFile(g.options.JWTSecretPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to read jwt secret")
 	}
@@ -181,4 +178,8 @@ func (g *GethClient) ClientURL() string {
 // AuthClient returns the auth client used for CL communication.
 func (g *GethClient) AuthClient() client.RPC {
 	return g.authClient
+}
+
+func (r *GethClient) MetricsPort() int {
+	return r.options.GethMetricsPort
 }

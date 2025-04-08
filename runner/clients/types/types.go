@@ -9,11 +9,8 @@ import (
 )
 
 type RuntimeConfig struct {
-	Stdout        io.WriteCloser
-	Stderr        io.WriteCloser
-	ChainCfgPath  string
-	JwtSecretPath string
-	DataDirPath   string
+	Stdout io.WriteCloser
+	Stderr io.WriteCloser
 }
 
 // ExecutionClient is an abstraction over the different clients that can be used to run the chain like
@@ -24,4 +21,5 @@ type ExecutionClient interface {
 	Client() *ethclient.Client
 	ClientURL() string // needed for external transaction payload workers
 	AuthClient() client.RPC
+	MetricsPort() int
 }

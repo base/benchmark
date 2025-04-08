@@ -68,8 +68,6 @@ func (r *RethMetricsCollector) Collect(ctx context.Context) error {
 		return fmt.Errorf("failed to get block number: %w", err)
 	}
 
-	r.log.Info("Block number", "number", block)
-
 	m := NewMetrics()
 	m.BlockNumber = block
 

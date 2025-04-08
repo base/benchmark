@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/pkg/errors"
 )
 
 type Worker interface {
@@ -114,13 +115,13 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 
 		transferTx, err := t.createTransferTx(t.prefundedAccount, nonce, t.accountAddresses[i], perAccount)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to create transfer transaction")
 		}
 		nonce++
 
 		marshaledTx, err := transferTx.MarshalBinary()
 		if err != nil {
-			return err
+			return errors.Wrap(err, "failed to marshal transfer transaction")
 		}
 
 		sendCalls = append(sendCalls, marshaledTx)
@@ -133,7 +134,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 
 	receipt, err := t.waitForReceipt(ctx, lastTxHash)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to wait for receipt")
 	}
 
 	t.log.Debug("Last receipt", "status", receipt.Status)

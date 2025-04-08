@@ -10,7 +10,7 @@ import (
 )
 
 // NewClient creates a new client based on the given client type.
-func NewClient(client Client, logger log.Logger, options *config.ClientOptions) types.ExecutionClient {
+func NewClient(client Client, logger log.Logger, options *config.InternalClientOptions) types.ExecutionClient {
 	switch client {
 	case Reth:
 		return reth.NewRethClient(logger, options)

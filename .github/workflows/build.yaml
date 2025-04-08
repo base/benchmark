@@ -47,6 +47,9 @@ jobs:
         go test -v -coverprofile=coverage.out ./... 
     
   basic-benchmarks:
+    strategy:
+      matrix:
+        node-type: [reth, geth]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
@@ -104,7 +107,7 @@ jobs:
         go run benchmark/cmd/main.go \
           --log.level debug \
           run \
-          --config ./configs/basic-reth.yml \
+          --config ./configs/basic-${{ matrix.node-type }}.yml \
           --root-dir ${{ runner.temp }}/data-dir \
           --output-dir ${{ runner.temp }}/output \
           --reth-bin ${{ runner.temp }}/bin/reth \
