@@ -184,27 +184,35 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *t
 	if err != nil {
 		return errors.Wrap(err, "failed to open logs file")
 	}
-	defer outFile.Close()
+	defer func() {
+		_ = outFile.Close()
+	}()
 
 	wr := gzip.NewWriter(outFile)
-	defer wr.Close()
+	defer func() {
+		_ = wr.Close()
+	}()
 
 	inFile, err := os.Open(logsPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to open logs file")
 	}
-	defer inFile.Close()
+	defer func() {
+		_ = inFile.Close()
+	}()
 	_, err = io.Copy(wr, inFile)
 	if err != nil {
 		return errors.Wrap(err, "failed to copy logs file")
 	}
-	wr.Close()
+	_ = wr.Close()
 
 	logsFile, err := os.Open(logsPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to open logs file")
 	}
-	defer logsFile.Close()
+	defer func() {
+		_ = logsFile.Close()
+	}()
 
 	errStr := (*string)(nil)
 	if returnedError != nil {
