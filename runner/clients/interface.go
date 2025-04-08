@@ -1,6 +1,8 @@
 package clients
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/base/base-bench/runner/clients/geth"
@@ -22,9 +24,24 @@ func NewClient(client Client, logger log.Logger, options *config.ClientOptions) 
 }
 
 // Client is an enum for the different clients that can be used to run the chain.
-type Client uint
+type Client string
 
 const (
-	Reth Client = iota
-	Geth
+	Reth Client = "reth"
+	Geth Client = "geth"
 )
+
+var (
+	ErrInvalidClient = fmt.Errorf("invalid client type")
+)
+
+func ParseClient(client string) (Client, error) {
+	switch client {
+	case "reth":
+		return Reth, nil
+	case "geth":
+		return Geth, nil
+	default:
+		return "", ErrInvalidClient
+	}
+}

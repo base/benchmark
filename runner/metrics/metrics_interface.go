@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/base/base-bench/runner/clients"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -43,7 +44,7 @@ func (m *Metrics) GetMetricTypes() map[string]bool {
 func NewMetricsCollector(
 	log log.Logger,
 	client *ethclient.Client,
-	clientName string) MetricsCollector {
+	clientName clients.Client) MetricsCollector {
 	switch clientName {
 	case "geth":
 		return NewGethMetricsCollector(log, client)
