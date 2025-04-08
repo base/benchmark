@@ -76,20 +76,22 @@ jobs:
         mkdir -p ${{ runner.temp }}/bin
 
         git clone https://github.com/paradigmxyz/reth
-        cd reth
-        git checkout --force fad870e3508adcc150faa4554111368e0e16f43b
+        git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b
+        
+        pushd reth
         cargo build --features asm-keccak --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
         cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
-        cd ..
+        popd
         chmod +x ${{ runner.temp }}/bin/reth
 
         git clone https://github.com/ethereum-optimism/op-geth
-        cd op-geth
-        git checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+        git -C op-geth checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+
+        pushd op-geth
         make geth
         cp ./build/bin/geth ${{ runner.temp }}/bin/geth
         chmod +x ${{ runner.temp }}/bin/geth
-        cd ..
+        popd
 
         echo "binaries compiled:"
         ls -la ${{ runner.temp }}/bin
