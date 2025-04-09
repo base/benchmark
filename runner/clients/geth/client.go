@@ -3,9 +3,11 @@ package geth
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -79,11 +81,11 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--http")
 
 	// TODO: allocate these dynamically eventually
-	args = append(args, "--http.port", "8545")
-	args = append(args, "--authrpc.port", "8551")
+	args = append(args, "--http.port", strconv.Itoa(g.options.GethHttpPort))
+	args = append(args, "--authrpc.port", strconv.Itoa(g.options.GethAuthRpcPort))
 	args = append(args, "--metrics")
 	args = append(args, "--metrics.addr", "localhost")
-	args = append(args, "--metrics.port", "8080")
+	args = append(args, "--metrics.port", strconv.Itoa(g.options.GethMetricsPort))
 
 	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
@@ -118,7 +120,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return err
 	}
 
-	g.clientURL = "http://127.0.0.1:8545"
+	g.clientURL = fmt.Sprintf("http://127.0.0.1:%d", g.options.GethHttpPort)
 	rpcClient, err := rpc.Dial(g.clientURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial rpc")
@@ -131,7 +133,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
-	l2Node, err := client.NewRPC(ctx, g.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
+	l2Node, err := client.NewRPC(ctx, g.logger, fmt.Sprintf("http://127.0.0.1:%d", g.options.GethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
 	if err != nil {
 		return err
 	}

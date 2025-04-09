@@ -268,11 +268,15 @@ func (s *service) runTest(ctx context.Context, testName string, params benchmark
 
 	// TODO: serialize these nicer so we can pass them directly
 	nodeType := clients.Geth
+	metricsPort := 0
+
 	switch params.NodeType {
 	case "geth":
 		nodeType = clients.Geth
+		metricsPort = s.config.ClientOptions().GethMetricsPort
 	case "reth":
 		nodeType = clients.Reth
+		metricsPort = s.config.ClientOptions().RethMetricsPort
 	}
 
 	client := clients.NewClient(nodeType, log, &options)
@@ -302,7 +306,7 @@ func (s *service) runTest(ctx context.Context, testName string, params benchmark
 	time.Sleep(2 * time.Second)
 
 	// Create metrics collector and writer
-	metricsCollector := metrics.NewMetricsCollector(log, client.Client(), params.NodeType)
+	metricsCollector := metrics.NewMetricsCollector(log, client.Client(), params.NodeType, metricsPort)
 	metricsWriter := metrics.NewFileMetricsWriter(testDirs.metricsPath)
 
 	// Wait for RPC to become available

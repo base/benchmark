@@ -11,16 +11,18 @@ import (
 )
 
 type GethMetricsCollector struct {
-	log     log.Logger
-	client  *ethclient.Client
-	metrics []Metrics
+	log         log.Logger
+	client      *ethclient.Client
+	metrics     []Metrics
+	metricsPort int
 }
 
-func NewGethMetricsCollector(log log.Logger, client *ethclient.Client) *GethMetricsCollector {
+func NewGethMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) *GethMetricsCollector {
 	return &GethMetricsCollector{
-		log:     log,
-		client:  client,
-		metrics: make([]Metrics, 0),
+		log:         log,
+		client:      client,
+		metricsPort: metricsPort,
+		metrics:     make([]Metrics, 0),
 	}
 }
 
@@ -35,7 +37,7 @@ func (g *GethMetricsCollector) GetMetricTypes() map[string]bool {
 }
 
 func (g *GethMetricsCollector) GetMetricsEndpoint() string {
-	return "http://127.0.0.1:8080/debug/metrics"
+	return fmt.Sprintf("http://127.0.0.1:%d/debug/metrics", g.metricsPort)
 }
 
 func (g *GethMetricsCollector) GetMetrics() []Metrics {

@@ -20,10 +20,16 @@ type ClientOptions struct {
 func ReadClientOptions(ctx *cli.Context) ClientOptions {
 	options := ClientOptions{
 		RethOptions: rethoptions.RethOptions{
-			RethBin: ctx.String(flags.RethBinFlagName),
+			RethBin:         ctx.String(flags.RethBin),
+			RethHttpPort:    ctx.Int(flags.RethHttpPort),
+			RethAuthRpcPort: ctx.Int(flags.RethAuthRpcPort),
+			RethMetricsPort: ctx.Int(flags.RethMetricsPort),
 		},
 		GethOptions: gethoptions.GethOptions{
-			GethBin: ctx.String(flags.GethBinFlagName),
+			GethBin:         ctx.String(flags.GethBin),
+			GethHttpPort:    ctx.Int(flags.GethHttpPort),
+			GethAuthRpcPort: ctx.Int(flags.GethAuthRpcPort),
+			GethMetricsPort: ctx.Int(flags.GethMetricsPort),
 		},
 	}
 

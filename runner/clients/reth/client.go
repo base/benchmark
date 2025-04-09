@@ -3,9 +3,11 @@ package reth
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -57,11 +59,11 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	// todo: make this dynamic eventually
 	args = append(args, "--http")
-	args = append(args, "--http.port", "8545")
+	args = append(args, "--http.port", strconv.Itoa(r.options.RethHttpPort))
 	args = append(args, "--http.api", "eth,net,web3,miner")
-	args = append(args, "--authrpc.port", "8551")
+	args = append(args, "--authrpc.port", strconv.Itoa(r.options.RethAuthRpcPort))
 	args = append(args, "--authrpc.jwtsecret", jwtSecretPath)
-	args = append(args, "--metrics", "8080")
+	args = append(args, "--metrics", strconv.Itoa(r.options.RethMetricsPort))
 	args = append(args, "-vvv")
 
 	// read jwt secret
@@ -105,7 +107,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return err
 	}
 
-	r.clientURL = "http://127.0.0.1:8545"
+	r.clientURL = fmt.Sprintf("http://127.0.0.1:%d", r.options.RethHttpPort)
 	rpcClient, err := rpc.Dial(r.clientURL)
 	if err != nil {
 		return errors.Wrap(err, "failed to dial rpc")
@@ -118,7 +120,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
-	l2Node, err := client.NewRPC(ctx, r.logger, "http://127.0.0.1:8551", client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
+	l2Node, err := client.NewRPC(ctx, r.logger, fmt.Sprintf("http://127.0.0.1:%d", r.options.RethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
 	if err != nil {
 		return err
 	}

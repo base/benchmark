@@ -44,12 +44,13 @@ func (m *Metrics) GetMetricTypes() map[string]bool {
 func NewMetricsCollector(
 	log log.Logger,
 	client *ethclient.Client,
-	clientName string) MetricsCollector {
+	clientName string,
+	metricsPort int) MetricsCollector {
 	switch clientName {
 	case "geth":
-		return NewGethMetricsCollector(log, client)
+		return NewGethMetricsCollector(log, client, metricsPort)
 	case "reth":
-		return NewRethMetricsCollector(log, client)
+		return NewRethMetricsCollector(log, client, metricsPort)
 	}
 	panic(fmt.Sprintf("unknown client: %s", clientName))
 }

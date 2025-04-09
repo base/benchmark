@@ -13,21 +13,23 @@ import (
 )
 
 type RethMetricsCollector struct {
-	log     log.Logger
-	client  *ethclient.Client
-	metrics []Metrics
+	log         log.Logger
+	client      *ethclient.Client
+	metrics     []Metrics
+	metricsPort int
 }
 
-func NewRethMetricsCollector(log log.Logger, client *ethclient.Client) *RethMetricsCollector {
+func NewRethMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) *RethMetricsCollector {
 	return &RethMetricsCollector{
-		log:     log,
-		client:  client,
-		metrics: make([]Metrics, 0),
+		log:         log,
+		client:      client,
+		metricsPort: metricsPort,
+		metrics:     make([]Metrics, 0),
 	}
 }
 
 func (r *RethMetricsCollector) GetMetricsEndpoint() string {
-	return "http://localhost:8080/metrics"
+	return fmt.Sprintf("http://localhost:%d/metrics", r.metricsPort)
 }
 
 func (r *RethMetricsCollector) GetMetrics() []Metrics {
