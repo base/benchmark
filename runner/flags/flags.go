@@ -12,7 +12,7 @@ const (
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
-	return []cli.Flag{
+	flags := []cli.Flag{
 		&cli.StringFlag{
 			Name:    RethBinFlagName,
 			Usage:   "Reth binary path",
@@ -26,4 +26,6 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "GETH_BIN"),
 		},
 	}
+	flags = append(flags, PortFlags(envPrefix)...)
+	return flags
 }
