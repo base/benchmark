@@ -13,7 +13,7 @@ import (
 )
 
 type MetricsCollector interface {
-	Collect(ctx context.Context) error
+	Collect(ctx context.Context, blockNumber uint64) error
 	GetMetricsEndpoint() string
 	GetMetrics() []Metrics
 }

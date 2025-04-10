@@ -56,7 +56,7 @@ func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.Ex
 		}
 
 		// Collect metrics after each block
-		f.collectMetrics(ctx)
+		f.collectMetrics(ctx, payloads[i].Number)
 	}
 	return nil
 }

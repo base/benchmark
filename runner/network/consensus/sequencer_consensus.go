@@ -216,6 +216,6 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context) (*engine.Executa
 	}
 
 	// Collect metrics after each block
-	f.collectMetrics(ctx)
+	f.collectMetrics(ctx, payload.Number)
 	return payload, nil
 }
