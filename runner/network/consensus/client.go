@@ -68,7 +68,7 @@ func (b basicBlockType) IsIsthmus(blkTime uint64) bool {
 
 var _ types.BlockType = basicBlockType{}
 
-func (f *BaseConsensusClient) updateForkChoice(ctx context.Context) (*eth.PayloadID, error) {
+func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs *eth.PayloadAttributes) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
 		HeadBlockHash:      f.headBlockHash,
 		SafeBlockHash:      f.headBlockHash,
@@ -78,7 +78,7 @@ func (f *BaseConsensusClient) updateForkChoice(ctx context.Context) (*eth.Payloa
 	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu)
+	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu, payloadAttrs)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to propose block")

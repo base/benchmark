@@ -1,7 +1,9 @@
 package consensus
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
@@ -11,6 +13,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
+	"github.com/ethereum-optimism/optimism/op-service/solabi"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -36,6 +39,47 @@ func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authC
 		BaseConsensusClient: base,
 		mempool:             mempool,
 	}
+}
+
+// marshalBinaryWithSignature creates the call data for an L1Info transaction.
+func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]byte, error) {
+	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoEcotoneLen))
+	if err := solabi.WriteSignature(w, signature); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(w, binary.BigEndian, info.BaseFeeScalar); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(w, binary.BigEndian, info.BlobBaseFeeScalar); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(w, binary.BigEndian, info.SequenceNumber); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(w, binary.BigEndian, info.Time); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(w, binary.BigEndian, info.Number); err != nil {
+		return nil, err
+	}
+	if err := solabi.WriteUint256(w, info.BaseFee); err != nil {
+		return nil, err
+	}
+	blobBasefee := info.BlobBaseFee
+	if blobBasefee == nil {
+		blobBasefee = big.NewInt(1) // set to 1, to match the min blob basefee as defined in EIP-4844
+	}
+	if err := solabi.WriteUint256(w, blobBasefee); err != nil {
+		return nil, err
+	}
+	if err := solabi.WriteHash(w, info.BlockHash); err != nil {
+		return nil, err
+	}
+	// ABI encoding will perform the left-padding with zeroes to 32 bytes, matching the "batcherHash" SystemConfig format and version 0 byte.
+	if err := solabi.WriteAddress(w, info.BatcherAddr); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
 }
 
 func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttributes, error) {
@@ -96,30 +140,6 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 	}
 
 	return payloadAttrs, nil
-}
-
-func (f *SequencerConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs *eth.PayloadAttributes) (*eth.PayloadID, error) {
-	fcu := engine.ForkchoiceStateV1{
-		HeadBlockHash:      f.headBlockHash,
-		SafeBlockHash:      f.headBlockHash,
-		FinalizedBlockHash: f.headBlockHash,
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	var resp engine.ForkChoiceResponse
-	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu, payloadAttrs)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to propose block")
-	}
-
-	if resp.PayloadID == nil {
-		return nil, fmt.Errorf("failed to propose block, payload status: %#v", resp.PayloadStatus)
-	}
-
-	f.lastTimestamp = uint64(payloadAttrs.Timestamp)
-	return resp.PayloadID, nil
 }
 
 // Propose starts block generation, waits BlockTime, and generates a block.

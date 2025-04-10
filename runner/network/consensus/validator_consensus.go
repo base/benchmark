@@ -1,16 +1,11 @@
 package consensus
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
-	"math/big"
 	"time"
 
 	"github.com/base/base-bench/runner/metrics"
-	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/client"
-	"github.com/ethereum-optimism/optimism/op-service/solabi"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -33,7 +28,7 @@ func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authCli
 // Propose starts block generation, waits BlockTime, and generates a block.
 func (f *SyncingConsensusClient) Propose(ctx context.Context, payload *engine.ExecutableData) error {
 	f.log.Info("Updating fork choice before validating payload", "payload_index", payload.Number)
-	_, err := f.updateForkChoice(ctx)
+	_, err := f.updateForkChoice(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -64,45 +59,4 @@ func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.Ex
 		f.collectMetrics(ctx)
 	}
 	return nil
-}
-
-// marshalBinaryWithSignature creates the call data for an L1Info transaction.
-func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]byte, error) {
-	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoEcotoneLen))
-	if err := solabi.WriteSignature(w, signature); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(w, binary.BigEndian, info.BaseFeeScalar); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(w, binary.BigEndian, info.BlobBaseFeeScalar); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(w, binary.BigEndian, info.SequenceNumber); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(w, binary.BigEndian, info.Time); err != nil {
-		return nil, err
-	}
-	if err := binary.Write(w, binary.BigEndian, info.Number); err != nil {
-		return nil, err
-	}
-	if err := solabi.WriteUint256(w, info.BaseFee); err != nil {
-		return nil, err
-	}
-	blobBasefee := info.BlobBaseFee
-	if blobBasefee == nil {
-		blobBasefee = big.NewInt(1) // set to 1, to match the min blob basefee as defined in EIP-4844
-	}
-	if err := solabi.WriteUint256(w, blobBasefee); err != nil {
-		return nil, err
-	}
-	if err := solabi.WriteHash(w, info.BlockHash); err != nil {
-		return nil, err
-	}
-	// ABI encoding will perform the left-padding with zeroes to 32 bytes, matching the "batcherHash" SystemConfig format and version 0 byte.
-	if err := solabi.WriteAddress(w, info.BatcherAddr); err != nil {
-		return nil, err
-	}
-	return w.Bytes(), nil
 }
