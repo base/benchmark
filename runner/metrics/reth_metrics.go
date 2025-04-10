@@ -43,7 +43,7 @@ func (r *RethMetricsCollector) GetMetricTypes() map[string]bool {
 	}
 }
 
-func (r *RethMetricsCollector) Collect(ctx context.Context) error {
+func (r *RethMetricsCollector) Collect(ctx context.Context, blockNumber uint64) error {
 	resp, err := http.Get(r.GetMetricsEndpoint())
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
@@ -63,13 +63,8 @@ func (r *RethMetricsCollector) Collect(ctx context.Context) error {
 		return fmt.Errorf("failed to parse metrics: %w", err)
 	}
 
-	block, err := r.client.BlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get block number: %w", err)
-	}
-
 	m := NewMetrics()
-	m.BlockNumber = block
+	m.BlockNumber = blockNumber
 
 	metricTypes := r.GetMetricTypes()
 

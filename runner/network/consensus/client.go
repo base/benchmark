@@ -124,8 +124,8 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 }
 
 // collectMetrics collects metrics after block processing.
-func (b *BaseConsensusClient) collectMetrics(ctx context.Context) {
-	if err := b.metricsCollector.Collect(ctx); err != nil {
+func (b *BaseConsensusClient) collectMetrics(ctx context.Context, blockNumber uint64) {
+	if err := b.metricsCollector.Collect(ctx, blockNumber); err != nil {
 		b.log.Error("Failed to collect metrics", "error", err)
 	}
 }

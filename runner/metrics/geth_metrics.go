@@ -44,7 +44,7 @@ func (g *GethMetricsCollector) GetMetrics() []Metrics {
 	return g.metrics
 }
 
-func (g *GethMetricsCollector) Collect(ctx context.Context) error {
+func (g *GethMetricsCollector) Collect(ctx context.Context, blockNumber uint64) error {
 	resp, err := http.Get(g.GetMetricsEndpoint())
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
@@ -58,13 +58,8 @@ func (g *GethMetricsCollector) Collect(ctx context.Context) error {
 		return fmt.Errorf("failed to decode metrics: %w", err)
 	}
 
-	block, err := g.client.BlockNumber(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get block number: %w", err)
-	}
-
 	m := NewMetrics()
-	m.BlockNumber = block
+	m.BlockNumber = blockNumber
 
 	metricTypes := g.GetMetricTypes()
 	for name, value := range metricsData {
