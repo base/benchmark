@@ -1,12 +1,11 @@
 package clients
 
 import (
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/base/base-bench/runner/clients/geth"
 	"github.com/base/base-bench/runner/clients/reth"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // NewClient creates a new client based on the given client type.

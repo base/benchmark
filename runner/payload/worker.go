@@ -4,9 +4,8 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"math/big"
-	"time"
-
 	"math/rand"
+	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"

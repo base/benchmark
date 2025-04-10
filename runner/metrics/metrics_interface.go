@@ -45,7 +45,8 @@ func NewMetricsCollector(
 	log log.Logger,
 	client *ethclient.Client,
 	clientName string,
-	metricsPort int) MetricsCollector {
+	metricsPort int,
+) MetricsCollector {
 	switch clientName {
 	case "geth":
 		return NewGethMetricsCollector(log, client, metricsPort)
@@ -75,12 +76,11 @@ func (w *FileMetricsWriter) Write(metrics []Metrics) error {
 	filename := path.Join(w.BaseDir, MetricsFileName)
 
 	data, err := json.MarshalIndent(metrics, "", "  ")
-
 	if err != nil {
 		return fmt.Errorf("failed to marshal metrics: %w", err)
 	}
 
-	if err := os.WriteFile(filename, data, 0644); err != nil {
+	if err := os.WriteFile(filename, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write metrics file: %w", err)
 	}
 
