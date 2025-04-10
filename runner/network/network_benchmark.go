@@ -16,10 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-type (
-	Metrics interface{}
-	Logs    interface{}
-)
+type Metrics interface{}
+type Logs interface{}
 
 // NetworkBenchmark handles the lifecycle for a single benchmark run.
 type NetworkBenchmark struct {

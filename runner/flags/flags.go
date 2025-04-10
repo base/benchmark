@@ -1,8 +1,9 @@
 package flags
 
 import (
-	opservice "github.com/ethereum-optimism/optimism/op-service"
 	"github.com/urfave/cli/v2"
+
+	opservice "github.com/ethereum-optimism/optimism/op-service"
 )
 
 const (

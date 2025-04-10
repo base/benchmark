@@ -11,15 +11,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/base/base-bench/runner/clients/common"
-	"github.com/base/base-bench/runner/clients/types"
-	"github.com/base/base-bench/runner/config"
 	"github.com/ethereum-optimism/optimism/op-service/client"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+
+	"github.com/base/base-bench/runner/clients/common"
+	"github.com/base/base-bench/runner/clients/types"
+	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 // GethClient handles the lifecycle of a geth client.

@@ -1,10 +1,11 @@
 package config
 
 import (
+	"github.com/urfave/cli/v2"
+
 	gethoptions "github.com/base/base-bench/runner/clients/geth/options"
 	rethoptions "github.com/base/base-bench/runner/clients/reth/options"
 	"github.com/base/base-bench/runner/flags"
-	"github.com/urfave/cli/v2"
 )
 
 // ClientOptions is the common options object that gets passed to execution clients.

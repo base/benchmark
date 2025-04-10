@@ -12,6 +12,10 @@ import (
 	"path"
 	"time"
 
+	"github.com/ethereum/go-ethereum/log"
+	"github.com/go-yaml/yaml"
+	"github.com/pkg/errors"
+
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
@@ -20,9 +24,6 @@ import (
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/go-yaml/yaml"
-	"github.com/pkg/errors"
 )
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -70,20 +71,20 @@ func (s *service) setupTest(ctx context.Context, params benchmark.Params, dataDi
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 
 	testDir := path.Join(dataDir, testName)
-	err := os.Mkdir(testDir, 0o755)
+	err := os.Mkdir(testDir, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create test directory")
 	}
 
 	metricsPath := path.Join(testDir, "metrics")
-	err = os.Mkdir(metricsPath, 0o755)
+	err = os.Mkdir(metricsPath, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create metrics directory")
 	}
 
 	// write chain config to testDir/chain.json
 	chainCfgPath := path.Join(testDir, "chain.json")
-	chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0o644)
+	chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open chain config file")
 	}
@@ -95,7 +96,7 @@ func (s *service) setupTest(ctx context.Context, params benchmark.Params, dataDi
 	}
 
 	dataDirPath := path.Join(testDir, "data")
-	err = os.Mkdir(dataDirPath, 0o755)
+	err = os.Mkdir(dataDirPath, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create data directory")
 	}
@@ -107,7 +108,7 @@ func (s *service) setupTest(ctx context.Context, params benchmark.Params, dataDi
 	}
 
 	jwtSecretPath := path.Join(testDir, "jwt_secret")
-	jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0o644)
+	jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open jwt secret file")
 	}
@@ -123,7 +124,7 @@ func (s *service) setupTest(ctx context.Context, params benchmark.Params, dataDi
 
 	// create output directory for this test at output/<testName>
 	outputPath := path.Join(s.config.OutputDir(), testName)
-	err = os.MkdirAll(outputPath, 0o755)
+	err = os.MkdirAll(outputPath, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create output directory")
 	}
@@ -173,7 +174,7 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *t
 	logsPath := path.Join(testDirs.testDirPath, ExecutionLayerLogFileName)
 	logsOutputPath := path.Join(testOutputDir, CompressedLogsFileName)
 
-	outFile, err := os.OpenFile(logsOutputPath, os.O_WRONLY|os.O_CREATE, 0o644)
+	outFile, err := os.OpenFile(logsOutputPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open logs file")
 	}
@@ -221,7 +222,7 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *t
 	}
 
 	resultPath := path.Join(testOutputDir, ResultMetadataFileName)
-	resultFile, err := os.OpenFile(resultPath, os.O_WRONLY|os.O_CREATE, 0o644)
+	resultFile, err := os.OpenFile(resultPath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open result file")
 	}
@@ -281,7 +282,7 @@ func (s *service) runTest(ctx context.Context, testName string, params benchmark
 	client := clients.NewClient(nodeType, log, &options)
 	defer client.Stop()
 
-	fileWriter, err := os.OpenFile(path.Join(testDirs.testDirPath, ExecutionLayerLogFileName), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	fileWriter, err := os.OpenFile(path.Join(testDirs.testDirPath, ExecutionLayerLogFileName), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to open log file")
 	}
@@ -362,7 +363,7 @@ func (s *service) Run(ctx context.Context) error {
 
 		// ensure output directory exists
 		for _, dir := range []string{dataDir, outputDir} {
-			err = os.MkdirAll(dir, 0o755)
+			err = os.MkdirAll(dir, 0755)
 			if err != nil {
 				return errors.Wrap(err, "failed to create output directory")
 			}

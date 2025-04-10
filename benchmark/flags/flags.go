@@ -2,9 +2,10 @@ package flags
 
 import (
 	"github.com/base/base-bench/runner/flags"
+	"github.com/urfave/cli/v2"
+
 	opservice "github.com/ethereum-optimism/optimism/op-service"
 	oplog "github.com/ethereum-optimism/optimism/op-service/log"
-	"github.com/urfave/cli/v2"
 )
 
 const EnvVarPrefix = "BASE_BENCH"

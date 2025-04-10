@@ -148,6 +148,7 @@ func (f *FakeConsensusClient) updateForkChoice(ctx context.Context) (*eth.Payloa
 	defer cancel()
 	var resp engine.ForkChoiceResponse
 	err = f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu, payloadAttrs)
+
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to propose block")
 	}
@@ -185,7 +186,9 @@ func (b basicBlockType) IsIsthmus(blkTime uint64) bool {
 
 var _ types.BlockType = basicBlockType{}
 
-var EmptyWithdrawalsRoot = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+var (
+	EmptyWithdrawalsRoot = common.HexToHash("0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+)
 
 // newPayload calls engine_newPayloadV3 with the given executable data, filling out necessary info.
 func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
@@ -200,6 +203,7 @@ func (f *FakeConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	defer cancel()
 	var resp engine.ForkChoiceResponse
 	err = f.authClient.CallContext(ctx, &resp, "engine_newPayloadV3", params, []common.Hash{}, common.Hash{})
+
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")
 	}
