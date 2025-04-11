@@ -5,7 +5,7 @@
   variables:
     - type: transaction_workload
       values:
-        - transfer-only
+        - tx-fuzz
     - type: node_type
       values:
         - geth

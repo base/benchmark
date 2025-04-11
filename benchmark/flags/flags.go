@@ -18,28 +18,49 @@ const (
 	ConfigFlagName    = "config"
 	RootDirFlagName   = "root-dir"
 	OutputDirFlagName = "output-dir"
+	TxFuzzBinFlagName = "tx-fuzz-bin"
+	ProxyPortFlagName = "proxy-port"
+)
+
+// TxFuzz defaults
+const (
+	DefaultTxFuzzBin = "../tx-fuzz/cmd/livefuzzer/livefuzzer"
 )
 
 var (
 	ConfigFlag = &cli.StringFlag{
-		Name:     "config",
+		Name:     ConfigFlagName,
 		Usage:    "Config Path",
 		EnvVars:  prefixEnvVars("CONFIG"),
 		Required: true,
 	}
 
 	RootDirFlag = &cli.StringFlag{
-		Name:     "root-dir",
+		Name:     RootDirFlagName,
 		Usage:    "Root Directory",
 		EnvVars:  prefixEnvVars("ROOT_DIR"),
 		Required: true,
 	}
 
 	OutputDirFlag = &cli.StringFlag{
-		Name:     "output-dir",
+		Name:     OutputDirFlagName,
 		Usage:    "Output Directory",
 		EnvVars:  prefixEnvVars("OUTPUT_DIR"),
 		Required: true,
+	}
+
+	TxFuzzBinFlag = &cli.StringFlag{
+		Name:    TxFuzzBinFlagName,
+		Usage:   "Transaction Fuzzer binary path",
+		Value:   DefaultTxFuzzBin,
+		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "TX_FUZZ_BIN"),
+	}
+
+	ProxyPortFlag = &cli.IntFlag{
+		Name:    "proxy-port",
+		Usage:   "Proxy port",
+		Value:   8546,
+		EnvVars: prefixEnvVars("PROXY_PORT"),
 	}
 )
 
@@ -50,6 +71,8 @@ var RunFlags = []cli.Flag{
 	ConfigFlag,
 	RootDirFlag,
 	OutputDirFlag,
+	TxFuzzBinFlag,
+	ProxyPortFlag,
 }
 
 func init() {

@@ -37,11 +37,7 @@ func NewProxyServer(client types.ExecutionClient, log log.Logger, port int) *Pro
 	}
 }
 
-func (p *ProxyServer) Run(ctx context.Context, config *types.RuntimeConfig) error {
-	if err := p.client.Run(ctx, config); err != nil {
-		return err
-	}
-
+func (p *ProxyServer) Run(ctx context.Context) error {
 	// Start the proxy server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", p.handleRequest)
@@ -162,7 +158,11 @@ func (p *ProxyServer) OverrideRequest(method string, params json.RawMessage) (bo
 	// case "eth_getBlockByNumber":
 	// 	response := "0x100"
 	// 	return true, json.RawMessage(`"` + response + `"`), nil
-
+	case "eth_sendRawTransaction":
+		// return true, json.RawMessage(`"` + response + `"`), nil
+		// print params
+		p.log.Info("Received eth_sendRawTransaction request", "params", string(params))
+		return true, json.RawMessage(`"0x"`), nil
 	default:
 		return false, nil, nil
 	}

@@ -18,6 +18,8 @@ type Config interface {
 	ConfigPath() string
 	DataDir() string
 	OutputDir() string
+	TxFuzzBinary() string
+	ProxyPort() int
 }
 
 type config struct {
@@ -26,6 +28,8 @@ type config struct {
 	dataDir       string
 	outputDir     string
 	clientOptions ClientOptions
+	txFuzzBinary  string
+	proxyPort     int
 }
 
 func NewConfig(ctx *cli.Context) Config {
@@ -34,6 +38,8 @@ func NewConfig(ctx *cli.Context) Config {
 		configPath:    ctx.String(appFlags.ConfigFlagName),
 		dataDir:       ctx.String(appFlags.RootDirFlagName),
 		outputDir:     ctx.String(appFlags.OutputDirFlagName),
+		txFuzzBinary:  ctx.String(appFlags.TxFuzzBinFlagName),
+		proxyPort:     ctx.Int(appFlags.ProxyPortFlagName),
 		clientOptions: ReadClientOptions(ctx),
 	}
 }
@@ -48,6 +54,10 @@ func (c *config) DataDir() string {
 
 func (c *config) OutputDir() string {
 	return c.outputDir
+}
+
+func (c *config) ProxyPort() int {
+	return c.proxyPort
 }
 
 func (c *config) Check() error {
@@ -77,4 +87,8 @@ func (c *config) LogConfig() oplog.CLIConfig {
 
 func (c *config) ClientOptions() ClientOptions {
 	return c.clientOptions
+}
+
+func (c *config) TxFuzzBinary() string {
+	return c.txFuzzBinary
 }

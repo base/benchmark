@@ -258,7 +258,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, rootDir 
 	}
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, &genesis)
+	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, &genesis, s.config)
 	if err != nil {
 		return errors.Wrap(err, "failed to create network benchmark")
 	}

@@ -9,11 +9,13 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
+	"github.com/base/base-bench/runner/clients/proxy"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/consensus"
+	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/payload"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -36,16 +38,18 @@ type NetworkBenchmark struct {
 	validatorOptions *config.InternalClientOptions
 
 	genesis *core.Genesis
+	config  config.Config
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client.
-func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, genesis *core.Genesis) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, genesis *core.Genesis, config config.Config) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:              log,
 		sequencerOptions: sequencerOptions,
 		validatorOptions: validatorOptions,
 		genesis:          genesis,
 		params:           benchParams,
+		config:           config,
 	}, nil
 }
 
@@ -111,8 +115,33 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	}()
 
 	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
+	privateKey := common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	var mempool mempool.FakeMempool
+	var worker payload.Worker
 
-	mempool, worker, err := payload.NewTransferPayloadWorker(nb.log, sequencerClient.ClientURL(), nb.params, common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80"), amount)
+	if len(nb.params.TransactionPayload) != 1 {
+		return nil, errors.New("Required exactly one transaction payload type")
+	}
+
+	payloadType := nb.params.TransactionPayload[0].Type
+
+	switch payloadType {
+	case "tx-fuzz":
+		proxyServer := proxy.NewProxyServer(sequencerClient, nb.log, nb.config.ProxyPort())
+		err = proxyServer.Run(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to run proxy server")
+		}
+		defer proxyServer.Stop()
+		mempool, worker, err = payload.NewTxFuzzPayloadWorker(
+			nb.log, proxyServer.ClientURL(), nb.params, privateKey, amount, nb.config.TxFuzzBinary())
+	case "transfer-only":
+		mempool, worker, err = payload.NewTransferPayloadWorker(
+			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
+	default:
+		return nil, errors.New("invalid payload type")
+	}
+
 	if err != nil {
 		return nil, err
 	}
