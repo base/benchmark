@@ -63,7 +63,8 @@ const LineChart: React.FC<LineChartProps> = ({ series, metricKey, title, descrip
           .attr('transform', 'rotate(-45)')
 
         svg.append('g')
-          .call(d3.axisLeft(y).tickFormat(d => formatValue(d as number, unit)))
+          .call(d3.axisLeft(y).tickFormat(d => formatValue(d as number, unit))
+          .ticks(8))
           .append('text')
           .attr('fill', '#000')
           .attr('transform', 'rotate(-90)')

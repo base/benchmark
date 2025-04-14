@@ -1,66 +1,48 @@
-import React, { useEffect, useState } from 'react'
-import { MetricData, DataSeries } from './types'
+import { useEffect, useState } from 'react'
+import { BenchmarkRuns, DataSeries } from './types'
 import { CHART_CONFIG } from './chart-manifest'
 import LineChart from './components/LineChart'
 import BarChart from './components/BarChart'
+import ChartSelector from './ChartSelector'
 
 function App() {
-  const [data, setData] = useState<DataSeries[]>([])
+  const [benchmarkRuns, setBenchmarkRuns] = useState<BenchmarkRuns | null>(null)
 
   useEffect(() => {
-    async function loadMetrics(url: string) {
+    async function loadMetrics() {
       try {
-        const response = await fetch(url)
+        const response = await fetch('/output/test_metadata.json')
         const jsonData = await response.json()
-        return jsonData
+        setBenchmarkRuns(jsonData)
       } catch (error) {
         console.error('Error loading metrics:', error)
       }
     }
-
-    Promise.all([loadMetrics('/output/geth-validator/metrics.json'), loadMetrics('/output/geth-sequencer/metrics.json')])
-      .then(([validatorMetrics, sequencerMetrics]) => {
-        setData([
-          {
-            name: 'Validator',
-            data: validatorMetrics
-          },
-          {
-            name: 'Sequencer',
-            data: sequencerMetrics
-          }
-        ])
-      })
+    loadMetrics()
   }, [])
 
-  if (data.length === 0) {
+  const fetchMetrics = async (outputDir: string, nodeType: string) => {
+    const response = await fetch(`/output/${outputDir}/metrics-${nodeType}.json`)
+    return await response.json()
+  }
+
+  const fetchResult = async (outputDir: string, nodeType: string) => {
+    const response = await fetch(`/output/${outputDir}/result-${nodeType}.json`)
+    return await response.json()
+  }
+
+  const getLogsDownloadGz = (outputDir: string, nodeType: string) => {
+    return `/output/${outputDir}/logs-${nodeType}.tar.gz`
+  }
+
+  if (!benchmarkRuns || benchmarkRuns.runs.length === 0) {
     return <div>Loading...</div>
   }
 
   return (
     <div className="container">
       <h1>Base Bench Metrics</h1>
-      <div className="charts-container">
-        {Object.entries(CHART_CONFIG).map(([metricKey, config]) => {
-          const chartProps = {
-            series: data,
-            metricKey,
-            title: config.title,
-            description: config.description,
-            unit: config.unit
-          }
-
-          return (
-            <div key={metricKey} className="chart-container">
-              {config.type === 'line' ? (
-                <LineChart {...chartProps} />
-              ) : (
-                <BarChart {...chartProps} />
-              )}
-            </div>
-          )
-        })}
-      </div>
+      <ChartSelector benchmarkRuns={benchmarkRuns} fetchMetrics={fetchMetrics} fetchResult={fetchResult} getLogsDownloadGz={getLogsDownloadGz} />
     </div>
   )
 }

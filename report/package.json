@@ -22,9 +22,10 @@
     "@types/node": "^20.11.24",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "prettier": "^3.5.3",
     "typescript": "^5.3.3",
     "vite": "^5.1.4",
-    "vite-plugin-static-copy": "^2.3.1",
-    "@vitejs/plugin-react": "^4.3.4"
+    "vite-plugin-static-copy": "^2.3.1"
   }
 }
