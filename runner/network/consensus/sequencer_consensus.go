@@ -26,6 +26,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	GetPayloadLatencyMetric = "latency/get_payload"
+	SendTxsLatencyMetric    = "latency/send_txs"
+)
+
 // SequencerConsensusClient is a fake consensus client that generates blocks on a timer.
 type SequencerConsensusClient struct {
 	*BaseConsensusClient
@@ -33,8 +38,8 @@ type SequencerConsensusClient struct {
 }
 
 // NewSequencerConsensusClient creates a new consensus client using the given genesis hash and timestamp.
-func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, metricsCollector metrics.MetricsCollector, options ConsensusClientOptions) *SequencerConsensusClient {
-	base := NewBaseConsensusClient(log, client, authClient, genesis, metricsCollector, options)
+func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, options ConsensusClientOptions) *SequencerConsensusClient {
+	base := NewBaseConsensusClient(log, client, authClient, genesis, options)
 	return &SequencerConsensusClient{
 		BaseConsensusClient: base,
 		mempool:             mempool,
@@ -143,19 +148,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 }
 
 // Propose starts block generation, waits BlockTime, and generates a block.
-func (f *SequencerConsensusClient) Propose(ctx context.Context) (*engine.ExecutableData, error) {
-	payloadAttrs, err := f.generatePayloadAttributes()
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate payload attributes")
-	}
-
-	f.log.Info("Starting block building")
-
-	payloadID, err := f.updateForkChoice(ctx, payloadAttrs)
-	if err != nil {
-		return nil, err
-	}
-
+func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics) (*engine.ExecutableData, error) {
 	startTime := time.Now()
 
 	transactionsToInclude := f.mempool.NextBlock()
@@ -191,11 +184,28 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context) (*engine.Executa
 
 	duration := time.Since(startTime)
 	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(transactionsToInclude))
+	blockMetrics.AddExecutionMetric(SendTxsLatencyMetric, duration)
+	startTime = time.Now()
+
+	f.log.Info("Starting block building")
+
+	payloadAttrs, err := f.generatePayloadAttributes()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to generate payload attributes")
+	}
+
+	payloadID, err := f.updateForkChoice(ctx, payloadAttrs)
+	if err != nil {
+		return nil, err
+	}
+
+	duration = time.Since(startTime)
+	blockMetrics.AddExecutionMetric(UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID
 
 	// wait block time
-	time.Sleep(f.options.BlockTime - duration)
+	time.Sleep(f.options.BlockTime)
 
 	startTime = time.Now()
 
@@ -206,8 +216,11 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context) (*engine.Executa
 		return nil, err
 	}
 	f.headBlockHash = payload.BlockHash
+	f.headBlockNumber = payload.Number
+	f.lastTimestamp = payload.Timestamp
 
 	duration = time.Since(startTime)
+	blockMetrics.AddExecutionMetric(GetPayloadLatencyMetric, duration)
 	f.log.Info("Fetched built payload", "duration", duration)
 
 	err = f.newPayload(ctx, payload)
@@ -215,7 +228,5 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context) (*engine.Executa
 		return nil, err
 	}
 
-	// Collect metrics after each block
-	f.collectMetrics(ctx, payload.Number)
 	return payload, nil
 }

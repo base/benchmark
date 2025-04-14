@@ -89,17 +89,17 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	payloads, err := nb.benchmarkSequencer(ctx)
+	payloads, lastSetupBlock, err := nb.benchmarkSequencer(ctx)
 	if err != nil {
 		return err
 	}
-	return nb.benchmarkValidator(ctx, payloads)
+	return nb.benchmarkValidator(ctx, payloads, lastSetupBlock)
 }
 
-func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.ExecutableData, error) {
+func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.ExecutableData, uint64, error) {
 	sequencerClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.sequencerOptions)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	defer sequencerClient.Stop()
@@ -120,7 +120,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	var worker payload.Worker
 
 	if len(nb.params.TransactionPayload) != 1 {
-		return nil, errors.New("Required exactly one transaction payload type")
+		return nil, 0, errors.New("Required exactly one transaction payload type")
 	}
 
 	payloadType := nb.params.TransactionPayload
@@ -130,7 +130,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		proxyServer := proxy.NewProxyServer(sequencerClient, nb.log, nb.config.ProxyPort())
 		err = proxyServer.Run(ctx)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to run proxy server")
+			return nil, 0, errors.Wrap(err, "failed to run proxy server")
 		}
 		defer proxyServer.Stop()
 		mempool, worker, err = payload.NewTxFuzzPayloadWorker(
@@ -139,17 +139,19 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		mempool, worker, err = payload.NewTransferPayloadWorker(
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
 	default:
-		return nil, errors.New("invalid payload type")
+		return nil, 0, errors.New("invalid payload type")
 	}
 
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	benchmarkCtx, benchmarkCancel := context.WithCancel(ctx)
 
 	errChan := make(chan error)
 	payloadResult := make(chan []engine.ExecutableData)
+
+	setupComplete := make(chan struct{})
 
 	go func() {
 		err := worker.Setup(benchmarkCtx)
@@ -158,31 +160,63 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 			errChan <- err
 			return
 		}
-
-		err = worker.Run(benchmarkCtx)
-		if err != nil {
-			nb.log.Warn("failed to start payload worker", "err", err)
-			errChan <- err
-			return
-		}
+		close(setupComplete)
 	}()
 
+	var lastSetupBlock uint64
+
 	go func() {
-		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, nb.genesis, metricsCollector, consensus.ConsensusClientOptions{
+		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, nb.genesis, consensus.ConsensusClientOptions{
 			BlockTime: nb.params.BlockTime,
 		})
 
 		payloads := make([]engine.ExecutableData, 0)
 
-		// wait 2 seconds before starting
-		time.Sleep(2 * time.Second)
+		// setup blocks
+		blockNum := uint64(0)
 
-		// run for a few blocks
-		for i := 0; i < 12; i++ {
-			payload, err := consensusClient.Propose(benchmarkCtx)
+	setupLoop:
+		for {
+			_blockMetrics := metrics.NewBlockMetrics(blockNum)
+			payload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics)
 			if err != nil {
 				errChan <- err
 				return
+			}
+
+			payloads = append(payloads, *payload)
+			blockNum = payload.Number
+			select {
+			case <-setupComplete:
+				break setupLoop
+			default:
+			}
+		}
+
+		lastSetupBlock = payloads[len(payloads)-1].Number
+		nb.log.Info("Last setup block", "block", lastSetupBlock)
+
+		// run for a few blocks
+		for i := 0; i < nb.params.NumBlocks; i++ {
+			blockMetrics := metrics.NewBlockMetrics(payloads[len(payloads)-1].Number + 1)
+			err := worker.SendTxs(benchmarkCtx)
+			if err != nil {
+				nb.log.Warn("failed to send transactions", "err", err)
+				errChan <- err
+				return
+			}
+
+			payload, err := consensusClient.Propose(benchmarkCtx, blockMetrics)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			time.Sleep(500 * time.Millisecond)
+
+			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
+			if err != nil {
+				nb.log.Error("Failed to collect metrics", "error", err)
 			}
 			nb.log.Info("Proposed payload", "payload_index", i, "len", len(payloads))
 			payloads = append(payloads, *payload)
@@ -193,14 +227,14 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	select {
 	case err := <-errChan:
 		benchmarkCancel()
-		return nil, err
+		return nil, 0, err
 	case payloads := <-payloadResult:
 		benchmarkCancel()
-		return payloads, nil
+		return payloads, lastSetupBlock + 1, nil
 	}
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData) error {
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {
 	validatorClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.validatorOptions)
 	if err != nil {
 		return err
@@ -218,11 +252,11 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		}
 	}()
 
-	consensusClient := consensus.NewSyncingConsensusClient(nb.log, validatorClient.Client(), validatorClient.AuthClient(), nb.genesis, metricsCollector, consensus.ConsensusClientOptions{
+	consensusClient := consensus.NewSyncingConsensusClient(nb.log, validatorClient.Client(), validatorClient.AuthClient(), nb.genesis, consensus.ConsensusClientOptions{
 		BlockTime: nb.params.BlockTime,
 	})
 
-	err = consensusClient.Start(ctx, payloads)
+	err = consensusClient.Start(ctx, payloads, metricsCollector, firstTestBlock)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		nb.log.Warn("failed to run consensus client", "err", err)
 		return err

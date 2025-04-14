@@ -15,7 +15,7 @@ import (
 type RethMetricsCollector struct {
 	log         log.Logger
 	client      *ethclient.Client
-	metrics     []Metrics
+	metrics     []BlockMetrics
 	metricsPort int
 }
 
@@ -24,7 +24,7 @@ func NewRethMetricsCollector(log log.Logger, client *ethclient.Client, metricsPo
 		log:         log,
 		client:      client,
 		metricsPort: metricsPort,
-		metrics:     make([]Metrics, 0),
+		metrics:     make([]BlockMetrics, 0),
 	}
 }
 
@@ -32,7 +32,7 @@ func (r *RethMetricsCollector) GetMetricsEndpoint() string {
 	return fmt.Sprintf("http://localhost:%d/metrics", r.metricsPort)
 }
 
-func (r *RethMetricsCollector) GetMetrics() []Metrics {
+func (r *RethMetricsCollector) GetMetrics() []BlockMetrics {
 	return r.metrics
 }
 
@@ -43,7 +43,7 @@ func (r *RethMetricsCollector) GetMetricTypes() map[string]bool {
 	}
 }
 
-func (r *RethMetricsCollector) Collect(ctx context.Context, blockNumber uint64) error {
+func (r *RethMetricsCollector) Collect(ctx context.Context, m *BlockMetrics) error {
 	resp, err := http.Get(r.GetMetricsEndpoint())
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
@@ -62,9 +62,6 @@ func (r *RethMetricsCollector) Collect(ctx context.Context, blockNumber uint64) 
 	if err != nil {
 		return fmt.Errorf("failed to parse metrics: %w", err)
 	}
-
-	m := NewMetrics()
-	m.BlockNumber = blockNumber
 
 	metricTypes := r.GetMetricTypes()
 

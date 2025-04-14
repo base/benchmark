@@ -17,46 +17,60 @@ type SyncingConsensusClient struct {
 	*BaseConsensusClient
 }
 
+const (
+	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
+	NewPayloadLatencyMetric       = "latency/new_payload"
+)
+
 // NewSyncingConsensusClient creates a new consensus client.
-func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, metricsCollector metrics.MetricsCollector, options ConsensusClientOptions) *SyncingConsensusClient {
-	base := NewBaseConsensusClient(log, client, authClient, genesis, metricsCollector, options)
+func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, options ConsensusClientOptions) *SyncingConsensusClient {
+	base := NewBaseConsensusClient(log, client, authClient, genesis, options)
 	return &SyncingConsensusClient{
 		BaseConsensusClient: base,
 	}
 }
 
 // Propose starts block generation, waits BlockTime, and generates a block.
-func (f *SyncingConsensusClient) Propose(ctx context.Context, payload *engine.ExecutableData) error {
+func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.ExecutableData, metrics *metrics.BlockMetrics) error {
 	f.log.Info("Updating fork choice before validating payload", "payload_index", payload.Number)
+	startTime := time.Now()
 	_, err := f.updateForkChoice(ctx, nil)
 	if err != nil {
 		return err
 	}
+	duration := time.Since(startTime)
+	metrics.AddExecutionMetric(UpdateForkChoiceLatencyMetric, duration)
 
 	f.log.Info("Validate payload", "payload_index", payload.Number)
-	startTime := time.Now()
+	startTime = time.Now()
 	err = f.newPayload(ctx, payload)
 	if err != nil {
 		return err
 	}
-	duration := time.Since(startTime)
+	duration = time.Since(startTime)
 	f.log.Info("Validated payload", "payload_index", payload.Number, "duration", duration)
+	metrics.AddExecutionMetric(NewPayloadLatencyMetric, duration)
 
 	return nil
 }
 
 // Start starts the fake consensus client.
-func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData) error {
+func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.MetricsCollector, firstTestBlock uint64) error {
 	f.log.Info("Starting sync benchmark", "num_payloads", len(payloads))
 	for i := 0; i < len(payloads); i++ {
+		m := metrics.NewBlockMetrics(payloads[i].Number)
 		f.log.Info("Proposing payload", "payload_index", i)
-		err := f.Propose(ctx, &payloads[i])
+		err := f.propose(ctx, &payloads[i], m)
 		if err != nil {
 			return err
 		}
 
-		// Collect metrics after each block
-		f.collectMetrics(ctx, payloads[i].Number)
+		if payloads[i].Number >= firstTestBlock {
+			err = metricsCollector.Collect(ctx, m)
+			if err != nil {
+				f.log.Error("Failed to collect metrics", "error", err)
+			}
+		}
 	}
 	return nil
 }

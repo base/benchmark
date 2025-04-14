@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/beacon/engine"
@@ -29,15 +28,15 @@ type BaseConsensusClient struct {
 	authClient client.RPC
 	options    ConsensusClientOptions
 
-	headBlockHash common.Hash
-	lastTimestamp uint64
+	headBlockHash   common.Hash
+	headBlockNumber uint64
+	lastTimestamp   uint64
 
 	currentPayloadID *engine.PayloadID
-	metricsCollector metrics.MetricsCollector
 }
 
 // NewBaseConsensusClient creates a new base consensus client.
-func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, metricsCollector metrics.MetricsCollector, options ConsensusClientOptions) *BaseConsensusClient {
+func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, options ConsensusClientOptions) *BaseConsensusClient {
 	genesisHash := genesis.ToBlock().Hash()
 	genesisTimestamp := genesis.Timestamp
 
@@ -46,10 +45,10 @@ func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient
 		client:           client,
 		authClient:       authClient,
 		headBlockHash:    genesisHash,
+		headBlockNumber:  genesis.Number,
 		lastTimestamp:    genesisTimestamp,
 		options:          options,
 		currentPayloadID: nil,
-		metricsCollector: metricsCollector,
 	}
 }
 
@@ -121,11 +120,4 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	}
 
 	return nil
-}
-
-// collectMetrics collects metrics after block processing.
-func (b *BaseConsensusClient) collectMetrics(ctx context.Context, blockNumber uint64) {
-	if err := b.metricsCollector.Collect(ctx, blockNumber); err != nil {
-		b.log.Error("Failed to collect metrics", "error", err)
-	}
 }

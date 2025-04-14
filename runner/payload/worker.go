@@ -23,7 +23,7 @@ import (
 
 type Worker interface {
 	Setup(ctx context.Context) error
-	Run(ctx context.Context) error
+	SendTxs(ctx context.Context) error
 }
 
 type NewWorkerFn func(logger log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error)
@@ -46,7 +46,7 @@ type TransferOnlyPayloadWorker struct {
 	mempool *mempool.StaticWorkloadMempool
 }
 
-const numAccounts = 1000
+const numAccounts = 10000
 
 func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (mempool.FakeMempool, Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(params.GasLimit)
@@ -191,25 +191,6 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 	return nil
 }
 
-func (t *TransferOnlyPayloadWorker) Run(ctx context.Context) error {
-	numBlocks := 10
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for i := 0; i < numBlocks; i++ {
-		select {
-		case <-ctx.Done():
-			return nil
-		case <-ticker.C:
-		}
-		err := t.loop(ctx)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
 	txdata := &types.DynamicFeeTx{
 		ChainID:   t.chainID,
@@ -217,7 +198,7 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 		To:        &toAddr,
 		Gas:       21000,
 		GasFeeCap: new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(1)),
-		GasTipCap: big.NewInt(1),
+		GasTipCap: big.NewInt(2),
 		Value:     amount,
 	}
 	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
@@ -226,8 +207,8 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 	return tx, nil
 }
 
-func (t *TransferOnlyPayloadWorker) loop(ctx context.Context) error {
-	if err := t.sendTxs(ctx, 21000*100); err != nil {
+func (t *TransferOnlyPayloadWorker) SendTxs(ctx context.Context) error {
+	if err := t.sendTxs(ctx, 21000*10000); err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
 		return err
 	}

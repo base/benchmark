@@ -13,29 +13,29 @@ import (
 )
 
 type MetricsCollector interface {
-	Collect(ctx context.Context, blockNumber uint64) error
-	GetMetricsEndpoint() string
-	GetMetrics() []Metrics
+	Collect(ctx context.Context, metrics *BlockMetrics) error
+	GetMetrics() []BlockMetrics
 }
 
-type Metrics struct {
+type BlockMetrics struct {
 	BlockNumber      uint64
 	Timestamp        time.Time
 	ExecutionMetrics map[string]interface{}
 }
 
-func NewMetrics() *Metrics {
-	return &Metrics{
+func NewBlockMetrics(blockNumber uint64) *BlockMetrics {
+	return &BlockMetrics{
+		BlockNumber:      blockNumber,
 		ExecutionMetrics: make(map[string]interface{}),
 		Timestamp:        time.Now(),
 	}
 }
 
-func (m *Metrics) AddExecutionMetric(name string, value interface{}) {
+func (m *BlockMetrics) AddExecutionMetric(name string, value interface{}) {
 	m.ExecutionMetrics[name] = value
 }
 
-func (m *Metrics) GetMetricTypes() map[string]bool {
+func (m *BlockMetrics) GetMetricTypes() map[string]bool {
 	return map[string]bool{
 		"execution": true,
 	}
@@ -56,7 +56,7 @@ func NewMetricsCollector(
 }
 
 type MetricsWriter interface {
-	Write(metrics []Metrics) error
+	Write(metrics []BlockMetrics) error
 }
 
 type FileMetricsWriter struct {
@@ -71,7 +71,7 @@ func NewFileMetricsWriter(baseDir string) *FileMetricsWriter {
 
 const MetricsFileName = "metrics.json"
 
-func (w *FileMetricsWriter) Write(metrics []Metrics) error {
+func (w *FileMetricsWriter) Write(metrics []BlockMetrics) error {
 	filename := path.Join(w.BaseDir, MetricsFileName)
 
 	data, err := json.MarshalIndent(metrics, "", "  ")

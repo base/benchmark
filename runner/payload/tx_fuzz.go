@@ -50,6 +50,11 @@ func (t *TxFuzzPayloadWorker) Setup(ctx context.Context) error {
 	return nil
 }
 
+func (t *TxFuzzPayloadWorker) SendTxs(ctx context.Context) error {
+	// TODO: Implement SendTxs for the tx fuzzer
+	return nil
+}
+
 // Run executes the transaction fuzzer
 func (t *TxFuzzPayloadWorker) Run(ctx context.Context) error {
 	t.log.Info("Starting tx fuzzer", "binary", t.txFuzzBin)
