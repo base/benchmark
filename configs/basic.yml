@@ -1,5 +1,5 @@
-- name: Test geth Performance
-  description: Geth Execution Speed
+- name: Test op-reth Performance
+  description: Reth Execution Speed
   benchmark:
     - sequencer
   variables:
@@ -8,4 +8,7 @@
         - transfer-only
     - type: node_type
       values:
+        - reth
         - geth
+    - type: num_blocks
+      value: 20

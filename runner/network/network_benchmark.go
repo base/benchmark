@@ -123,7 +123,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		return nil, errors.New("Required exactly one transaction payload type")
 	}
 
-	payloadType := nb.params.TransactionPayload[0].Type
+	payloadType := nb.params.TransactionPayload
 
 	switch payloadType {
 	case "tx-fuzz":

@@ -8,16 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewMatrixFromConfig(t *testing.T) {
+func TestResolveTestRunsFromMatrix(t *testing.T) {
 	tests := []struct {
 		name    string
-		config  benchmark.Matrix
-		want    benchmark.ParamsMatrix
+		config  benchmark.TestDefinition
+		want    []benchmark.TestRun
 		wantErr bool
 	}{
 		{
 			name: "basic config with single value",
-			config: benchmark.Matrix{
+			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
 						ParamType: benchmark.ParamTypeTxWorkload,
@@ -25,99 +25,71 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					},
 				},
 			},
-			want: benchmark.ParamsMatrix{
+			want: []benchmark.TestRun{
 				{
-					NodeType:           "geth",
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}},
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					BlockTime:          time.Second,
+					Params: benchmark.Params{
+						NodeType:           "geth",
+						TransactionPayload: benchmark.TransactionPayload("simple"),
+						GasLimit:           benchmark.DefaultParams.GasLimit,
+						BlockTime:          time.Second,
+					},
 				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "config with multiple values",
-			config: benchmark.Matrix{
+			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
 						ParamType: benchmark.ParamTypeTxWorkload,
-						Values:    &[]string{"simple", "complex"},
+						Values:    []interface{}{"simple", "complex"},
 					},
 					{
 						ParamType: benchmark.ParamTypeNode,
-						Values:    &[]string{"geth", "erigon"},
+						Values:    []interface{}{"geth", "erigon"},
 					},
 				},
 			},
-			want: benchmark.ParamsMatrix{
+			want: []benchmark.TestRun{
 				{
-					NodeType:           "geth",
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
-					BlockTime:          time.Second,
-				},
-				{
-					NodeType:           "erigon",
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
-					BlockTime:          time.Second,
-				},
-			},
-			wantErr: false,
-		},
-		{
-			name: "config with multiple values 2x2",
-			config: benchmark.Matrix{
-				Variables: []benchmark.Param{
-					{
-						ParamType: benchmark.ParamTypeTxWorkload,
-						Values:    &[]string{"simple", "complex"},
-					},
-					{
-						ParamType: benchmark.ParamTypeNode,
-						Values:    &[]string{"geth", "erigon"},
-					},
-					{
-						ParamType: benchmark.ParamTypeEnv,
-						Values:    &[]string{"TEST_ENV=0", "TEST_ENV=1"},
+					Params: benchmark.Params{
+						NodeType:           "geth",
+						GasLimit:           benchmark.DefaultParams.GasLimit,
+						TransactionPayload: benchmark.TransactionPayload("simple"),
+						BlockTime:          time.Second,
 					},
 				},
-			},
-			want: benchmark.ParamsMatrix{
 				{
-					NodeType:           "geth",
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					BlockTime:          time.Second,
-					Env:                map[string]string{"TEST_ENV": "0"},
+					Params: benchmark.Params{
+						NodeType:           "erigon",
+						GasLimit:           benchmark.DefaultParams.GasLimit,
+						TransactionPayload: benchmark.TransactionPayload("simple"),
+						BlockTime:          time.Second,
+					},
 				},
 				{
-					NodeType:           "erigon",
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					BlockTime:          time.Second,
-					Env:                map[string]string{"TEST_ENV": "0"},
+					Params: benchmark.Params{
+						NodeType:           "geth",
+						GasLimit:           benchmark.DefaultParams.GasLimit,
+						TransactionPayload: benchmark.TransactionPayload("complex"),
+						BlockTime:          time.Second,
+					},
 				},
 				{
-					NodeType:           "geth",
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					BlockTime:          time.Second,
-					Env:                map[string]string{"TEST_ENV": "1"},
-				},
-				{
-					NodeType:           "erigon",
-					TransactionPayload: []benchmark.TransactionPayload{{Type: "simple"}, {Type: "complex"}},
-					GasLimit:           benchmark.DefaultParams.GasLimit,
-					BlockTime:          time.Second,
-					Env:                map[string]string{"TEST_ENV": "1"},
+					Params: benchmark.Params{
+						NodeType:           "erigon",
+						GasLimit:           benchmark.DefaultParams.GasLimit,
+						TransactionPayload: benchmark.TransactionPayload("complex"),
+						BlockTime:          time.Second,
+					},
 				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "duplicate param type",
-			config: benchmark.Matrix{
+			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
 						ParamType: benchmark.ParamTypeTxWorkload,
@@ -129,12 +101,12 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					},
 				},
 			},
-			want:    nil,
+			want:    []benchmark.TestRun{},
 			wantErr: true,
 		},
 		{
 			name: "missing transaction payload",
-			config: benchmark.Matrix{
+			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
 						ParamType: benchmark.ParamTypeNode,
@@ -142,20 +114,27 @@ func TestNewMatrixFromConfig(t *testing.T) {
 					},
 				},
 			},
-			want:    nil,
+			want:    []benchmark.TestRun{},
 			wantErr: true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := benchmark.NewParamsMatrixFromConfig(tt.config)
+			got, err := benchmark.ResolveTestRunsFromMatrix(tt.config, "")
 
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			} else {
 				require.NoError(t, err)
+			}
+			// ignore outputDir
+			for i := range tt.want {
+				tt.want[i].OutputDir = ""
+			}
+			for i := range got {
+				got[i].OutputDir = ""
 			}
 			require.ElementsMatch(t, tt.want, got)
 		})

@@ -107,7 +107,7 @@ jobs:
         go run benchmark/cmd/main.go \
           --log.level debug \
           run \
-          --config ./configs/basic-${{ matrix.node-type }}.yml \
+          --config ./configs/basic.yml \
           --root-dir ${{ runner.temp }}/data-dir \
           --output-dir ${{ runner.temp }}/output \
           --reth-bin ${{ runner.temp }}/bin/reth \

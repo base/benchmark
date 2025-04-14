@@ -3,6 +3,10 @@ package benchmark
 import (
 	"errors"
 	"fmt"
+	"path"
+	"regexp"
+	"strings"
+	"time"
 )
 
 // BenchmarkType is the type of benchmark to run, testing either sequencer speed or fault proof program speed.
@@ -43,6 +47,7 @@ const (
 	ParamTypeTxWorkload
 	ParamTypeNode
 	ParamTypeGasLimit
+	ParamTypeNumBlocks
 )
 
 func (b ParamType) String() string {
@@ -63,6 +68,8 @@ func (b *ParamType) UnmarshalText(text []byte) error {
 		*b = ParamTypeNode
 	case "gas_limit":
 		*b = ParamTypeGasLimit
+	case "num_blocks":
+		*b = ParamTypeNumBlocks
 	default:
 		return fmt.Errorf("invalid benchmark param type: %s", string(text))
 	}
@@ -72,10 +79,10 @@ func (b *ParamType) UnmarshalText(text []byte) error {
 // Param is a single dimension of a benchmark matrix. It can be a
 // single value or a list of values.
 type Param struct {
-	Name      *string   `yaml:"name"`
-	ParamType ParamType `yaml:"type"`
-	Value     *string   `yaml:"value"`
-	Values    *[]string `yaml:"values"`
+	Name      *string       `yaml:"name"`
+	ParamType ParamType     `yaml:"type"`
+	Value     interface{}   `yaml:"value"`
+	Values    []interface{} `yaml:"values"`
 }
 
 func (bp *Param) Check() error {
@@ -88,16 +95,16 @@ func (bp *Param) Check() error {
 	return nil
 }
 
-// Matrix is the user-facing YAML configuration for specifying a
+// TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
-type Matrix struct {
+type TestDefinition struct {
 	Name        string          `yaml:"name"`
 	Description string          `yaml:"desciption"`
 	Benchmark   []BenchmarkType `yaml:"benchmark"`
 	Variables   []Param         `yaml:"variables"`
 }
 
-func (bc *Matrix) Check() error {
+func (bc *TestDefinition) Check() error {
 	if bc.Name == "" {
 		return errors.New("name is required")
 	}
@@ -116,58 +123,92 @@ func (bc *Matrix) Check() error {
 	return nil
 }
 
-// NewParamsMatrixFromConfig constructs a new ParamsMatrix from a config.
-func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
-	var txPayloadOptions []TransactionPayload
+// BenchmarkRun is the output JSON metadata for a benchmark run.
+type BenchmarkRun struct {
+	SourceFile      string                 `json:"sourceFile"`
+	OutputDir       string                 `json:"outputDir"`
+	TestName        string                 `json:"testName"`
+	TestDescription string                 `json:"testDescription"`
+	TestConfig      map[string]interface{} `json:"testConfig"`
+}
 
+// BenchmarkRuns is the output JSON metadata file schema.
+type BenchmarkRuns struct {
+	Runs []BenchmarkRun `json:"runs"`
+}
+
+// TestPlan represents a list of test runs to be executed.
+type TestPlan []TestRun
+
+func NewTestPlanFromConfig(c []TestDefinition, testFileName string) (TestPlan, error) {
+	testPlan := make(TestPlan, 0, len(c))
+
+	for _, m := range c {
+		params, err := ResolveTestRunsFromMatrix(m, testFileName)
+		if err != nil {
+			return nil, err
+		}
+		testPlan = append(testPlan, params...)
+	}
+
+	return testPlan, nil
+}
+
+func (tp TestPlan) ToMetadata() BenchmarkRuns {
+	metadata := BenchmarkRuns{
+		Runs: make([]BenchmarkRun, 0, len(tp)),
+	}
+
+	for _, params := range tp {
+		metadata.Runs = append(metadata.Runs, BenchmarkRun{
+			SourceFile:      params.TestFile,
+			TestName:        params.Name,
+			TestDescription: params.Description,
+			TestConfig:      params.Params.ToConfig(),
+			OutputDir:       params.OutputDir,
+		})
+	}
+
+	return metadata
+}
+
+var alphaNumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
+
+func nameToSlug(name string) string {
+	return strings.ToLower(alphaNumericRegex.ReplaceAllString(name, "-"))
+}
+
+// ResolveTestRunsFromMatrix constructs a new ParamsMatrix from a config.
+func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun, error) {
 	seenParams := make(map[ParamType]bool)
 
 	// Multiple payloads can run in a single benchmark.
-	paramsExceptPayload := make([]Param, 0, len(c.Variables))
+	params := make([]Param, 0, len(c.Variables))
 	for _, p := range c.Variables {
 		if seenParams[p.ParamType] {
 			return nil, fmt.Errorf("duplicate param type %s", p.ParamType)
 		}
 		seenParams[p.ParamType] = true
-		if p.ParamType == ParamTypeTxWorkload {
-			var params []string
-			if p.Values != nil {
-				params = *p.Values
-			} else {
-				params = []string{*p.Value}
-			}
-			options, err := parseTransactionPayloads(params)
-			if err != nil {
-				return nil, err
-			}
-			txPayloadOptions = options
-			continue
-		}
-		paramsExceptPayload = append(paramsExceptPayload, p)
-	}
-
-	// Ensure transaction payload is specified
-	if txPayloadOptions == nil {
-		return nil, fmt.Errorf("no transaction payloads specified")
+		params = append(params, p)
 	}
 
 	// Calculate the dimensions of the matrix for each param
-	dimensions := make([]int, len(paramsExceptPayload))
-	for i, p := range paramsExceptPayload {
+	dimensions := make([]int, len(params))
+	for i, p := range params {
 		if p.Values != nil {
-			dimensions[i] = len(*p.Values)
+			dimensions[i] = len(p.Values)
 		} else {
 			dimensions[i] = 1
 		}
 	}
 
 	// Create a list of values for each param
-	valuesByParam := make([][]string, len(paramsExceptPayload))
-	for i, p := range paramsExceptPayload {
+	valuesByParam := make([][]interface{}, len(params))
+	for i, p := range params {
 		if p.Values == nil {
-			valuesByParam[i] = []string{*p.Value}
+			valuesByParam[i] = []interface{}{p.Value}
 		} else {
-			valuesByParam[i] = *p.Values
+			valuesByParam[i] = p.Values
 		}
 	}
 
@@ -184,19 +225,30 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 	currentParams := make([]int, len(dimensions))
 
 	// Create the params matrix
-	paramsMatrix := make(ParamsMatrix, totalParams)
+	testParams := make([]TestRun, totalParams)
+
+	fileNameWithoutExt := strings.TrimSuffix(path.Base(testFileName), path.Ext(testFileName))
+
+	testOutDir := fmt.Sprintf("%s-%s-%d", nameToSlug(fileNameWithoutExt), nameToSlug(c.Name), time.Now().Unix())
 
 	for i := 0; i < totalParams; i++ {
-		valueSelections := make(map[ParamType]string)
-		for j, p := range paramsExceptPayload {
+		valueSelections := make(map[ParamType]interface{})
+		for j, p := range params {
 			valueSelections[p.ParamType] = valuesByParam[j][currentParams[j]]
 		}
 
-		params, err := NewParamsFromValues(valueSelections, txPayloadOptions)
+		params, err := NewParamsFromValues(valueSelections)
 		if err != nil {
 			return nil, err
 		}
-		paramsMatrix[i] = *params
+
+		testParams[i] = TestRun{
+			Params:      *params,
+			OutputDir:   fmt.Sprintf("%s-%d", testOutDir, i),
+			Name:        c.Name,
+			Description: c.Description,
+			TestFile:    testFileName,
+		}
 
 		done := true
 
@@ -218,5 +270,5 @@ func NewParamsMatrixFromConfig(c Matrix) (ParamsMatrix, error) {
 		}
 	}
 
-	return paramsMatrix, nil
+	return testParams, nil
 }
