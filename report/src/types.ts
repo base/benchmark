@@ -38,3 +38,35 @@ export interface ChartConfig {
   type: 'line' | 'bar';
   unit?: 'ns' | 'us' | 'ms' | 's' | 'bytes' | 'gas' | 'count'; // Add 'us', add more units as needed
 }
+
+export interface BenchmarkRun {
+  sourceFile: string;
+  testName: string;
+  testDescription: string;
+  outputDir: string;
+  testConfig: Record<string, string | number>;
+}
+
+export interface BenchmarkRuns {
+  runs: BenchmarkRun[];
+}
+
+export function getBenchmarkVariables(runs: BenchmarkRun[]) {
+  const inferredConfig: Record<string, Array<string | number | boolean>> = {};
+
+  for (const run of runs) {
+    for (const [key, value] of Object.entries(run.testConfig)) {
+      if (!inferredConfig[key]) {
+        inferredConfig[key] = [];
+      }
+      inferredConfig[key].push(value);
+    }
+  }
+
+  return Object.fromEntries(
+    Object.entries(inferredConfig).filter(([_, values]) => values.length > 1).map(([key, values]) => {
+      return [key, [...new Set(values)]];
+    })
+  );
+}
+
