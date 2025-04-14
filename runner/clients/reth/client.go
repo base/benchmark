@@ -62,6 +62,10 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--metrics", strconv.Itoa(r.options.RethMetricsPort))
 	args = append(args, "-vvv")
 
+	// increase mempool size
+	args = append(args, "--txpool.pending-max-count", "1000000")
+	args = append(args, "--txpool.queued-max-count", "1000000")
+
 	// read jwt secret
 	jwtSecretStr, err := os.ReadFile(r.options.JWTSecretPath)
 	if err != nil {

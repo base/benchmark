@@ -84,6 +84,12 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--metrics.addr", "localhost")
 	args = append(args, "--metrics.port", strconv.Itoa(g.options.GethMetricsPort))
 
+	// Set mempool size to 100x default
+	args = append(args, "--txpool.globalslots", "1000000")
+	args = append(args, "--txpool.globalqueue", "1000000")
+	args = append(args, "--txpool.accountslots", "1000000")
+	args = append(args, "--txpool.accountqueue", "1000000")
+
 	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.jwtsecret", g.options.JWTSecretPath)
 
