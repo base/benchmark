@@ -10,30 +10,36 @@ package proxy
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
-	"github.com/base/base-bench/runner/clients/types"
-	"github.com/ethereum-optimism/optimism/op-service/client"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/base/base-bench/runner/network/mempool"
+	"github.com/ethereum/go-ethereum/common"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type ProxyServer struct {
-	client types.ExecutionClient
-	log    log.Logger
-	port   int
-	server *http.Server
+	log        log.Logger
+	port       int
+	server     *http.Server
+	pendingTxs []*ethTypes.Transaction
+	clientURL  string
+	mempool    *mempool.StaticWorkloadMempool
 }
 
-func NewProxyServer(client types.ExecutionClient, log log.Logger, port int) *ProxyServer {
+func NewProxyServer(clientURL string, log log.Logger, port int, mempool *mempool.StaticWorkloadMempool) *ProxyServer {
 	return &ProxyServer{
-		client: client,
-		log:    log,
-		port:   port,
+		clientURL: clientURL,
+		log:       log,
+		port:      port,
+		mempool:   mempool,
 	}
 }
 
@@ -56,6 +62,14 @@ func (p *ProxyServer) Run(ctx context.Context) error {
 	return nil
 }
 
+func (p *ProxyServer) PendingTxs() []*ethTypes.Transaction {
+	return p.pendingTxs
+}
+
+func (p *ProxyServer) ClearPendingTxs() {
+	p.pendingTxs = make([]*ethTypes.Transaction, 0)
+}
+
 // Stop stops both the proxy server and the underlying client
 func (p *ProxyServer) Stop() {
 	if p.server != nil {
@@ -63,19 +77,10 @@ func (p *ProxyServer) Stop() {
 			p.log.Error("Error closing proxy server", "err", err)
 		}
 	}
-	p.client.Stop()
-}
-
-func (p *ProxyServer) Client() *ethclient.Client {
-	return p.client.Client()
 }
 
 func (p *ProxyServer) ClientURL() string {
 	return fmt.Sprintf("http://localhost:%d", p.port)
-}
-
-func (p *ProxyServer) AuthClient() client.RPC {
-	return p.client.AuthClient()
 }
 
 func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
@@ -123,7 +128,7 @@ func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", p.client.ClientURL(), bytes.NewReader(body))
+	req, err := http.NewRequest("POST", p.clientURL, bytes.NewReader(body))
 	if err != nil {
 		http.Error(w, "Error creating request", http.StatusInternalServerError)
 		return
@@ -146,24 +151,88 @@ func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(resp.StatusCode)
 
-	_, err = io.Copy(w, resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		p.log.Error("Error reading response body", "err", err)
+		return
+	}
+
+	_, err = w.Write(respBody)
 	if err != nil {
 		p.log.Error("Error copying response body", "err", err)
 	}
+
+	p.DebugResponse(request.Method, request.Params, respBody)
 }
 
-func (p *ProxyServer) OverrideRequest(method string, params json.RawMessage) (bool, json.RawMessage, error) {
+func (p *ProxyServer) OverrideRequest(method string, rawParams json.RawMessage) (bool, json.RawMessage, error) {
 	switch method {
-	// Example of how to intercept a request
-	// case "eth_getBlockByNumber":
-	// 	response := "0x100"
-	// 	return true, json.RawMessage(`"` + response + `"`), nil
+	case "eth_getTransactionCount":
+		var params []string
+		if err := json.Unmarshal(rawParams, &params); err != nil {
+			return false, nil, fmt.Errorf("failed to unmarshal params: %w", err)
+		}
+
+		nonce := p.mempool.GetTransactionCount(common.HexToAddress(params[0]))
+		jsonResponse, _ := json.Marshal(fmt.Sprintf("0x%x", nonce))
+		return true, jsonResponse, nil
+
 	case "eth_sendRawTransaction":
-		// return true, json.RawMessage(`"` + response + `"`), nil
-		// print params
-		p.log.Info("Received eth_sendRawTransaction request", "params", string(params))
-		return true, json.RawMessage(`"0x"`), nil
+		var params []string
+		if err := json.Unmarshal(rawParams, &params); err != nil {
+			return false, nil, fmt.Errorf("failed to unmarshal params: %w", err)
+		}
+
+		if len(params) == 0 {
+			return false, nil, fmt.Errorf("no params found")
+		}
+
+		var tx ethTypes.Transaction
+
+		rawTxHex := params[0]
+		rawTxBytes, err := hex.DecodeString(rawTxHex[2:]) // strip "0x"
+		if err != nil {
+			p.log.Error("failed to decode hex", "err", err)
+			return false, nil, fmt.Errorf("failed to decode hex: %w", err)
+		}
+
+		err = rlp.DecodeBytes(rawTxBytes, &tx)
+
+		if err != nil {
+			p.log.Error("failed to decode RLP", "err", err)
+			return false, nil, fmt.Errorf("failed to decode RLP: %w", err)
+		}
+
+		p.pendingTxs = append(p.pendingTxs, &tx)
+
+		txHash := tx.Hash().Hex()
+		jsonResponse, _ := json.Marshal(txHash)
+		return true, jsonResponse, nil
 	default:
 		return false, nil, nil
 	}
+}
+
+func (p *ProxyServer) DebugResponse(method string, params json.RawMessage, respBody []byte) {
+	p.log.Debug("method", "method", method)
+	p.log.Debug("params", "params", params)
+
+	gzipReader, err := gzip.NewReader(bytes.NewReader(respBody))
+	if err != nil {
+		p.log.Error("Error creating gzip reader", "err", err)
+		return
+	}
+	defer func() {
+		if err := gzipReader.Close(); err != nil {
+			p.log.Error("Error closing gzip reader", "err", err)
+		}
+	}()
+
+	uncompressedBody, err := io.ReadAll(gzipReader)
+
+	if err != nil {
+		p.log.Error("Error reading uncompressed response body", "err", err)
+		return
+	}
+	p.log.Debug("Uncompressed body", "body", string(uncompressedBody))
 }

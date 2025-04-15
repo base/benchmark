@@ -21,9 +21,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Note: Payload workers are responsible keeping track of gas in a block and sending transactions to the mempool.
 type Worker interface {
 	Setup(ctx context.Context) error
 	SendTxs(ctx context.Context) error
+	Stop(ctx context.Context) error
 }
 
 type NewWorkerFn func(logger log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error)
@@ -49,7 +51,7 @@ type TransferOnlyPayloadWorker struct {
 const numAccounts = 10000
 
 func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (mempool.FakeMempool, Worker, error) {
-	mempool := mempool.NewStaticWorkloadMempool(params.GasLimit)
+	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {
@@ -98,13 +100,18 @@ func (t *TransferOnlyPayloadWorker) generateAccounts() error {
 	return nil
 }
 
+func (t *TransferOnlyPayloadWorker) Stop(ctx context.Context) error {
+	// TODO: Implement
+	return nil
+}
+
 func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	// 21000 * numAccounts
 	gasCost := new(big.Int).Mul(big.NewInt(22000*params.GWei), big.NewInt(numAccounts))
 	// (prefundAmount - gasCost) / numAccounts
 	perAccount := new(big.Int).Div(new(big.Int).Sub(t.prefundAmount, gasCost), big.NewInt(numAccounts))
 
-	sendCalls := make([][]byte, 0, numAccounts)
+	sendCalls := make([]*types.Transaction, 0, numAccounts)
 
 	nonce := uint64(0)
 
@@ -118,18 +125,12 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create transfer transaction")
 		}
 		nonce++
-
-		marshaledTx, err := transferTx.MarshalBinary()
-		if err != nil {
-			return errors.Wrap(err, "failed to marshal transfer transaction")
-		}
-
-		sendCalls = append(sendCalls, marshaledTx)
+		sendCalls = append(sendCalls, transferTx)
 		lastTxHash = transferTx.Hash()
 	}
 
 	for _, tx := range sendCalls {
-		t.mempool.AddTransaction(tx, 21000)
+		t.mempool.AddTransaction(tx)
 	}
 
 	receipt, err := t.waitForReceipt(ctx, lastTxHash)
@@ -161,7 +162,7 @@ func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 
 func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64) error {
 	gasUsed := uint64(0)
-	txs := make([][]byte, 0, numAccounts)
+	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
 
 	for gasUsed < gasLimit {
@@ -171,12 +172,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 			return err
 		}
 
-		marshaledTx, err := transferTx.MarshalBinary()
-		if err != nil {
-			return err
-		}
-
-		txs = append(txs, marshaledTx)
+		txs = append(txs, transferTx)
 
 		gasUsed += 21000
 		t.accountNonces[t.accountAddresses[acctIdx]]++
@@ -185,7 +181,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 	}
 
 	for _, tx := range txs {
-		t.mempool.AddTransaction(tx, 21000)
+		t.mempool.AddTransaction(tx)
 	}
 
 	return nil

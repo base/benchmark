@@ -9,7 +9,6 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
-	"github.com/base/base-bench/runner/clients/proxy"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/logger"
@@ -123,14 +122,9 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 
 	switch payloadType {
 	case "tx-fuzz":
-		proxyServer := proxy.NewProxyServer(sequencerClient, nb.log, nb.config.ProxyPort())
-		err = proxyServer.Run(ctx)
-		if err != nil {
-			return nil, 0, errors.Wrap(err, "failed to run proxy server")
-		}
-		defer proxyServer.Stop()
+		nb.log.Info("Running tx-fuzz payload")
 		mempool, worker, err = payload.NewTxFuzzPayloadWorker(
-			nb.log, proxyServer.ClientURL(), nb.params, privateKey, amount, nb.config.TxFuzzBinary())
+			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.config.TxFuzzBinary())
 	case "transfer-only":
 		mempool, worker, err = payload.NewTransferPayloadWorker(
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
@@ -141,6 +135,13 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	if err != nil {
 		return nil, 0, err
 	}
+
+	defer func() {
+		err := worker.Stop(ctx)
+		if err != nil {
+			nb.log.Warn("failed to stop payload worker", "err", err)
+		}
+	}()
 
 	benchmarkCtx, benchmarkCancel := context.WithCancel(ctx)
 
@@ -214,7 +215,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 			if err != nil {
 				nb.log.Error("Failed to collect metrics", "error", err)
 			}
-			nb.log.Info("Proposed payload", "payload_index", i, "len", len(payloads))
+			nb.log.Info("Proposed payload", "payload_index", i, "len", len(payloads), "payload_transactions", len(payload.Transactions))
 			payloads = append(payloads, *payload)
 		}
 		payloadResult <- payloads

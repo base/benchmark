@@ -9,3 +9,5 @@
     - type: node_type
       values:
         - geth
+    - type: num_blocks
+      value: 20
