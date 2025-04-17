@@ -101,7 +101,7 @@ const ChartSelector = ({
       lastSentDataRef.current = dataToSend;
       onChangeDataQuery(dataToSend);
     }
-  }, [matchedRuns, onChangeDataQuery]);
+  }, [byMetric, matchedRuns, onChangeDataQuery]);
 
   return (
       <div className="filter-container">
@@ -112,7 +112,7 @@ const ChartSelector = ({
             onChange={(e) => setByMetric(e.target.value)}
           >
             {Object.entries(variables).map(([k]) => (
-              <option value={`${k}`}>{camelToTitleCase(k)}</option>
+              <option value={`${k}`} key={k}>{camelToTitleCase(k)}</option>
             ))}
           </select>
         </div>
@@ -132,7 +132,7 @@ const ChartSelector = ({
                   }}
                 >
                   {value.map((val) => (
-                    <option value={`${val}`}>{val.toString()}</option>
+                    <option value={`${val}`} key={`${val}`}>{val.toString()}</option>
                   ))}
                 </select>
               </div>

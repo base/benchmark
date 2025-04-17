@@ -64,7 +64,7 @@ export function getBenchmarkVariables(runs: BenchmarkRun[]) {
   }
 
   return Object.fromEntries(
-    Object.entries(inferredConfig).filter(([_, values]) => values.length > 1).map(([key, values]) => {
+    Object.entries(inferredConfig).filter(([, values]) => values.length > 1).map(([key, values]) => {
       return [key, [...new Set(values)]];
     })
   );

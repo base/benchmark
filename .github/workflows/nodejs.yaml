@@ -1,0 +1,32 @@
+name: Node.js CI
+
+on:
+  push:
+    paths:
+      - "report/**"
+    branches:
+      - main
+  pull_request:
+    paths:
+      - "report/**"
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./report
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "16"
+          cache: "npm"
+          cache-dependency-path: "./report/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+      - name: Check formatting
+        run: |
+          npm run check
