@@ -47,9 +47,6 @@ jobs:
         go test -v -coverprofile=coverage.out ./... 
     
   basic-benchmarks:
-    strategy:
-      matrix:
-        node-type: [reth, geth]
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
