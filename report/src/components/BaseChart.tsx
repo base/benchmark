@@ -11,15 +11,15 @@ interface BaseChartProps {
 }
 
 const TOP_MARGIN = 20
-const ASPECT_RATIO = 0.5 // Height is 50% of width
-const LEGEND_SPACE = 20; // Reduced space reserved for the legend below the chart
+const ASPECT_RATIO = 0.5
+const LEGEND_SPACE = 20;
 const X_AXIS_SPACE = 60;
 const Y_AXIS_SPACE = 40;
 const TITLE_SPACE = 50;
-// Reduce margins for better space utilization, add space for legend at bottom
+
 const DEFAULT_MARGIN = { top: TOP_MARGIN + TITLE_SPACE, right: 40, bottom: Y_AXIS_SPACE + LEGEND_SPACE, left: X_AXIS_SPACE }
 
-const BaseChart: React.FC<BaseChartProps> = ({ data, metricKey, title, description, children }) => {
+const BaseChart: React.FC<BaseChartProps> = ({ data, metricKey, title, description, children }: BaseChartProps) => {
   const svgRef = useRef<SVGSVGElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [dimensions, setDimensions] = useState<{ width: number; height: number; margin: typeof DEFAULT_MARGIN } | null>(null)

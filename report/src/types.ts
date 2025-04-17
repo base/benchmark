@@ -35,7 +35,7 @@ export interface ChartOptions {
 export interface ChartConfig {
   title: string;
   description: string;
-  type: 'line' | 'bar';
+  type: 'line';
   unit?: 'ns' | 'us' | 'ms' | 's' | 'bytes' | 'gas' | 'count'; // Add 'us', add more units as needed
 }
 

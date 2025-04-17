@@ -1,26 +1,35 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DataSeries } from "./types";
-import { BenchmarkRuns, getBenchmarkVariables, MetricData } from "./types";
-import LineChart from "./components/LineChart";
-import BarChart from "./components/BarChart";
-import { CHART_CONFIG } from "./chart-manifest";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BenchmarkRun, DataSeries } from "../types";
+import { BenchmarkRuns, getBenchmarkVariables, MetricData } from "../types";
+import { isEqual } from "lodash";
+
+export interface DataFileRequest {
+  outputDir: string;
+  role: string;
+  name: string;
+}
 
 interface ChartSelectorProps {
   benchmarkRuns: BenchmarkRuns;
+  onChangeDataQuery: (data: DataFileRequest[]) => void;
+}
 
-  fetchMetrics: (outputDir: string, role: string) => Promise<MetricData[]>;
-  fetchResult: (outputDir: string, role: string) => Promise<unknown>;
-  getLogsDownloadGz: (outputDir: string, role: string) => string;
+const camelToTitleCase = (str: string) => {
+  return str
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase());
+}
+
+interface BenchmarkRunWithRole extends BenchmarkRun {
+  testConfig: BenchmarkRun['testConfig'] & {
+    role: string;
+  }
 }
 
 const ChartSelector = ({
   benchmarkRuns,
-  fetchMetrics,
-  fetchResult,
-  getLogsDownloadGz,
+  onChangeDataQuery,
 }: ChartSelectorProps) => {
-  const [data, setData] = useState<DataSeries[]>([]);
-
   const [byMetric, setByMetric] = useState<string | null>("role");
 
   const variables = useMemo((): Record<string, (string | number | boolean)[]> => {
@@ -39,9 +48,6 @@ const ChartSelector = ({
     const validVars = Object.keys(variables).filter((key) => {
       return key !== byMetric;
     });
-
-    console.log(validVars)
-
     for (const key in filterSelections) {
       if (!validVars.includes(key)) {
         delete filterSelections[key];
@@ -61,10 +67,8 @@ const ChartSelector = ({
     setFilterSelections(newFilterSelections);
   }, [variables, filterSelections, byMetric]);
 
-  console.log(filterSelections)
-
   const matchedRuns = useMemo(() => {
-    return benchmarkRuns.runs.flatMap((r) => ([{
+    return benchmarkRuns.runs.flatMap((r): BenchmarkRunWithRole[] => ([{
       ...r,
       testConfig: {
         ...r.testConfig,
@@ -83,44 +87,23 @@ const ChartSelector = ({
     });
   }, [filterSelections, benchmarkRuns.runs]);
 
-  const urlsToFetch = useMemo(() => {
-    const urls = new Set(
-      matchedRuns.map((run) => `${run.outputDir},${run.testConfig.role},${run.testConfig[byMetric ?? "role"]}`),
-    );
-
-    return [...urls];
-  }, [matchedRuns]);
-
-  console.log(urlsToFetch)
-
-  const loadingRef = useRef<number>(0);
+  const lastSentDataRef = useRef<DataFileRequest[]>([]);
   useEffect(() => {
-    loadingRef.current += 1;
-    const mustEqual = loadingRef.current;
-    setData([]);
+    const dataToSend: DataFileRequest[] = matchedRuns.map((run) => {
+      return {
+        outputDir: run.outputDir,
+        role: run.testConfig.role,
+        name: `${run.testConfig[byMetric ?? 'role']}`,
+      };
+    });
 
-    (async () => {
-      
-        const result = (
-          await Promise.all(
-            urlsToFetch.map(async (url) => {
-              const [outputDir, role, name] = url.split(",");
-              const data = (await fetchMetrics(outputDir, role))
-              
-              return { data, name: `${name}`  };
-            }),
-          )
-        ).flat()
-
-        if (loadingRef.current === mustEqual) {
-          setData(result);
-        }
-
-    })();
-  }, [urlsToFetch]);
+    if (!isEqual(dataToSend, lastSentDataRef.current)) {
+      lastSentDataRef.current = dataToSend;
+      onChangeDataQuery(dataToSend);
+    }
+  }, [matchedRuns, onChangeDataQuery]);
 
   return (
-    <>
       <div className="filter-container">
         <div>
           <div>Show Line Per</div>
@@ -129,7 +112,7 @@ const ChartSelector = ({
             onChange={(e) => setByMetric(e.target.value)}
           >
             {Object.entries(variables).map(([k]) => (
-              <option value={`${k}`}>{k}</option>
+              <option value={`${k}`}>{camelToTitleCase(k)}</option>
             ))}
           </select>
         </div>
@@ -139,7 +122,7 @@ const ChartSelector = ({
           .map(([key, value]) => {
             return (
               <div key={key}>
-                <div>{key}</div>
+                <div>{camelToTitleCase(key)}</div>
                 <select value={filterSelections[key] ?? value[0]}
                   onChange={(e) => {
                     setFilterSelections({
@@ -148,7 +131,7 @@ const ChartSelector = ({
                     });
                   }}
                 >
-                  {value.map((val, i) => (
+                  {value.map((val) => (
                     <option value={`${val}`}>{val.toString()}</option>
                   ))}
                 </select>
@@ -156,28 +139,6 @@ const ChartSelector = ({
             );
           })}
       </div>
-      <div className="charts-container">
-        {Object.entries(CHART_CONFIG).map(([metricKey, config]) => {
-          const chartProps = {
-            series: data,
-            metricKey,
-            title: config.title,
-            description: config.description,
-            unit: config.unit,
-          };
-
-          return (
-            <div key={metricKey} className="chart-container">
-              {config.type === "line" ? (
-                <LineChart {...chartProps} />
-              ) : (
-                <BarChart {...chartProps} />
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </>
   );
 };
 

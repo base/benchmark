@@ -2,7 +2,7 @@ import React from 'react'
 import * as d3 from 'd3'
 import { DataSeries, MetricData, ChartConfig } from '../types'
 import BaseChart from './BaseChart'
-import { formatValue } from '../utils/formatters'; // Import shared formatter
+import { formatValue } from '../utils/formatters';
 
 interface LineChartProps {
   series: DataSeries[]
@@ -81,7 +81,7 @@ const LineChart: React.FC<LineChartProps> = ({ series, metricKey, title, descrip
           .selectAll('g')
           .data(series)
           .join('g')
-            .attr('transform', (d, i) => `translate(${i * 100}, ${dimensions.height + 40})`); // Position below chart
+            .attr('transform', (_d, i) => `translate(${i * 100}, ${dimensions.height + 40})`); // Position below chart
 
         legend.append('rect')
           .attr('x', 0)
@@ -112,7 +112,7 @@ const LineChart: React.FC<LineChartProps> = ({ series, metricKey, title, descrip
         const startX = Math.max(0, (dimensions.width - totalLegendWidth) / 2);
         let currentX = startX;
 
-        legendGroupSelection.each(function(d, i) {
+        legendGroupSelection.each(function(_d, i) {
             d3.select(this).attr('transform', `translate(${currentX}, ${dimensions.height + 25})`); // Move legend closer
             currentX += legendItemWidths[i] + spacing; // Add spacing between items
         });
@@ -125,7 +125,7 @@ const LineChart: React.FC<LineChartProps> = ({ series, metricKey, title, descrip
             .x(d => x(d.BlockNumber))
             .y(d => y(d.ExecutionMetrics[metricKey]))
 
-          const path = svg.append('path')
+          svg.append('path')
             .datum(s.data)
             .attr('fill', 'none')
             .attr('stroke', color)
@@ -133,7 +133,7 @@ const LineChart: React.FC<LineChartProps> = ({ series, metricKey, title, descrip
             .attr('d', line)
 
           // Add dots
-          const dots = svg.selectAll(`.dot-${i}`)
+          svg.selectAll(`.dot-${i}`)
             .data(s.data)
             .enter()
             .append('circle')
@@ -143,8 +143,6 @@ const LineChart: React.FC<LineChartProps> = ({ series, metricKey, title, descrip
             .attr('r', 4)
             .style('fill', color)
             .style('opacity', 0)
-
-          // Legend items are now created outside this loop
         })
       }}
     </BaseChart>
