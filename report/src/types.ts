@@ -35,8 +35,8 @@ export interface ChartOptions {
 export interface ChartConfig {
   title: string;
   description: string;
-  type: 'line';
-  unit?: 'ns' | 'us' | 'ms' | 's' | 'bytes' | 'gas' | 'count'; // Add 'us', add more units as needed
+  type: "line";
+  unit?: "ns" | "us" | "ms" | "s" | "bytes" | "gas" | "count"; // Add 'us', add more units as needed
 }
 
 export interface BenchmarkRun {
@@ -64,9 +64,10 @@ export function getBenchmarkVariables(runs: BenchmarkRun[]) {
   }
 
   return Object.fromEntries(
-    Object.entries(inferredConfig).filter(([, values]) => values.length > 1).map(([key, values]) => {
-      return [key, [...new Set(values)]];
-    })
+    Object.entries(inferredConfig)
+      .filter(([, values]) => values.length > 1)
+      .map(([key, values]) => {
+        return [key, [...new Set(values)]];
+      }),
   );
 }
-

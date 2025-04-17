@@ -17,4 +17,4 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"]
-} 
+}

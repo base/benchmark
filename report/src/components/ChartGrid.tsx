@@ -1,17 +1,20 @@
-import React from 'react';
-import { CHART_CONFIG } from '../metricDefinitions';
-import { DataSeries } from '../types';
-import LineChart from './LineChart';
+import React from "react";
+import { CHART_CONFIG } from "../metricDefinitions";
+import { DataSeries } from "../types";
+import LineChart from "./LineChart";
 
 interface ProvidedProps {
-    data: DataSeries[];
+  data: DataSeries[];
 }
 
 const ChartGrid: React.FC<ProvidedProps> = ({ data }: ProvidedProps) => {
-    return   <div className="charts-container">
+  return (
+    <div className="charts-container">
       {Object.entries(CHART_CONFIG).map(([metricKey, config]) => {
-        const chartData =   data.flatMap(s => s.data)
-        const executionMetrics = chartData.map((d) => d.ExecutionMetrics[metricKey]).filter((v) => v !== undefined);
+        const chartData = data.flatMap((s) => s.data);
+        const executionMetrics = chartData
+          .map((d) => d.ExecutionMetrics[metricKey])
+          .filter((v) => v !== undefined);
 
         if (executionMetrics.length === 0) {
           return null;
@@ -31,7 +34,8 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data }: ProvidedProps) => {
           </div>
         );
       })}
-    </div>;
-}
+    </div>
+  );
+};
 
 export default ChartGrid;

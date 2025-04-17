@@ -1,4 +1,4 @@
-import  { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import ChartSelector, { DataFileRequest } from "./components/ChartSelector";
 import ChartGrid from "./components/ChartGrid";
 import { useTestMetadata, useMultipleDataSeries } from "./utils/useDataSeries";
@@ -6,7 +6,8 @@ import { useTestMetadata, useMultipleDataSeries } from "./utils/useDataSeries";
 function App() {
   const [dataQuery, setDataQuery] = useState<DataFileRequest[]>([]);
 
-  const { data: benchmarkRuns, isLoading: isLoadingBenchmarkRuns } = useTestMetadata();
+  const { data: benchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
+    useTestMetadata();
 
   const dataQueryKey = useMemo(() => {
     return dataQuery.map(
@@ -28,7 +29,6 @@ function App() {
       };
     });
   }, [dataPerFile, dataQuery]);
-
 
   if (!benchmarkRuns || isLoadingBenchmarkRuns) {
     return <div>Loading...</div>;
