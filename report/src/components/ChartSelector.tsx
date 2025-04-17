@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BenchmarkRun, DataSeries } from "../types";
-import { BenchmarkRuns, getBenchmarkVariables, MetricData } from "../types";
+import { BenchmarkRun } from "../types";
+import { BenchmarkRuns, getBenchmarkVariables } from "../types";
 import { isEqual } from "lodash";
 
 export interface DataFileRequest {
