@@ -11,7 +11,7 @@ on:
       - "report/**"
 
 jobs:
-  prettier:
+  lint:
     runs-on: ubuntu-latest
     defaults:
       run:
