@@ -119,10 +119,6 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	var mempool mempool.FakeMempool
 	var worker payload.Worker
 
-	if len(nb.params.TransactionPayload) != 1 {
-		return nil, 0, errors.New("Required exactly one transaction payload type")
-	}
-
 	payloadType := nb.params.TransactionPayload
 
 	switch payloadType {

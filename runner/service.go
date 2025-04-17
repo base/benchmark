@@ -340,5 +340,9 @@ func (s *service) Run(ctx context.Context) error {
 
 	s.log.Info("Finished benchmarking", "numSuccess", numSuccess, "numFailure", numFailure)
 
+	if numFailure > 0 {
+		return fmt.Errorf("failed to run %d tests", numFailure)
+	}
+
 	return nil
 }
