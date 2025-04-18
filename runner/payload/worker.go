@@ -129,9 +129,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 		lastTxHash = transferTx.Hash()
 	}
 
-	for _, tx := range sendCalls {
-		t.mempool.AddTransaction(tx)
-	}
+	t.mempool.AddTransactions(sendCalls)
 
 	receipt, err := t.waitForReceipt(ctx, lastTxHash)
 	if err != nil {
@@ -180,10 +178,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 		acctIdx = (acctIdx + 1) % numAccounts
 	}
 
-	for _, tx := range txs {
-		t.mempool.AddTransaction(tx)
-	}
-
+	t.mempool.AddTransactions(txs)
 	return nil
 }
 

@@ -76,8 +76,6 @@ func (t *TxFuzzPayloadWorker) SendTxs(ctx context.Context) error {
 	pendingTxs := t.proxyServer.PendingTxs()
 	t.proxyServer.ClearPendingTxs()
 
-	for _, tx := range pendingTxs {
-		t.mempool.AddTransaction(tx)
-	}
+	t.mempool.AddTransactions(pendingTxs)
 	return nil
 }

@@ -36,23 +36,26 @@ func NewStaticWorkloadMempool(log log.Logger) *StaticWorkloadMempool {
 	}
 }
 
-func (m *StaticWorkloadMempool) AddTransaction(transaction *types.Transaction) {
+func (m *StaticWorkloadMempool) AddTransactions(transactions []*types.Transaction) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	from, err := types.Sender(types.NewIsthmusSigner(transaction.ChainId()), transaction)
-	if err != nil {
-		panic(err)
+	for _, transaction := range transactions {
+		from, err := types.Sender(types.NewIsthmusSigner(transaction.ChainId()), transaction)
+
+		if err != nil {
+			panic(err)
+		}
+
+		m.addressNonce[from] = transaction.Nonce()
+
+		bytes, err := transaction.MarshalBinary()
+		if err != nil {
+			panic(err)
+		}
+
+		m.currentBlock = append(m.currentBlock, bytes)
 	}
-
-	m.addressNonce[from] = transaction.Nonce()
-
-	bytes, err := transaction.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-
-	m.currentBlock = append(m.currentBlock, bytes)
 }
 
 // returns nonce of latest transaction. This will be incremented by the transaction generators.
