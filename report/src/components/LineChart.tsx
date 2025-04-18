@@ -2,7 +2,7 @@ import React from "react";
 import * as d3 from "d3";
 import { DataSeries, MetricData, ChartConfig } from "../types";
 import BaseChart from "./BaseChart";
-import { formatValue } from "../utils/formatters";
+import { formatLabel, formatValue } from "../utils/formatters";
 
 interface LineChartProps {
   series: DataSeries[];
@@ -127,7 +127,9 @@ const LineChart: React.FC<LineChartProps> = ({
           .attr("x", 15) // Adjust text position
           .attr("y", 5) // Adjust text position (center vertically)
           .attr("dy", "0.35em")
-          .text((d) => d.name);
+          .text((d) => {
+            return formatLabel(d.name);
+          });
 
         // Center the legend group horizontally
         const legendGroupSelection = svg.selectAll(

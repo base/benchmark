@@ -5,12 +5,15 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/consensus"
@@ -127,14 +130,24 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 
 	payloadType := nb.params.TransactionPayload
 
-	switch payloadType {
-	case "tx-fuzz":
+	switch {
+	case payloadType == "tx-fuzz":
 		nb.log.Info("Running tx-fuzz payload")
 		mempool, worker, err = payload.NewTxFuzzPayloadWorker(
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.config.TxFuzzBinary())
-	case "transfer-only":
+	case payloadType == "transfer-only":
 		mempool, worker, err = payload.NewTransferPayloadWorker(
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
+	case strings.HasPrefix(string(payloadType), "contract"):
+		var config payload.ContractPayloadWorkerConfig
+		config, err = nb.validateContractPayload(payloadType)
+
+		if err != nil {
+			return nil, 0, err
+		}
+
+		mempool, worker, err = payload.NewContractPayloadWorker(
+			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, config)
 	default:
 		return nil, 0, errors.New("invalid payload type")
 	}
@@ -246,6 +259,35 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		benchmarkCancel()
 		return payloads, lastSetupBlock + 1, nil
 	}
+}
+
+func (*NetworkBenchmark) validateContractPayload(payloadType benchmark.TransactionPayload) (payload.ContractPayloadWorkerConfig, error) {
+	selectors := strings.Split(string(payloadType), ":")
+
+	if len(selectors) != 6 {
+		return payload.ContractPayloadWorkerConfig{}, errors.New("invalid contract payload type")
+	}
+
+	var callsPerBlock int
+	callsPerBlock, err := strconv.Atoi(selectors[1])
+	if err != nil {
+		return payload.ContractPayloadWorkerConfig{}, errors.New("invalid calls per block")
+	}
+
+	functionSignature := selectors[2]
+	input1 := selectors[3]
+
+	calldata := common.FromHex(selectors[4])
+	bytecode := common.FromHex(selectors[5])
+
+	config := payload.ContractPayloadWorkerConfig{
+		Bytecode:          bytecode,
+		FunctionSignature: functionSignature,
+		Input1:            input1,
+		Calldata:          calldata,
+		CallsPerBlock:     callsPerBlock,
+	}
+	return config, nil
 }
 
 func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {

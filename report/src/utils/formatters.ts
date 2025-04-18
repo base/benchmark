@@ -52,6 +52,10 @@ const formatWithPrefix = (
   return `${value.toFixed(decimalPlaces)} ${baseUnit}`;
 };
 
+export const formatLabel = (label: string) => {
+  return label.length > 50 ? label.substring(0, 50) + "..." : label;
+};
+
 export const formatValue = (
   value: number,
   unit?: ChartConfig["unit"],

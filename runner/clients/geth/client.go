@@ -89,7 +89,8 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--txpool.globalqueue", "1000000")
 	args = append(args, "--txpool.accountslots", "1000000")
 	args = append(args, "--txpool.accountqueue", "1000000")
-
+	args = append(args, "--maxpeers", "0")
+	args = append(args, "--nodiscover")
 	args = append(args, "--http.api", "eth,net,web3,miner")
 	args = append(args, "--authrpc.jwtsecret", g.options.JWTSecretPath)
 

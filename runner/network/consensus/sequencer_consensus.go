@@ -86,7 +86,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 	gasLimit := eth.Uint64Quantity(f.options.GasLimit)
 
 	var b8 eth.Bytes8
-	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 10))
+	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 1))
 
 	timestamp := max(f.lastTimestamp+1, uint64(time.Now().Unix()))
 
@@ -117,7 +117,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 		To:                  &derive.L1BlockAddress,
 		Mint:                nil,
 		Value:               big.NewInt(0),
-		Gas:                 150_000_000,
+		Gas:                 100_000,
 		IsSystemTransaction: true,
 		Data:                data,
 	}
@@ -148,12 +148,12 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	transactionsToInclude := f.mempool.NextBlock()
 	sendCallsPerBatch := 100
-	batches := len(transactionsToInclude) / sendCallsPerBatch
+	batches := (len(transactionsToInclude) + sendCallsPerBatch - 1) / sendCallsPerBatch
 
 	f.log.Info("Sending transactions", "num_transactions", len(transactionsToInclude), "num_batches", batches)
 
 	for i := 0; i < batches; i++ {
-		batch := transactionsToInclude[i*sendCallsPerBatch : (i+1)*sendCallsPerBatch]
+		batch := transactionsToInclude[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(transactionsToInclude))]
 		results := make([]interface{}, len(batch))
 
 		batchCall := make([]rpc.BatchElem, len(batch))
@@ -216,7 +216,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(metrics.GetPayloadLatencyMetric, duration)
-	f.log.Info("Fetched built payload", "duration", duration)
+	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "BaseFeePerGas", payload.BaseFeePerGas)
 
 	// get gas usage
 	gasPerBlock := payload.GasUsed

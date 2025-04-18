@@ -109,3 +109,13 @@ jobs:
           --output-dir ${{ runner.temp }}/output \
           --reth-bin ${{ runner.temp }}/bin/reth \
           --geth-bin ${{ runner.temp }}/bin/geth
+    - name: Run Contract Benchmark
+      id: contract
+      run: | 
+        go run benchmark/cmd/main.go \
+          --log.level info \
+          run \
+          --config ./configs/contract.yml \
+          --root-dir ${{ runner.temp }}/data-dir \
+          --output-dir ${{ runner.temp }}/output \
+          --geth-bin ${{ runner.temp }}/bin/geth

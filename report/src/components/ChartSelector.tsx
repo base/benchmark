@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BenchmarkRun } from "../types";
 import { BenchmarkRuns, getBenchmarkVariables } from "../types";
 import { isEqual } from "lodash";
-
+import { formatLabel } from "../utils/formatters";
 export interface DataFileRequest {
   outputDir: string;
   role: string;
@@ -149,7 +149,7 @@ const ChartSelector = ({
               >
                 {value.map((val) => (
                   <option value={`${val}`} key={`${val}`}>
-                    {val.toString()}
+                    {formatLabel(val.toString())}
                   </option>
                 ))}
               </select>
