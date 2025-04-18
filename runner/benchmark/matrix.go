@@ -134,7 +134,8 @@ type BenchmarkRun struct {
 
 // BenchmarkRuns is the output JSON metadata file schema.
 type BenchmarkRuns struct {
-	Runs []BenchmarkRun `json:"runs"`
+	Runs      []BenchmarkRun `json:"runs"`
+	CreatedAt time.Time      `json:"createdAt"`
 }
 
 // TestPlan represents a list of test runs to be executed.
@@ -156,7 +157,8 @@ func NewTestPlanFromConfig(c []TestDefinition, testFileName string) (TestPlan, e
 
 func (tp TestPlan) ToMetadata() BenchmarkRuns {
 	metadata := BenchmarkRuns{
-		Runs: make([]BenchmarkRun, 0, len(tp)),
+		Runs:      make([]BenchmarkRun, 0, len(tp)),
+		CreatedAt: time.Now(),
 	}
 
 	for _, params := range tp {
