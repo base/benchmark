@@ -165,6 +165,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	go func() {
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, nb.genesis, consensus.ConsensusClientOptions{
 			BlockTime: nb.params.BlockTime,
+			GasLimit:  nb.params.GasLimit,
 		})
 
 		payloads := make([]engine.ExecutableData, 0)

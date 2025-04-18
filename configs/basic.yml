@@ -10,3 +10,5 @@
         - geth
     - type: num_blocks
       value: 20
+    - type: gas_limit
+      value: 10000000000

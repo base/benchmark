@@ -88,7 +88,7 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 }
 
 func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttributes, error) {
-	gasLimit := eth.Uint64Quantity(40e9)
+	gasLimit := eth.Uint64Quantity(f.options.GasLimit)
 
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 10))

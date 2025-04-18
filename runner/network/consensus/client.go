@@ -19,6 +19,8 @@ import (
 type ConsensusClientOptions struct {
 	// BlockTime is the time between FCU and GetPayload calls
 	BlockTime time.Duration
+	// GasLimit is the gas limit for the payload
+	GasLimit uint64
 }
 
 // BaseConsensusClient contains common functionality shared between different consensus client implementations.
