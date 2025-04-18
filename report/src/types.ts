@@ -49,6 +49,7 @@ export interface BenchmarkRun {
 
 export interface BenchmarkRuns {
   runs: BenchmarkRun[];
+  createdAt: string;
 }
 
 export function getBenchmarkVariables(runs: BenchmarkRun[]) {

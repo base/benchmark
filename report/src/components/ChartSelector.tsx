@@ -115,10 +115,11 @@ const ChartSelector = ({
   }, [byMetric, matchedRuns, onChangeDataQuery]);
 
   return (
-    <div className="filter-container">
+    <div className="flex flex-wrap gap-4 pb-4">
       <div>
         <div>Show Line Per</div>
         <select
+          className="filter-select"
           value={byMetric ?? undefined}
           onChange={(e) => setByMetric(e.target.value)}
         >
@@ -137,6 +138,7 @@ const ChartSelector = ({
             <div key={key}>
               <div>{camelToTitleCase(key)}</div>
               <select
+                className="filter-select"
                 value={filterSelections[key] ?? value[0]}
                 onChange={(e) => {
                   setFilterSelections({

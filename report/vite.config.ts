@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import { resolve } from "path";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   server: {
@@ -19,6 +20,8 @@ export default defineConfig({
   },
   // assetsInclude: ['../output/**/*']
   plugins: [
+    react(),
+    tailwindcss(),
     viteStaticCopy({
       targets: [
         {
