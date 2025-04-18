@@ -126,7 +126,7 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 		Nonce:      0,
 		Timestamp:  uint64(genesisTime.Unix()),
 		ExtraData:  eip1559.EncodeHoloceneExtraData(50, 10),
-		GasLimit:   40e9,
+		GasLimit:   p.GasLimit,
 		Difficulty: big.NewInt(1),
 		Alloc:      allocs,
 		Config: &params.ChainConfig{
