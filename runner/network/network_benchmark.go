@@ -129,7 +129,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		mempool, worker, err = payload.NewTransferPayloadWorker(
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
 	case "custom":
-		mempool, worker, err = payload.NewTransferPayloadWorker(
+		mempool, worker, err = payload.NewCustomPayloadWorker(
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
 
 	default:

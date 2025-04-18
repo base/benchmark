@@ -3,6 +3,7 @@ package payload
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -12,13 +13,13 @@ import (
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/pkg/errors"
 )
 
 type CustomPayloadWorker struct {
@@ -29,6 +30,8 @@ type CustomPayloadWorker struct {
 	accountNonces    map[common.Address]uint64
 	accountBalances  map[common.Address]*big.Int
 
+	contractAddress common.Address
+
 	params  benchmark.Params
 	chainID *big.Int
 	client  *ethclient.Client
@@ -37,9 +40,9 @@ type CustomPayloadWorker struct {
 	prefundAmount    *big.Int
 
 	mempool *mempool.StaticWorkloadMempool
-}
 
-const customNumAccounts = 10000
+	nonce uint64
+}
 
 func NewCustomPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (mempool.FakeMempool, Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
@@ -96,47 +99,108 @@ func (t *CustomPayloadWorker) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (t *CustomPayloadWorker) Setup(ctx context.Context) error {
-	// 21000 * numAccounts
-	gasCost := new(big.Int).Mul(big.NewInt(22000*params.GWei), big.NewInt(numAccounts))
-	// (prefundAmount - gasCost) / numAccounts
-	perAccount := new(big.Int).Div(new(big.Int).Sub(t.prefundAmount, gasCost), big.NewInt(numAccounts))
+// this will be called in the setup function, it just deployes the smart contract using the prefundedAccount
+func (t *CustomPayloadWorker) basicSmartContract(ctx context.Context) error {
+	address := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
+	nonce := t.mempool.GetTransactionCount(address)
+	t.nonce = nonce
 
-	sendCalls := make([]*types.Transaction, 0, numAccounts)
+	var gasLimit uint64 = 1000000
 
-	nonce := uint64(0)
-
-	var lastTxHash common.Hash
-
-	// prefund accounts
-	for i := 0; i < numAccounts; i++ {
-
-		transferTx, err := t.createTransferTx(t.prefundedAccount, nonce, t.accountAddresses[i], perAccount)
-		if err != nil {
-			return errors.Wrap(err, "failed to create transfer transaction")
-		}
-		nonce++
-		sendCalls = append(sendCalls, transferTx)
-		lastTxHash = transferTx.Hash()
-	}
-
-	t.mempool.AddTransactions(sendCalls)
-
-	receipt, err := t.waitForReceipt(ctx, lastTxHash)
+	// Get suggested gas price from the network
+	gasPrice, err := t.client.SuggestGasPrice(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to wait for receipt")
+		return fmt.Errorf("failed to get suggested gas price: %w", err)
 	}
 
-	t.log.Debug("Last receipt", "status", receipt.Status)
+	var amount *big.Int = big.NewInt(0)
 
-	t.log.Debug("Prefunded accounts", "numAccounts", len(t.accountAddresses), "perAccount", perAccount)
+	storeSelector := crypto.Keccak256([]byte("store(uint256)"))[:4]
+	retrieveSelector := crypto.Keccak256([]byte("retrieve()"))[:4]
 
-	// update account amounts
-	for i := 0; i < numAccounts; i++ {
-		t.accountBalances[t.accountAddresses[i]] = perAccount
+	runtime := []byte{
+		// function dispatcher
+		byte(vm.CALLDATALOAD),
+		byte(vm.PUSH4), storeSelector[0], storeSelector[1], storeSelector[2], storeSelector[3],
+		byte(vm.EQ),
+		byte(vm.PUSH1), 0x17, // JUMPDEST for store()
+		byte(vm.JUMPI),
+
+		byte(vm.CALLDATALOAD),
+		byte(vm.PUSH4), retrieveSelector[0], retrieveSelector[1], retrieveSelector[2], retrieveSelector[3],
+		byte(vm.EQ),
+		byte(vm.PUSH1), 0x1d, // JUMPDEST for retrieve()
+		byte(vm.JUMPI),
+
+		byte(vm.STOP),
+
+		// store():
+		byte(vm.JUMPDEST), // 0x17
+		byte(vm.CALLDATALOAD),
+		byte(vm.PUSH1), 0x00,
+		byte(vm.SSTORE),
+		byte(vm.STOP),
+
+		// retrieve():
+		byte(vm.JUMPDEST), // 0x1d
+		byte(vm.PUSH1), 0x00,
+		byte(vm.SLOAD),
+		byte(vm.PUSH1), 0x00,
+		byte(vm.MSTORE),
+		byte(vm.PUSH1), 0x20,
+		byte(vm.PUSH1), 0x00,
+
+		byte(vm.RETURN),
 	}
 
+	constructor := []byte{
+		byte(vm.PUSH1), byte(len(runtime)),
+		byte(vm.PUSH1), byte(0x0a), // hardcode offset = 10 (length of constructor)
+		byte(vm.PUSH1), 0x00,
+		byte(vm.CODECOPY),
+		byte(vm.PUSH1), byte(len(runtime)),
+		byte(vm.PUSH1), 0x00,
+		byte(vm.RETURN),
+	}
+
+	data := append(constructor, runtime...)
+
+	tx_unsigned := types.NewContractCreation(nonce, amount, gasLimit, gasPrice, data)
+
+	// Use the appropriate signer for your network
+	signer := types.LatestSignerForChainID(t.chainID)
+
+	tx, err := types.SignTx(tx_unsigned, signer, t.prefundedAccount)
+	if err != nil {
+		return fmt.Errorf("failed to sign transaction: %w", err)
+	}
+
+	// Send the transaction to the network
+	err = t.client.SendTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to send transaction: %w", err)
+	}
+
+	t.contractAddress = crypto.CreateAddress(address, nonce)
+	t.log.Info("Contract address", "address", t.contractAddress)
+
+	receipt, err := t.waitForReceipt(ctx, tx.Hash())
+	if err != nil {
+		return fmt.Errorf("failed to get transaction receipt: %w", err)
+	}
+
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		return fmt.Errorf("contract deployment failed with status: %d", receipt.Status)
+	}
+
+	t.nonce++
+
+	t.log.Info("Contract deployed successfully", "receipt", receipt)
 	return nil
+}
+
+func (t *CustomPayloadWorker) Setup(ctx context.Context) error {
+	return t.basicSmartContract(ctx)
 }
 
 func (t *CustomPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
@@ -149,50 +213,64 @@ func (t *CustomPayloadWorker) waitForReceipt(ctx context.Context, txHash common.
 	})
 }
 
-func (t *CustomPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64) error {
-	gasUsed := uint64(0)
-	txs := make([]*types.Transaction, 0, numAccounts)
-	acctIdx := 0
+func (t *CustomPayloadWorker) sendStoreTx(ctx context.Context) error {
+	address := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
 
-	for gasUsed < gasLimit {
-		transferTx, err := t.createTransferTx(t.accounts[acctIdx], t.accountNonces[t.accountAddresses[acctIdx]], t.accountAddresses[(acctIdx+1)%numAccounts], big.NewInt(1))
-		if err != nil {
-			t.log.Error("Failed to create transfer transaction", "err", err)
-			return err
-		}
-
-		txs = append(txs, transferTx)
-
-		gasUsed += 21000
-		t.accountNonces[t.accountAddresses[acctIdx]]++
-		// 21000 gas per transfer
-		acctIdx = (acctIdx + 1) % numAccounts
+	gasPrice, err := t.client.SuggestGasPrice(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get suggested gas price: %w", err)
 	}
 
-	t.mempool.AddTransactions(txs)
+	// Get gas limit estimate
+	msg := ethereum.CallMsg{
+		From:  address,
+		To:    &t.contractAddress,
+		Value: big.NewInt(0),
+		Data:  append(crypto.Keccak256([]byte("store(uint256)"))[:4], common.LeftPadBytes(big.NewInt(0).Bytes(), 32)...),
+	}
+	gasLimit, err := t.client.EstimateGas(ctx, msg)
+	if err != nil {
+		return fmt.Errorf("failed to estimate gas: %w", err)
+	}
+
+	// Add some buffer to the gas limit
+	gasLimit = gasLimit * 2
+
+	contractAddress := t.contractAddress
+	storeSelector := crypto.Keccak256([]byte("store(uint256)"))[:4]
+	value := new(big.Int).SetUint64(0)
+	encodedValue := common.LeftPadBytes(value.Bytes(), 32)
+	data := append(storeSelector, encodedValue...)
+
+	tx_unsigned := types.NewTransaction(t.nonce, contractAddress, nil, gasLimit, gasPrice, data)
+
+	signer := types.LatestSignerForChainID(t.chainID)
+	tx, err := types.SignTx(tx_unsigned, signer, t.prefundedAccount)
+	if err != nil {
+		return fmt.Errorf("failed to sign store transaction: %w", err)
+	}
+
+	// Send the transaction to the network
+	err = t.client.SendTransaction(ctx, tx)
+	if err != nil {
+		return fmt.Errorf("failed to send store transaction: %w", err)
+	}
+
+	// Increment nonce after successful broadcast
+	t.nonce++
+
 	return nil
 }
 
-func (t *CustomPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
-	txdata := &types.DynamicFeeTx{
-		ChainID:   t.chainID,
-		Nonce:     nonce,
-		To:        &toAddr,
-		Gas:       21000,
-		GasFeeCap: new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(1)),
-		GasTipCap: big.NewInt(2),
-		Value:     amount,
-	}
-	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
-	tx := types.MustSignNewTx(fromPriv, signer, txdata)
-
-	return tx, nil
-}
+// func (t *CustomPayloadWorker) sendRetrieveTx(ctx context.Context) error {
+// 	return nil
+// }
 
 func (t *CustomPayloadWorker) SendTxs(ctx context.Context) error {
-	if err := t.sendTxs(ctx, 21000*10000); err != nil {
-		t.log.Error("Failed to send transactions", "err", err)
+	err := t.sendStoreTx(ctx)
+	if err != nil {
 		return err
 	}
+
 	return nil
 }

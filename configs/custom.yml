@@ -10,4 +10,4 @@
       values:
         - geth
     - type: num_blocks
-      value: 20
+      value: 2
