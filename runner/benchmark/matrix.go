@@ -98,10 +98,9 @@ func (bp *Param) Check() error {
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
-	Name        string          `yaml:"name"`
-	Description string          `yaml:"desciption"`
-	Benchmark   []BenchmarkType `yaml:"benchmark"`
-	Variables   []Param         `yaml:"variables"`
+	Name        string  `yaml:"name"`
+	Description string  `yaml:"desciption"`
+	Variables   []Param `yaml:"variables"`
 }
 
 func (bc *TestDefinition) Check() error {
@@ -110,9 +109,6 @@ func (bc *TestDefinition) Check() error {
 	}
 	if bc.Description == "" {
 		return errors.New("description is required")
-	}
-	if len(bc.Benchmark) == 0 {
-		return errors.New("benchmark is required")
 	}
 	for _, b := range bc.Variables {
 		err := b.Check()

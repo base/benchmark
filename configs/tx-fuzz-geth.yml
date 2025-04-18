@@ -1,7 +1,5 @@
 - name: Test geth Performance
   description: Geth Execution Speed
-  benchmark:
-    - sequencer
   variables:
     - type: transaction_workload
       values:

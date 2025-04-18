@@ -1,7 +1,5 @@
-- name: Test op-reth Performance
-  description: Reth Execution Speed
-  benchmark:
-    - sequencer
+- name: Test Performance
+  description: Execution Speed
   variables:
     - type: transaction_workload
       values:
