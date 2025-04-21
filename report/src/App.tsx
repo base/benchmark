@@ -5,8 +5,7 @@ import Logo from "./assets/logo.svg";
 import { useTestMetadata } from "./utils/useDataSeries";
 
 function App() {
-  const { data: benchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
-    useTestMetadata();
+  const { data: benchmarkRuns } = useTestMetadata();
 
   const benchmarkTime = benchmarkRuns?.createdAt
     ? new Date(benchmarkRuns.createdAt)

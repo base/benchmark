@@ -26,7 +26,7 @@ function RunIndex() {
     });
 
     const differingKeys = Object.entries(configKeyToValues)
-      .filter(([_, values]) => values.size > 1)
+      .filter(([, values]) => values.size > 1)
       .map(([key]) => key);
 
     return benchmarkRuns.runs.map((run) => {
