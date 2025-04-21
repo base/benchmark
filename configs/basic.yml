@@ -1,5 +1,5 @@
-- name: Test Performance
-  description: Execution Speed
+- name: Transfer-only execution speed
+  description: Transfer-only execution speed
   variables:
     - type: transaction_workload
       values:
