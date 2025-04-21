@@ -102,7 +102,7 @@ jobs:
         mkdir ${{ runner.temp }}/data-dir
         mkdir ${{ runner.temp }}/output
         go run benchmark/cmd/main.go \
-          --log.level debug \
+          --log.level info \
           run \
           --config ./configs/basic.yml \
           --root-dir ${{ runner.temp }}/data-dir \

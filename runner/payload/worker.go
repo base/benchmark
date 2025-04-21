@@ -158,12 +158,14 @@ func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 	})
 }
 
-func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64) error {
+func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	gasUsed := uint64(0)
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
 
-	for gasUsed < gasLimit {
+	print10Times := 0
+
+	for gasUsed < t.params.GasLimit {
 		transferTx, err := t.createTransferTx(t.accounts[acctIdx], t.accountNonces[t.accountAddresses[acctIdx]], t.accountAddresses[(acctIdx+1)%numAccounts], big.NewInt(1))
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
@@ -172,7 +174,13 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context, gasLimit uint64
 
 		txs = append(txs, transferTx)
 
-		gasUsed += 21000
+		gasUsed += transferTx.Gas()
+
+		print10Times++
+		if print10Times%10 == 0 {
+			t.log.Info("Gas used", "gasUsed", gasUsed)
+		}
+
 		t.accountNonces[t.accountAddresses[acctIdx]]++
 		// 21000 gas per transfer
 		acctIdx = (acctIdx + 1) % numAccounts
@@ -199,7 +207,7 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 }
 
 func (t *TransferOnlyPayloadWorker) SendTxs(ctx context.Context) error {
-	if err := t.sendTxs(ctx, 21000*10000); err != nil {
+	if err := t.sendTxs(ctx); err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
 		return err
 	}

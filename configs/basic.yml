@@ -9,6 +9,7 @@
         - reth
         - geth
     - type: num_blocks
-      value: 20
+      value: 10
     - type: gas_limit
-      value: 10000000000
+      value: 1000000000
+             

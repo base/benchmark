@@ -210,6 +210,15 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 				return
 			}
 
+			if payload == nil {
+				errChan <- errors.New("received nil payload from consensus client")
+				return
+			}
+
+			// Now safe to access payload fields
+			nb.log.Info("Gas limit", "gasLimit", payload.GasLimit)
+			nb.log.Info("Gas used", "gasUsed", payload.GasUsed)
+
 			time.Sleep(500 * time.Millisecond)
 
 			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
