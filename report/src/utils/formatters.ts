@@ -13,23 +13,22 @@ const PREFIXES = {
 };
 
 const BINARY_PREFIXES = {
-    "": 1,
-    Ki: 1024,
-    Mi: 1024 ** 2,
-    Gi: 1024 ** 3,
-    Ti: 1024 ** 4,
-    Pi: 1024 ** 5,
-    Ei: 1024 ** 6,
-    Zi: 1024 ** 7,
-    Yi: 1024 ** 8,
+  "": 1,
+  Ki: 1024,
+  Mi: 1024 ** 2,
+  Gi: 1024 ** 3,
+  Ti: 1024 ** 4,
+  Pi: 1024 ** 5,
+  Ei: 1024 ** 6,
+  Zi: 1024 ** 7,
+  Yi: 1024 ** 8,
 };
 
-
 const TIME_UNITS = {
-    ns: 1,
-    us: 1e3, // Microsecond
-    ms: 1e6, // Millisecond
-    s: 1e9,  // Second
+  ns: 1,
+  us: 1e3, // Microsecond
+  ms: 1e6, // Millisecond
+  s: 1e9, // Second
 };
 
 const formatWithPrefix = (
@@ -40,7 +39,9 @@ const formatWithPrefix = (
 ): string => {
   if (value === 0) return `0 ${baseUnit}`;
 
-  const sortedPrefixes = Object.entries(prefixes).sort(([, valA], [, valB]) => valB - valA);
+  const sortedPrefixes = Object.entries(prefixes).sort(
+    ([, valA], [, valB]) => valB - valA,
+  );
 
   for (const [prefix, multiplier] of sortedPrefixes) {
     if (Math.abs(value) >= multiplier) {
@@ -50,7 +51,6 @@ const formatWithPrefix = (
   // Should not happen if "" prefix with value 1 is included, but as fallback:
   return `${value.toFixed(decimalPlaces)} ${baseUnit}`;
 };
-
 
 export const formatValue = (
   value: number,
@@ -62,15 +62,15 @@ export const formatValue = (
 
   // Time Conversions (ns, us, ms, s)
   if (unit === "ns" || unit === "us" || unit === "ms" || unit === "s") {
-      const baseValueInNs = value * (TIME_UNITS[unit] || 1); // Convert input to ns
-      return formatWithPrefix(baseValueInNs, "s", { // Target unit is 's', prefixes based on ns
-          "n": TIME_UNITS.ns,
-          "µ": TIME_UNITS.us,
-          "m": TIME_UNITS.ms,
-          "": TIME_UNITS.s, // Base unit 's' corresponding to 1e9 ns
-      });
+    const baseValueInNs = value * (TIME_UNITS[unit] || 1); // Convert input to ns
+    return formatWithPrefix(baseValueInNs, "s", {
+      // Target unit is 's', prefixes based on ns
+      n: TIME_UNITS.ns,
+      µ: TIME_UNITS.us,
+      m: TIME_UNITS.ms,
+      "": TIME_UNITS.s, // Base unit 's' corresponding to 1e9 ns
+    });
   }
-
 
   // Byte Conversions (bytes, KB, MB, GB) - using Binary Prefixes (KiB, MiB, GiB)
   if (unit === "bytes") {
@@ -87,7 +87,6 @@ export const formatValue = (
     // Use SI prefixes for rate
     return formatWithPrefix(value, "gas/s", PREFIXES);
   }
-
 
   // Default: just return the number as string
   return value.toString();
