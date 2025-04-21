@@ -6,10 +6,21 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"reflect"
 	"time"
 
+	"github.com/base/base-bench/runner/benchmark"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+)
+
+const (
+	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
+	NewPayloadLatencyMetric       = "latency/new_payload"
+	GetPayloadLatencyMetric       = "latency/get_payload"
+	SendTxsLatencyMetric          = "latency/send_txs"
+	GasPerBlockMetric             = "gas/per_block"
+	GasPerSecondMetric            = "gas/per_second"
 )
 
 type MetricsCollector interface {
@@ -38,6 +49,76 @@ func (m *BlockMetrics) AddExecutionMetric(name string, value interface{}) {
 func (m *BlockMetrics) GetMetricTypes() map[string]bool {
 	return map[string]bool{
 		"execution": true,
+	}
+}
+
+func (m *BlockMetrics) GetMetricFloat(name string) (float64, bool) {
+	if value, ok := m.ExecutionMetrics[name]; ok {
+		fmt.Println(reflect.TypeOf(value))
+		if v, ok := value.(time.Time); ok {
+			return float64(v.UnixNano()) / 1e9, true
+		} else if v, ok := value.(time.Duration); ok {
+			return float64(v.Nanoseconds()) / 1e9, true
+		}
+		switch v := value.(type) {
+		case float64:
+			return v, true
+		case float32:
+			return float64(v), true
+		case int:
+			return float64(v), true
+		case int64:
+			return float64(v), true
+		case uint:
+			return float64(v), true
+		case uint64:
+			return float64(v), true
+		}
+	}
+
+	return 0, false
+}
+
+func getAverage(metrics []BlockMetrics, metricName string) float64 {
+	var total float64
+	var count int
+	for _, metric := range metrics {
+		if value, ok := metric.GetMetricFloat(metricName); ok {
+			total += value
+			count++
+		}
+	}
+	if count == 0 {
+		return 0
+	}
+	return total / float64(count)
+}
+
+func BlockMetricsToValidatorSummary(metrics []BlockMetrics) *benchmark.ValidatorKeyMetrics {
+	averageNewPayloadLatency := getAverage(metrics, NewPayloadLatencyMetric)
+	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
+
+	return &benchmark.ValidatorKeyMetrics{
+		AverageNewPayloadLatency: averageNewPayloadLatency,
+		CommonKeyMetrics: benchmark.CommonKeyMetrics{
+			AverageGasPerSecond: averageGasPerSecond,
+		},
+	}
+}
+
+func BlockMetricsToSequencerSummary(metrics []BlockMetrics) *benchmark.SequencerKeyMetrics {
+	averageUpdateForkChoiceLatency := getAverage(metrics, UpdateForkChoiceLatencyMetric)
+	averageSendTxsLatency := getAverage(metrics, SendTxsLatencyMetric)
+	averageGetPayloadLatency := getAverage(metrics, GetPayloadLatencyMetric)
+	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
+
+	return &benchmark.SequencerKeyMetrics{
+		AverageFCULatency:        averageUpdateForkChoiceLatency,
+		AverageSendTxsLatency:    averageSendTxsLatency,
+		AverageGetPayloadLatency: averageGetPayloadLatency,
+		CommonKeyMetrics: benchmark.CommonKeyMetrics{
+			AverageGasPerSecond: averageGasPerSecond,
+		},
 	}
 }
 

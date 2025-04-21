@@ -119,20 +119,6 @@ func (bc *TestDefinition) Check() error {
 	return nil
 }
 
-// BenchmarkRun is the output JSON metadata for a benchmark run.
-type BenchmarkRun struct {
-	SourceFile      string                 `json:"sourceFile"`
-	OutputDir       string                 `json:"outputDir"`
-	TestName        string                 `json:"testName"`
-	TestDescription string                 `json:"testDescription"`
-	TestConfig      map[string]interface{} `json:"testConfig"`
-}
-
-// BenchmarkRuns is the output JSON metadata file schema.
-type BenchmarkRuns struct {
-	Runs []BenchmarkRun `json:"runs"`
-}
-
 // TestPlan represents a list of test runs to be executed.
 type TestPlan []TestRun
 
@@ -148,24 +134,6 @@ func NewTestPlanFromConfig(c []TestDefinition, testFileName string) (TestPlan, e
 	}
 
 	return testPlan, nil
-}
-
-func (tp TestPlan) ToMetadata() BenchmarkRuns {
-	metadata := BenchmarkRuns{
-		Runs: make([]BenchmarkRun, 0, len(tp)),
-	}
-
-	for _, params := range tp {
-		metadata.Runs = append(metadata.Runs, BenchmarkRun{
-			SourceFile:      params.TestFile,
-			TestName:        params.Name,
-			TestDescription: params.Description,
-			TestConfig:      params.Params.ToConfig(),
-			OutputDir:       params.OutputDir,
-		})
-	}
-
-	return metadata
 }
 
 var alphaNumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)

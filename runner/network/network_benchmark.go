@@ -36,6 +36,9 @@ type NetworkBenchmark struct {
 	sequencerOptions *config.InternalClientOptions
 	validatorOptions *config.InternalClientOptions
 
+	collectedSequencerMetrics *benchmark.SequencerKeyMetrics
+	collectedValidatorMetrics *benchmark.ValidatorKeyMetrics
+
 	genesis *core.Genesis
 	config  config.Config
 }
@@ -108,7 +111,11 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	metricsWriter := metrics.NewFileMetricsWriter(nb.sequencerOptions.MetricsPath)
 
 	defer func() {
-		if err := metricsWriter.Write(metricsCollector.GetMetrics()); err != nil {
+		sequencerMetrics := metricsCollector.GetMetrics()
+
+		nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
+
+		if err := metricsWriter.Write(sequencerMetrics); err != nil {
 			nb.log.Error("Failed to write metrics", "error", err)
 		}
 	}()
@@ -245,7 +252,11 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 	metricsWriter := metrics.NewFileMetricsWriter(nb.validatorOptions.MetricsPath)
 
 	defer func() {
-		if err := metricsWriter.Write(metricsCollector.GetMetrics()); err != nil {
+		validatorMetrics := metricsCollector.GetMetrics()
+
+		nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
+
+		if err := metricsWriter.Write(validatorMetrics); err != nil {
 			nb.log.Error("Failed to write metrics", "error", err)
 		}
 	}()
@@ -260,4 +271,16 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		return err
 	}
 	return nil
+}
+
+func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
+	if nb.collectedSequencerMetrics == nil || nb.collectedValidatorMetrics == nil {
+		return nil, errors.New("metrics not collected")
+	}
+
+	return &benchmark.BenchmarkRunResult{
+		SequencerMetrics: *nb.collectedSequencerMetrics,
+		ValidatorMetrics: *nb.collectedValidatorMetrics,
+		Success:          true,
+	}, nil
 }

@@ -17,11 +17,6 @@ type SyncingConsensusClient struct {
 	*BaseConsensusClient
 }
 
-const (
-	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
-	NewPayloadLatencyMetric       = "latency/new_payload"
-)
-
 // NewSyncingConsensusClient creates a new consensus client.
 func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, options ConsensusClientOptions) *SyncingConsensusClient {
 	base := NewBaseConsensusClient(log, client, authClient, genesis, options)
@@ -31,7 +26,7 @@ func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authCli
 }
 
 // Propose starts block generation, waits BlockTime, and generates a block.
-func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.ExecutableData, metrics *metrics.BlockMetrics) error {
+func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.ExecutableData, blockMetrics *metrics.BlockMetrics) error {
 	f.log.Info("Updating fork choice before validating payload", "payload_index", payload.Number)
 	startTime := time.Now()
 	_, err := f.updateForkChoice(ctx, nil)
@@ -39,7 +34,7 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 		return err
 	}
 	duration := time.Since(startTime)
-	metrics.AddExecutionMetric(UpdateForkChoiceLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
 
 	f.log.Info("Validate payload", "payload_index", payload.Number)
 	startTime = time.Now()
@@ -49,7 +44,14 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 	}
 	duration = time.Since(startTime)
 	f.log.Info("Validated payload", "payload_index", payload.Number, "duration", duration)
-	metrics.AddExecutionMetric(NewPayloadLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(metrics.NewPayloadLatencyMetric, duration)
+
+	// fetch gas used from the payload
+	gasUsed := payload.GasUsed
+	gasPerSecond := float64(gasUsed) / duration.Seconds()
+
+	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasUsed))
+	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
 
 	return nil
 }

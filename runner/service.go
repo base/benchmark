@@ -216,7 +216,7 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *c
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string) error {
+func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string) (*benchmark.BenchmarkRunResult, error) {
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
 	// for devnets, just create a new genesis with the current time
@@ -244,38 +244,43 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 
 	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, &genesis)
 	if err != nil {
-		return errors.Wrap(err, "failed to setup internal directories")
+		return nil, errors.Wrap(err, "failed to setup internal directories")
 	}
 
 	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, &genesis)
 	if err != nil {
-		return errors.Wrap(err, "failed to setup internal directories")
+		return nil, errors.Wrap(err, "failed to setup internal directories")
 	}
 
 	// Run benchmark
 	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, &genesis, s.config)
 	if err != nil {
-		return errors.Wrap(err, "failed to create network benchmark")
+		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
 	err = benchmark.Run(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to export output")
 	}
 
 	err = s.exportOutput(testName, err, sequencerOptions, outputDir, "sequencer")
 	if err != nil {
-		return errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to export output")
 	}
 
 	err = s.exportOutput(testName, err, validatorOptions, outputDir, "validator")
 	if err != nil {
-		return errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to export output")
 	}
 
-	return nil
+	result, err := benchmark.GetResult()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get metrics")
+	}
+
+	return result, nil
 }
 
-func (s *service) writeTestMetadata(testPlan benchmark.TestPlan) error {
+func (s *service) writeTestMetadata(testPlan benchmark.BenchmarkRuns) error {
 	metadataPath := path.Join(s.config.OutputDir(), "test_metadata.json")
 	metadataFile, err := os.OpenFile(metadataPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
@@ -284,7 +289,7 @@ func (s *service) writeTestMetadata(testPlan benchmark.TestPlan) error {
 
 	jsonEncoder := json.NewEncoder(metadataFile)
 	jsonEncoder.SetIndent("", "  ")
-	err = jsonEncoder.Encode(testPlan.ToMetadata())
+	err = jsonEncoder.Encode(testPlan)
 	if err != nil {
 		return errors.Wrap(err, "failed to encode test metadata")
 	}
@@ -315,12 +320,14 @@ func (s *service) Run(ctx context.Context) error {
 		testPlan = append(testPlan, matrix...)
 	}
 
-	err = s.writeTestMetadata(testPlan)
+	metadata := benchmark.BenchmarkMetadataFromTestPlan(testPlan)
+
+	err = s.writeTestMetadata(metadata)
 	if err != nil {
 		return errors.Wrap(err, "failed to write test metadata")
 	}
 
-	for _, c := range testPlan {
+	for testIdx, c := range testPlan {
 		outputDir := path.Join(s.config.OutputDir(), c.OutputDir)
 
 		// ensure output directory exists
@@ -329,13 +336,22 @@ func (s *service) Run(ctx context.Context) error {
 			return errors.Wrap(err, "failed to create output directory")
 		}
 
-		err = s.runTest(ctx, c.Params, s.config.DataDir(), outputDir)
+		metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir)
 		if err != nil && !errors.Is(err, context.Canceled) {
 			log.Error("Failed to run test", "err", err)
+			metricSummary = &benchmark.BenchmarkRunResult{
+				Success: false,
+			}
 			numFailure++
-			continue
+		} else {
+			numSuccess++
 		}
-		numSuccess++
+		metadata.AddResult(testIdx, *metricSummary)
+
+		err = s.writeTestMetadata(metadata)
+		if err != nil {
+			return errors.Wrap(err, "failed to write test metadata")
+		}
 	}
 
 	s.log.Info("Finished benchmarking", "numSuccess", numSuccess, "numFailure", numFailure)

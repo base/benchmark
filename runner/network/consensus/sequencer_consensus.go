@@ -26,11 +26,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	GetPayloadLatencyMetric = "latency/get_payload"
-	SendTxsLatencyMetric    = "latency/send_txs"
-)
-
 // SequencerConsensusClient is a fake consensus client that generates blocks on a timer.
 type SequencerConsensusClient struct {
 	*BaseConsensusClient
@@ -184,7 +179,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	duration := time.Since(startTime)
 	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(transactionsToInclude))
-	blockMetrics.AddExecutionMetric(SendTxsLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(metrics.SendTxsLatencyMetric, duration)
 	startTime = time.Now()
 
 	f.log.Info("Starting block building")
@@ -200,7 +195,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	}
 
 	duration = time.Since(startTime)
-	blockMetrics.AddExecutionMetric(UpdateForkChoiceLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID
 
@@ -220,8 +215,14 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	f.lastTimestamp = payload.Timestamp
 
 	duration = time.Since(startTime)
-	blockMetrics.AddExecutionMetric(GetPayloadLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(metrics.GetPayloadLatencyMetric, duration)
 	f.log.Info("Fetched built payload", "duration", duration)
+
+	// get gas usage
+	gasPerBlock := payload.GasUsed
+	gasPerSecond := float64(gasPerBlock) / f.options.BlockTime.Seconds()
+	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasPerBlock))
+	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
 
 	err = f.newPayload(ctx, payload)
 	if err != nil {
