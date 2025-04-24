@@ -125,4 +125,10 @@ export const CHART_CONFIG: Record<string, ChartConfig> = {
     description: "Shows the median time taken for committing TrieDB changes",
     unit: "ns",
   },
+  "transactions/per_block": {
+    type: "line",
+    title: "Transactions per Block",
+    description: "Shows the number of transactions per block",
+    unit: "count",
+  },
 };

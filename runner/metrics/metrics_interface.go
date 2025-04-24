@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"reflect"
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
@@ -21,6 +20,7 @@ const (
 	SendTxsLatencyMetric          = "latency/send_txs"
 	GasPerBlockMetric             = "gas/per_block"
 	GasPerSecondMetric            = "gas/per_second"
+	TransactionsPerBlockMetric    = "transactions/per_block"
 )
 
 type MetricsCollector interface {
@@ -54,7 +54,7 @@ func (m *BlockMetrics) GetMetricTypes() map[string]bool {
 
 func (m *BlockMetrics) GetMetricFloat(name string) (float64, bool) {
 	if value, ok := m.ExecutionMetrics[name]; ok {
-		fmt.Println(reflect.TypeOf(value))
+
 		if v, ok := value.(time.Time); ok {
 			return float64(v.UnixNano()) / 1e9, true
 		} else if v, ok := value.(time.Duration); ok {

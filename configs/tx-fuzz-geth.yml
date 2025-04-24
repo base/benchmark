@@ -1,5 +1,5 @@
-- name: Test geth Performance
-  description: Geth Execution Speed
+- name: TX-Fuzz Geth Performance
+  description: TX-Fuzz Geth Performance
   variables:
     - type: transaction_workload
       values:
@@ -8,5 +8,5 @@
       values:
         - geth
     - type: num_blocks
-      value: 2
+      value: 20
   

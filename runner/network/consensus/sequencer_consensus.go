@@ -224,6 +224,10 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasPerBlock))
 	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
 
+	// get transactions per block
+	transactionsPerBlock := len(payload.Transactions)
+	blockMetrics.AddExecutionMetric(metrics.TransactionsPerBlockMetric, transactionsPerBlock)
+
 	err = f.newPayload(ctx, payload)
 	if err != nil {
 		return nil, err
