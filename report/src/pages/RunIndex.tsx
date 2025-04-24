@@ -112,7 +112,7 @@ function RunIndex() {
           {benchmarkRuns?.runs.map((run, i) => (
             <tr key={run.outputDir} className="hover:bg-slate-50">
               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 align-top">
-                {run.testName}
+                <Link to={`/run-comparison`}>{run.testName}</Link>
               </td>
               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 align-top">
                 {diffConfigKeys[i] && (

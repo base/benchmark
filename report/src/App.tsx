@@ -16,12 +16,11 @@ function App() {
       <nav className="flex px-8 border-b border-slate-300 items-center bg-white gap-x-4">
         <div className="flex items-center gap-x-4 flex-grow">
           <div className="flex items-center gap-x-4 py-4">
-            <img src={Logo} className="w-8 h-8" />
+            <Link to="/">
+              <img src={Logo} className="w-8 h-8" />
+            </Link>
             <div className="font-medium">Client Benchmark Report</div>
           </div>
-          <Link to="/" className="text-slate-500 hover:text-slate-700 p-4">
-            All Tests
-          </Link>
         </div>
         <div>
           Showing Benchmark from{" "}
