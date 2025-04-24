@@ -2,7 +2,6 @@ package benchmark_test
 
 import (
 	"testing"
-	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/stretchr/testify/require"
@@ -31,7 +30,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:           "geth",
 						TransactionPayload: benchmark.TransactionPayload("simple"),
 						GasLimit:           benchmark.DefaultParams.GasLimit,
-						BlockTime:          time.Second,
+						BlockTime:          benchmark.DefaultParams.BlockTime,
 					},
 				},
 			},
@@ -57,7 +56,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:           "geth",
 						GasLimit:           benchmark.DefaultParams.GasLimit,
 						TransactionPayload: benchmark.TransactionPayload("simple"),
-						BlockTime:          time.Second,
+						BlockTime:          benchmark.DefaultParams.BlockTime,
 					},
 				},
 				{
@@ -65,7 +64,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:           "erigon",
 						GasLimit:           benchmark.DefaultParams.GasLimit,
 						TransactionPayload: benchmark.TransactionPayload("simple"),
-						BlockTime:          time.Second,
+						BlockTime:          benchmark.DefaultParams.BlockTime,
 					},
 				},
 				{
@@ -73,7 +72,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:           "geth",
 						GasLimit:           benchmark.DefaultParams.GasLimit,
 						TransactionPayload: benchmark.TransactionPayload("complex"),
-						BlockTime:          time.Second,
+						BlockTime:          benchmark.DefaultParams.BlockTime,
 					},
 				},
 				{
@@ -81,7 +80,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:           "erigon",
 						GasLimit:           benchmark.DefaultParams.GasLimit,
 						TransactionPayload: benchmark.TransactionPayload("complex"),
-						BlockTime:          time.Second,
+						BlockTime:          benchmark.DefaultParams.BlockTime,
 					},
 				},
 			},

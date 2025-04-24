@@ -118,7 +118,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 		Mint:                nil,
 		Value:               big.NewInt(0),
 		Gas:                 100_000,
-		IsSystemTransaction: true,
+		IsSystemTransaction: false,
 		Data:                data,
 	}
 	l1Tx := types.NewTx(out)
@@ -180,7 +180,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	duration := time.Since(startTime)
 	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(transactionsToInclude))
 	blockMetrics.AddExecutionMetric(metrics.SendTxsLatencyMetric, duration)
-	startTime = time.Now()
+	startBlockBuildingTime := time.Now()
 
 	f.log.Info("Starting block building")
 
@@ -194,11 +194,13 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 		return nil, err
 	}
 
+	if payloadID == nil {
+		return nil, errors.New("failed to build block")
+	}
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID
-
 	// wait block time
 	time.Sleep(f.options.BlockTime)
 
@@ -213,14 +215,15 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	f.headBlockHash = payload.BlockHash
 	f.headBlockNumber = payload.Number
 	f.lastTimestamp = payload.Timestamp
+	blockBuildingDuration := time.Since(startBlockBuildingTime)
 
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(metrics.GetPayloadLatencyMetric, duration)
-	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "BaseFeePerGas", payload.BaseFeePerGas)
+	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions))
 
 	// get gas usage
 	gasPerBlock := payload.GasUsed
-	gasPerSecond := float64(gasPerBlock) / f.options.BlockTime.Seconds()
+	gasPerSecond := float64(gasPerBlock) / blockBuildingDuration.Seconds()
 	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasPerBlock))
 	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
 

@@ -48,7 +48,7 @@ type TransferOnlyPayloadWorker struct {
 	mempool *mempool.StaticWorkloadMempool
 }
 
-const numAccounts = 10000
+const numAccounts = 1000
 
 func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (mempool.FakeMempool, Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
@@ -107,7 +107,7 @@ func (t *TransferOnlyPayloadWorker) Stop(ctx context.Context) error {
 
 func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	// 21000 * numAccounts
-	gasCost := new(big.Int).Mul(big.NewInt(22000*params.GWei), big.NewInt(numAccounts))
+	gasCost := new(big.Int).Mul(big.NewInt(21000*params.GWei), big.NewInt(numAccounts))
 	// (prefundAmount - gasCost) / numAccounts
 	perAccount := new(big.Int).Div(new(big.Int).Sub(t.prefundAmount, gasCost), big.NewInt(numAccounts))
 
@@ -118,8 +118,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	var lastTxHash common.Hash
 
 	// prefund accounts
-	for i := 0; i < numAccounts; i++ {
-
+	for i := range numAccounts {
 		transferTx, err := t.createTransferTx(t.prefundedAccount, nonce, t.accountAddresses[i], perAccount)
 		if err != nil {
 			return errors.Wrap(err, "failed to create transfer transaction")
@@ -163,9 +162,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
 
-	print10Times := 0
-
-	for gasUsed < t.params.GasLimit {
+	for gasUsed < (t.params.GasLimit - 100_000) {
 		transferTx, err := t.createTransferTx(t.accounts[acctIdx], t.accountNonces[t.accountAddresses[acctIdx]], t.accountAddresses[(acctIdx+1)%numAccounts], big.NewInt(1))
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
@@ -175,11 +172,6 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 		txs = append(txs, transferTx)
 
 		gasUsed += transferTx.Gas()
-
-		print10Times++
-		if print10Times%10 == 0 {
-			t.log.Info("Gas used", "gasUsed", gasUsed)
-		}
 
 		t.accountNonces[t.accountAddresses[acctIdx]]++
 		// 21000 gas per transfer

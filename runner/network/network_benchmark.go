@@ -94,11 +94,11 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	payloads, lastSetupBlock, err := nb.benchmarkSequencer(ctx)
+	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx)
 	if err != nil {
 		return err
 	}
-	return nb.benchmarkValidator(ctx, payloads, lastSetupBlock)
+	return nb.benchmarkValidator(ctx, payloads, firstTestBlock)
 }
 
 func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.ExecutableData, uint64, error) {
@@ -216,7 +216,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 
 		// run for a few blocks
 		for i := 0; i < nb.params.NumBlocks; i++ {
-			blockMetrics := metrics.NewBlockMetrics(payloads[len(payloads)-1].Number + 1)
+			blockMetrics := metrics.NewBlockMetrics(uint64(i))
 			err := worker.SendTxs(benchmarkCtx)
 			if err != nil {
 				nb.log.Warn("failed to send transactions", "err", err)
@@ -235,17 +235,12 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 				return
 			}
 
-			// Now safe to access payload fields
-			nb.log.Info("Gas limit", "gasLimit", payload.GasLimit)
-			nb.log.Info("Gas used", "gasUsed", payload.GasUsed)
-
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(1000 * time.Millisecond)
 
 			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
 			if err != nil {
 				nb.log.Error("Failed to collect metrics", "error", err)
 			}
-			nb.log.Info("Proposed payload", "payload_index", i, "len", len(payloads), "payload_transactions", len(payload.Transactions))
 			payloads = append(payloads, *payload)
 		}
 		payloadResult <- payloads

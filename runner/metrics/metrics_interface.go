@@ -54,7 +54,6 @@ func (m *BlockMetrics) GetMetricTypes() map[string]bool {
 
 func (m *BlockMetrics) GetMetricFloat(name string) (float64, bool) {
 	if value, ok := m.ExecutionMetrics[name]; ok {
-
 		if v, ok := value.(time.Time); ok {
 			return float64(v.UnixNano()) / 1e9, true
 		} else if v, ok := value.(time.Duration); ok {
