@@ -2,23 +2,24 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BenchmarkRun } from "../types";
 import { BenchmarkRuns, getBenchmarkVariables } from "../types";
 import { isEqual } from "lodash";
-import { formatLabel } from "../utils/formatters";
+import {
+  camelToTitleCase,
+  formatValue,
+  formatLabel,
+} from "../utils/formatters";
+import { interpolateWarm } from "d3";
+
 export interface DataFileRequest {
   outputDir: string;
   role: string;
   name: string;
+  color?: string;
 }
 
 interface ChartSelectorProps {
   benchmarkRuns: BenchmarkRuns;
   onChangeDataQuery: (data: DataFileRequest[]) => void;
 }
-
-const camelToTitleCase = (str: string) => {
-  return str
-    .replace(/([A-Z])/g, " $1")
-    .replace(/^./, (str) => str.toUpperCase());
-};
 
 interface BenchmarkRunWithRole extends BenchmarkRun {
   testConfig: BenchmarkRun["testConfig"] & {
@@ -99,12 +100,39 @@ const ChartSelector = ({
   }, [filterSelections, benchmarkRuns.runs]);
 
   const lastSentDataRef = useRef<DataFileRequest[]>([]);
+
   useEffect(() => {
+    let colorMap: ((val: number) => string) | undefined = undefined;
+
+    if (byMetric === "GasLimit") {
+      const min = matchedRuns.reduce((a, b) => {
+        return Math.min(a, Number(b.testConfig.GasLimit));
+      }, 0);
+      const max = matchedRuns.reduce((a, b) => {
+        return Math.max(a, Number(b.testConfig.GasLimit));
+      }, 0);
+
+      console.log(min, max);
+
+      colorMap = (val: number) =>
+        interpolateWarm(1 - (max > 0 ? (val - min) / max : 0));
+    }
+
     const dataToSend: DataFileRequest[] = matchedRuns.map((run) => {
+      let seriesName = `${run.testConfig[byMetric ?? "role"]}`;
+      let color = undefined;
+
+      if (byMetric === "GasLimit") {
+        seriesName = formatValue(Number(run.testConfig.GasLimit), "gas");
+        color = colorMap?.(Number(run.testConfig.GasLimit));
+        console.log(color);
+      }
+
       return {
         outputDir: run.outputDir,
         role: run.testConfig.role,
-        name: `${run.testConfig[byMetric ?? "role"]}`,
+        name: seriesName,
+        color,
       };
     });
 

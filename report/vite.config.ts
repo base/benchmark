@@ -8,6 +8,7 @@ export default defineConfig({
   server: {
     port: 3000,
   },
+  base: "./", // use relative path for github pages
   build: {
     outDir: "dist",
     assetsDir: "assets",

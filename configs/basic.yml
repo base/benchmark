@@ -6,10 +6,13 @@
         - transfer-only
     - type: node_type
       values:
-        - reth
         - geth
+        - reth
     - type: num_blocks
       value: 10
     - type: gas_limit
-      value: 1000000000
-             
+      values:
+        - 15000000
+        - 30000000
+        - 60000000
+        - 90000000

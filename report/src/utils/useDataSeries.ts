@@ -6,23 +6,23 @@ export const fetchMetrics = async (
   outputDir: string,
   nodeType: string,
 ): Promise<MetricData[]> => {
-  const response = await fetch(`/output/${outputDir}/metrics-${nodeType}.json`);
+  const response = await fetch(`output/${outputDir}/metrics-${nodeType}.json`);
   return await response.json();
 };
 
 const metricsKey = (outputDir: string, nodeType: string) => {
-  return `/output/${outputDir}/metrics-${nodeType}.json`;
+  return `output/${outputDir}/metrics-${nodeType}.json`;
 };
 
 export const useTestMetadata = () => {
   const fetcher = useCallback(async () => {
-    const response = await fetch("/output/test_metadata.json");
+    const response = await fetch("output/test_metadata.json");
     const jsonData = await response.json();
 
     return jsonData as BenchmarkRuns;
   }, []);
 
-  return useSWR("/output/test_metadata.json", fetcher);
+  return useSWR("output/test_metadata.json", fetcher);
 };
 
 export const useMultipleDataSeries = (

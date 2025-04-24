@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { formatValue } from "../utils/formatters";
+import { camelToTitleCase, formatValue } from "../utils/formatters";
 import { useTestMetadata } from "../utils/useDataSeries";
 import { useMemo } from "react";
 
@@ -114,18 +114,23 @@ function RunIndex() {
               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 align-top">
                 <Link to={`/run-comparison`}>{run.testName}</Link>
               </td>
-              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 align-top">
+              <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-900 align-top">
                 {diffConfigKeys[i] && (
                   <div className="mt-1 flex flex-wrap gap-1">
-                    {diffConfigKeys[i].map(([key, value]) => (
+                    {[...diffConfigKeys[i]].map(([key, value]) => (
                       <span
                         key={key} // Key should be unique within a run's diff tags
-                        title={`${key}: ${value}`}
-                        className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-600 ring-1 ring-inset ring-slate-500/10 overflow-hidden text-ellipsis whitespace-nowrap"
-                        style={{ maxWidth: "120px" }}
+                        title={`${camelToTitleCase(key)}: ${value}`}
+                        className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 ring-1 ring-inset ring-slate-500/10 overflow-hidden text-ellipsis whitespace-nowrap"
                       >
-                        <span className="font-semibold mr-1">{key}:</span>
-                        {String(value)}
+                        <span className="mr-1 text-slate-500">
+                          {camelToTitleCase(key)}:
+                        </span>
+                        {key === "GasLimit" ? (
+                          <pre>{formatValue(Number(value), "gas")}</pre>
+                        ) : (
+                          String(value)
+                        )}
                       </span>
                     ))}
                   </div>

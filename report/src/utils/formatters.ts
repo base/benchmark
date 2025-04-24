@@ -82,8 +82,14 @@ export const formatValue = (
   }
 
   // Gas or Count (no scaling, use thousands separators)
-  if (unit === "gas" || unit === "count") {
+  if (unit === "count") {
     return `${value.toLocaleString()}${unit !== "count" ? ` ${unit}` : ""}`;
+  }
+
+  // Gas per Second
+  if (unit === "gas") {
+    // Use SI prefixes for rate
+    return formatWithPrefix(value, "gas", PREFIXES);
   }
 
   // Gas per Second
@@ -94,4 +100,10 @@ export const formatValue = (
 
   // Default: just return the number as string
   return value.toString();
+};
+
+export const camelToTitleCase = (str: string) => {
+  return str
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (str) => str.toUpperCase());
 };

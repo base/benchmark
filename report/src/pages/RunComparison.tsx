@@ -22,10 +22,11 @@ function RunComparison() {
     }
 
     return dataPerFile.map((data, index) => {
-      const { name } = dataQuery[index];
+      const { name, color } = dataQuery[index];
       return {
         name,
         data,
+        color,
       };
     });
   }, [dataPerFile, dataQuery]);

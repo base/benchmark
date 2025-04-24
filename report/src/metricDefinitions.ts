@@ -131,4 +131,10 @@ export const CHART_CONFIG: Record<string, ChartConfig> = {
     description: "Shows the number of transactions per block",
     unit: "count",
   },
+  "gas/per_block": {
+    type: "line",
+    title: "Gas Per Block",
+    description: "Shows the median gas per block",
+    unit: "gas",
+  },
 };
