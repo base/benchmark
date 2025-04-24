@@ -60,7 +60,7 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.MetricsCollector, firstTestBlock uint64) error {
 	f.log.Info("Starting sync benchmark", "num_payloads", len(payloads))
 	for i := 0; i < len(payloads); i++ {
-		m := metrics.NewBlockMetrics(payloads[i].Number)
+		m := metrics.NewBlockMetrics(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock))))
 		f.log.Info("Proposing payload", "payload_index", i)
 		err := f.propose(ctx, &payloads[i], m)
 		if err != nil {
