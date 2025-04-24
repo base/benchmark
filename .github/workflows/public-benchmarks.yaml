@@ -3,7 +3,6 @@ name: run-publish-benchmarks
 on:
   push:
     branches: [ "main" ]
-  pull_request:
 
 jobs:
   basic-benchmarks:
