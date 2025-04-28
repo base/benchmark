@@ -2,87 +2,87 @@ name: run-publish-benchmarks
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   basic-benchmarks:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: 1.24
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.24
 
-    - name: Set up Rust
-      uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
 
-    - name: Install project dependencies
-      run: | 
-        go mod download
+      - name: Install project dependencies
+        run: |
+          go mod download
 
-    - name: Cache binaries
-      uses: actions/cache@v3
-      id: cache-bin
-      with:
-        path: ${{ runner.temp }}/bin
-        key: ${{ runner.os }}-binaries
+      - name: Cache binaries
+        uses: actions/cache@v3
+        id: cache-bin
+        with:
+          path: ${{ runner.temp }}/bin
+          key: ${{ runner.os }}-binaries
 
-    - name: Download geth and reth
-      if: steps.cache-bin.outputs.cache-hit != 'true'
-      run: | 
-        mkdir -p ${{ runner.temp }}/bin
+      - name: Download geth and reth
+        if: steps.cache-bin.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ${{ runner.temp }}/bin
 
-        git clone https://github.com/paradigmxyz/reth
-        git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b
-        
-        pushd reth
-        cargo build --features asm-keccak --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
-        cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
-        popd
-        chmod +x ${{ runner.temp }}/bin/reth
+          git clone https://github.com/paradigmxyz/reth
+          git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b
 
-        git clone https://github.com/ethereum-optimism/op-geth
-        git -C op-geth checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+          pushd reth
+          cargo build --features asm-keccak --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
+          cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
+          popd
+          chmod +x ${{ runner.temp }}/bin/reth
 
-        pushd op-geth
-        make geth
-        cp ./build/bin/geth ${{ runner.temp }}/bin/geth
-        chmod +x ${{ runner.temp }}/bin/geth
-        popd
+          git clone https://github.com/ethereum-optimism/op-geth
+          git -C op-geth checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
 
-        echo "binaries compiled:"
-        ls -la ${{ runner.temp }}/bin
+          pushd op-geth
+          make geth
+          cp ./build/bin/geth ${{ runner.temp }}/bin/geth
+          chmod +x ${{ runner.temp }}/bin/geth
+          popd
 
-    - name: Run Basic Benchmarks
-      id: unit
-      run: | 
-        mkdir ${{ runner.temp }}/data-dir
-        mkdir ${{ runner.temp }}/output
-        go run benchmark/cmd/main.go \
-          --log.level info \
-          run \
-          --config ./configs/basic.yml \
-          --root-dir ${{ runner.temp }}/data-dir \
-          --output-dir ${{ runner.temp }}/output \
-          --reth-bin ${{ runner.temp }}/bin/reth \
-          --geth-bin ${{ runner.temp }}/bin/geth
+          echo "binaries compiled:"
+          ls -la ${{ runner.temp }}/bin
 
-    - name: Build Report
-      run: |
-        cp -r ${{ runner.temp }}/output/ ./output/
-        pushd report
-        npm install
-        npm run build
-        popd
+      - name: Run Basic Benchmarks
+        id: unit
+        run: |
+          mkdir ${{ runner.temp }}/data-dir
+          mkdir ${{ runner.temp }}/output
+          go run benchmark/cmd/main.go \
+            --log.level info \
+            run \
+            --config ./configs/public-benchmark.yml \
+            --root-dir ${{ runner.temp }}/data-dir \
+            --output-dir ${{ runner.temp }}/output \
+            --reth-bin ${{ runner.temp }}/bin/reth \
+            --geth-bin ${{ runner.temp }}/bin/geth
 
-    - name: Upload static files as artifact
-      id: deployment
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: report/dist/
+      - name: Build Report
+        run: |
+          cp -r ${{ runner.temp }}/output/ ./output/
+          pushd report
+          npm install
+          npm run build
+          popd
+
+      - name: Upload static files as artifact
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: report/dist/
 
   deploy:
     runs-on: ubuntu-latest
@@ -96,5 +96,5 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
-    - name: Publish Report
-      uses: actions/deploy-pages@v4
+      - name: Publish Report
+        uses: actions/deploy-pages@v4

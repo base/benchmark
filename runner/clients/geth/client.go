@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -85,8 +86,8 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--metrics.port", strconv.Itoa(g.options.GethMetricsPort))
 
 	// Set mempool size to 100x default
-	args = append(args, "--txpool.globalslots", "1000000")
-	args = append(args, "--txpool.globalqueue", "1000000")
+	args = append(args, "--txpool.globalslots", "10000000")
+	args = append(args, "--txpool.globalqueue", "10000000")
 	args = append(args, "--txpool.accountslots", "1000000")
 	args = append(args, "--txpool.accountqueue", "1000000")
 	args = append(args, "--maxpeers", "0")
@@ -128,7 +129,9 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	g.clientURL = fmt.Sprintf("http://127.0.0.1:%d", g.options.GethHttpPort)
-	rpcClient, err := rpc.Dial(g.clientURL)
+	rpcClient, err := rpc.DialOptions(ctx, g.clientURL, rpc.WithHTTPClient(&http.Client{
+		Timeout: 30 * time.Second,
+	}))
 	if err != nil {
 		return errors.Wrap(err, "failed to dial rpc")
 	}
@@ -140,7 +143,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
-	l2Node, err := client.NewRPC(ctx, g.logger, fmt.Sprintf("http://127.0.0.1:%d", g.options.GethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
+	l2Node, err := client.NewRPC(ctx, g.logger, fmt.Sprintf("http://127.0.0.1:%d", g.options.GethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(30*time.Second))
 	if err != nil {
 		return err
 	}

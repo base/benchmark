@@ -189,6 +189,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 		return nil, errors.Wrap(err, "failed to generate payload attributes")
 	}
 
+	startTime = time.Now()
 	payloadID, err := f.updateForkChoice(ctx, payloadAttrs)
 	if err != nil {
 		return nil, err

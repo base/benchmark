@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -63,8 +64,10 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "-vvv")
 
 	// increase mempool size
-	args = append(args, "--txpool.pending-max-count", "1000000")
-	args = append(args, "--txpool.queued-max-count", "1000000")
+	args = append(args, "--txpool.pending-max-count", "100000000")
+	args = append(args, "--txpool.queued-max-count", "100000000")
+	args = append(args, "--txpool.pending-max-size", "100")
+	args = append(args, "--txpool.queued-max-size", "100")
 
 	// read jwt secret
 	jwtSecretStr, err := os.ReadFile(r.options.JWTSecretPath)
@@ -108,7 +111,9 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	r.clientURL = fmt.Sprintf("http://127.0.0.1:%d", r.options.RethHttpPort)
-	rpcClient, err := rpc.Dial(r.clientURL)
+	rpcClient, err := rpc.DialOptions(ctx, r.clientURL, rpc.WithHTTPClient(&http.Client{
+		Timeout: 30 * time.Second,
+	}))
 	if err != nil {
 		return errors.Wrap(err, "failed to dial rpc")
 	}
@@ -120,7 +125,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
-	l2Node, err := client.NewRPC(ctx, r.logger, fmt.Sprintf("http://127.0.0.1:%d", r.options.RethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))))
+	l2Node, err := client.NewRPC(ctx, r.logger, fmt.Sprintf("http://127.0.0.1:%d", r.options.RethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(30*time.Second))
 	if err != nil {
 		return err
 	}

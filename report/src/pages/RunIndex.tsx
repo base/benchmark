@@ -1,5 +1,9 @@
 import { Link } from "react-router-dom";
-import { camelToTitleCase, formatValue } from "../utils/formatters";
+import {
+  camelToTitleCase,
+  formatLabel,
+  formatValue,
+} from "../utils/formatters";
 import { useTestMetadata } from "../utils/useDataSeries";
 import { useMemo } from "react";
 
@@ -129,7 +133,7 @@ function RunIndex() {
                         {key === "GasLimit" ? (
                           <pre>{formatValue(Number(value), "gas")}</pre>
                         ) : (
-                          String(value)
+                          String(formatLabel(`${value}`))
                         )}
                       </span>
                     ))}

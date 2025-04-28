@@ -11,7 +11,6 @@ import (
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -142,26 +141,6 @@ func (t *ContractPayloadWorker) waitForReceipt(ctx context.Context, txHash commo
 	})
 }
 
-func (t *ContractPayloadWorker) getContractState(ctx context.Context) error {
-	debugSelector := common.FromHex(GET_RESULT_SELECTOR)
-
-	var result []byte
-	msg := ethereum.CallMsg{
-		To:   &t.contractAddress,
-		Data: debugSelector,
-	}
-
-	result, err := t.client.CallContract(ctx, msg, nil)
-	if err != nil {
-		return fmt.Errorf("failed to call retrieve: %w", err)
-	}
-
-	debugValue := new(big.Int).SetBytes(result)
-	t.log.Info("Debug", "value", debugValue.String())
-
-	return nil
-}
-
 func (t *ContractPayloadWorker) sendContractTx(ctx context.Context) error {
 	contractAddress := t.contractAddress
 
@@ -224,23 +203,14 @@ func (t *ContractPayloadWorker) sendContractTx(ctx context.Context) error {
 	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
 	tx := types.MustSignNewTx(privateKey, signer, txdata)
 
-	err = t.client.SendTransaction(context.Background(), tx)
-	if err != nil {
-		return fmt.Errorf("failed to send transaction: %w", err)
-	}
-	t.log.Info("Transaction sent", "tx", tx.Hash().Hex())
+	t.mempool.AddTransactions([]*types.Transaction{tx})
 
 	return nil
 }
 
 func (t *ContractPayloadWorker) SendTxs(ctx context.Context) error {
-	err := t.getContractState(ctx)
-	if err != nil {
-		return err
-	}
-
 	for i := 0; i < t.CallsPerBlock; i++ {
-		err = t.sendContractTx(ctx)
+		err := t.sendContractTx(ctx)
 		if err != nil {
 			return err
 		}

@@ -76,7 +76,7 @@ func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs
 		FinalizedBlockHash: f.headBlockHash,
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
 	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu, payloadAttrs)
@@ -90,7 +90,7 @@ func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs
 
 // getBuiltPayload retrieves the built payload for the given payload ID.
 func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID engine.PayloadID) (*engine.ExecutableData, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
 	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV3", payloadID)
@@ -112,7 +112,7 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 
 	params.BlockHash = block.Hash()
 
-	ctx, cancel := context.WithTimeout(ctx, time.Second*5)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
 	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV3", params, []common.Hash{}, common.Hash{})
