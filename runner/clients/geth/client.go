@@ -97,6 +97,9 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	// TODO: make this configurable
 	args = append(args, "--verbosity", "3")
 
+	minerNewPayloadTimeout := time.Second * 2
+	args = append(args, "--miner.newpayload-timeout", minerNewPayloadTimeout.String())
+
 	jwtSecretStr, err := os.ReadFile(g.options.JWTSecretPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to read jwt secret")

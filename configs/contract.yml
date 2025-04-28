@@ -1,4 +1,4 @@
-- name: EC Pairing Geth Performance
+- name: Basic EC Pairing Precompile
   description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
   benchmark:
     - sequencer
