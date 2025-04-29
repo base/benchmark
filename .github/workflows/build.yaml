@@ -64,7 +64,7 @@ jobs:
         go mod download
 
     - name: Cache binaries
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       id: cache-bin
       with:
         path: ${{ runner.temp }}/bin
