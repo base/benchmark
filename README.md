@@ -2,6 +2,7 @@
   <h1 style="font-size:32pt">Base Benchmark</h1>
   <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status: Beta">
   <img src="https://img.shields.io/badge/language-Go-00ADD8" alt="Language: Go">
+  <a href="https://github.com/base/benchmark/blob/main/LICENSE">
   <img src="https://img.shields.io/github/license/base/benchmark" alt="License">
 </div>
 
