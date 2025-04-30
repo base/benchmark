@@ -3,7 +3,6 @@ module github.com/base/base-bench
 go 1.22.8
 
 require (
-	github.com/btcsuite/btcd/btcec/v2 v2.3.4
 	github.com/ethereum-optimism/optimism v1.12.2
 	github.com/ethereum/go-ethereum v1.15.3
 	github.com/go-yaml/yaml v2.1.0+incompatible

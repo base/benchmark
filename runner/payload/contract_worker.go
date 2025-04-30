@@ -9,7 +9,6 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
@@ -56,7 +55,10 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 	}
 
 	chainID := params.Genesis(time.Now()).Config.ChainID
-	priv, _ := btcec.PrivKeyFromBytes(prefundedPrivateKey)
+	priv, err := crypto.ToECDSA(prefundedPrivateKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert private key: %w", err)
+	}
 
 	t := &ContractPayloadWorker{
 		log:                         log,
@@ -64,7 +66,7 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 		mempool:                     mempool,
 		params:                      params,
 		chainID:                     chainID,
-		prefundedAccount:            priv.ToECDSA(),
+		prefundedAccount:            priv,
 		prefundAmount:               prefundAmount,
 		ContractPayloadWorkerConfig: config,
 	}

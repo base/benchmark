@@ -3,6 +3,7 @@ package payload
 import (
 	"context"
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
-	"github.com/btcsuite/btcd/btcec/v2"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -59,7 +59,10 @@ func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 	}
 
 	chainID := params.Genesis(time.Now()).Config.ChainID
-	priv, _ := btcec.PrivKeyFromBytes(prefundedPrivateKey)
+	priv, err := crypto.ToECDSA(prefundedPrivateKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to convert private key: %w", err)
+	}
 
 	t := &TransferOnlyPayloadWorker{
 		log:              log,
@@ -67,7 +70,7 @@ func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 		mempool:          mempool,
 		params:           params,
 		chainID:          chainID,
-		prefundedAccount: priv.ToECDSA(),
+		prefundedAccount: priv,
 		prefundAmount:    prefundAmount,
 	}
 
@@ -86,7 +89,7 @@ func (t *TransferOnlyPayloadWorker) generateAccounts() error {
 
 	src := rand.New(rand.NewSource(100))
 	for i := 0; i < numAccounts; i++ {
-		key, err := ecdsa.GenerateKey(btcec.S256(), src)
+		key, err := ecdsa.GenerateKey(crypto.S256(), src)
 		if err != nil {
 			return err
 		}
