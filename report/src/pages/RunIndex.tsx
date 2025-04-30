@@ -5,21 +5,49 @@ import {
   formatValue,
 } from "../utils/formatters";
 import { useTestMetadata } from "../utils/useDataSeries";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { getBenchmarkVariables } from "../filter";
 
 function RunIndex() {
   const { data: benchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
     useTestMetadata();
 
+  // State for filter selections
+  const [filterSelections, setFilterSelections] = useState<
+    Record<string, string | number>
+  >({});
+
+  // Calculate filter options and filtered runs
+  const { filterOptions, matchedRuns } = useMemo(() => {
+    if (!benchmarkRuns) {
+      return { filterOptions: {}, matchedRuns: [] };
+    }
+
+    // Only include non-"any" filters in the params
+    const activeFilters = Object.fromEntries(
+      Object.entries(filterSelections).filter(([, value]) => value !== "any"),
+    );
+
+    return getBenchmarkVariables(
+      benchmarkRuns.runs,
+      {
+        params: activeFilters,
+        byMetric: "N/A",
+      },
+      undefined,
+      "any",
+    );
+  }, [benchmarkRuns, filterSelections]);
+
   // Calculate only configs that differ across runs
   const diffConfigKeys = useMemo(() => {
-    if (!benchmarkRuns) {
+    if (!matchedRuns) {
       return [];
     }
 
     const configKeyToValues: Record<string, Set<string | number>> = {};
 
-    benchmarkRuns.runs.forEach((run) => {
+    matchedRuns.forEach((run) => {
       const runConfig = run.testConfig || {};
       Object.entries(runConfig).forEach(([key, value]) => {
         if (!configKeyToValues[key]) {
@@ -30,16 +58,18 @@ function RunIndex() {
     });
 
     const differingKeys = Object.entries(configKeyToValues)
-      .filter(([, values]) => values.size > 1)
+      .filter(
+        ([key, values]) => values.size > 1 || filterSelections[key] !== "any",
+      )
       .map(([key]) => key);
 
-    return benchmarkRuns.runs.map((run) => {
+    return matchedRuns.map((run) => {
       const runConfig = run.testConfig || {};
       return Object.entries(runConfig).filter(([key]) =>
         differingKeys.includes(key),
       );
     });
-  }, [benchmarkRuns]);
+  }, [matchedRuns, filterSelections]);
 
   if (!benchmarkRuns || isLoadingBenchmarkRuns) {
     return <div>Loading...</div>;
@@ -47,6 +77,45 @@ function RunIndex() {
 
   return (
     <div className="container mx-auto">
+      {/* Filter Interface */}
+      <div className="flex flex-wrap gap-4 pb-4 mb-4">
+        {Object.entries(filterOptions)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([key, availableValues]) => {
+            const currentValue = filterSelections[key] ?? "any";
+            return (
+              <div key={key}>
+                <div className="text-sm text-slate-500 mb-1">
+                  {camelToTitleCase(key)}
+                </div>
+                <select
+                  className="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  value={String(currentValue)}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setFilterSelections((prev) => {
+                      const newSelections = { ...prev };
+                      if (newValue === "any") {
+                        delete newSelections[key];
+                      } else {
+                        newSelections[key] = newValue;
+                      }
+                      return newSelections;
+                    });
+                  }}
+                >
+                  <option value="any">Any</option>
+                  {availableValues.map((val) => (
+                    <option value={String(val)} key={String(val)}>
+                      {formatLabel(String(val))}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+      </div>
+
       <table className="min-w-full divide-y divide-slate-200 rounded-lg">
         <thead>
           <tr>
@@ -113,7 +182,7 @@ function RunIndex() {
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-slate-200 border-left border border-slate-200">
-          {benchmarkRuns?.runs.map((run, i) => (
+          {matchedRuns.map((run, i) => (
             <tr key={run.outputDir} className="hover:bg-slate-50">
               <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-slate-900 align-top">
                 <Link to={`/run-comparison`}>{run.testName}</Link>

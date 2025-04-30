@@ -8,7 +8,8 @@
     "preview": "vite preview",
     "start": "vite build && vite preview",
     "check": "eslint . --ext .ts,.tsx --fix && prettier --check .",
-    "lint": "eslint . --ext .ts,.tsx --fix && prettier --write ."
+    "lint": "eslint . --ext .ts,.tsx --fix && prettier --write .",
+    "test": "vitest"
   },
   "keywords": [],
   "author": "",
@@ -40,6 +41,7 @@
     "prettier": "^3.5.3",
     "typescript": "^5.3.3",
     "vite": "^5.1.4",
-    "vite-plugin-static-copy": "^2.3.1"
+    "vite-plugin-static-copy": "^2.3.1",
+    "vitest": "^3.1.2"
   }
 }

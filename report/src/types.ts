@@ -64,24 +64,3 @@ export interface BenchmarkRuns {
   runs: BenchmarkRun[];
   createdAt: string;
 }
-
-export function getBenchmarkVariables(runs: BenchmarkRun[]) {
-  const inferredConfig: Record<string, Array<string | number | boolean>> = {};
-
-  for (const run of runs) {
-    for (const [key, value] of Object.entries(run.testConfig)) {
-      if (!inferredConfig[key]) {
-        inferredConfig[key] = [];
-      }
-      inferredConfig[key].push(value);
-    }
-  }
-
-  return Object.fromEntries(
-    Object.entries(inferredConfig)
-      .filter(([, values]) => values.length > 1)
-      .map(([key, values]) => {
-        return [key, [...new Set(values)]];
-      }),
-  );
-}
