@@ -78,7 +78,7 @@ function RunIndex() {
   return (
     <div className="container mx-auto">
       {/* Filter Interface */}
-      <div className="flex flex-wrap gap-4 pb-4 mb-4">
+      <div className="flex flex-wrap gap-4 mb-4">
         {Object.entries(filterOptions)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map(([key, availableValues]) => {
@@ -89,7 +89,7 @@ function RunIndex() {
                   {camelToTitleCase(key)}
                 </div>
                 <select
-                  className="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="bg-white border border-slate-200 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   value={String(currentValue)}
                   onChange={(e) => {
                     const newValue = e.target.value;
