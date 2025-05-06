@@ -14,6 +14,7 @@ interface LineChartProps {
   description?: string;
   unit?: ChartConfig["unit"];
   xAxisDomain?: [number, number];
+  xAxisLabel?: string;
 }
 
 interface TooltipData {
@@ -36,6 +37,7 @@ const LineChart: React.FC<LineChartProps> = ({
   description,
   unit,
   xAxisDomain,
+  xAxisLabel = "Block Number",
 }) => {
   // Generate a unique ID for this chart
   const chartId = useId();
@@ -377,12 +379,30 @@ const LineChart: React.FC<LineChartProps> = ({
         svg
           .append("g")
           .attr("transform", `translate(0,${dimensions.height})`)
-          .call(d3.axisBottom(x))
+          .call(
+            d3
+              .axisBottom(x)
+              .ticks(maxBlock - minBlock)
+              .tickFormat((d) => (Number.isInteger(d) ? d.toString() : "")),
+          )
           .selectAll("text")
           .style("text-anchor", "end")
           .attr("dx", "-.8em")
           .attr("dy", ".15em")
           .attr("transform", "rotate(-45)");
+
+        // Add x-axis label if provided
+        if (xAxisLabel) {
+          svg
+            .append("text")
+            .attr("class", "x-axis-label")
+            .attr("text-anchor", "middle")
+            .attr("x", dimensions.width / 2)
+            .attr("y", dimensions.height + 27)
+            .attr("font-size", 12)
+            .attr("fill", "#333")
+            .text(xAxisLabel);
+        }
 
         svg
           .append("g")
@@ -452,7 +472,7 @@ const LineChart: React.FC<LineChartProps> = ({
         legendGroupSelection.each(function (_d, i) {
           d3.select(this).attr(
             "transform",
-            `translate(${currentX}, ${dimensions.height + 25})`,
+            `translate(${currentX}, ${dimensions.height + 36})`,
           ); // Move legend closer
           currentX += legendItemWidths[i] + spacing; // Add spacing between items
         });
