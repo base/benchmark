@@ -36,6 +36,7 @@ func (p Params) ToConfig() map[string]interface{} {
 
 // TestRun is a single run of a benchmark. Each config should result in multiple test runs.
 type TestRun struct {
+	ID          string
 	Params      Params
 	TestFile    string
 	Name        string

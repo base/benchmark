@@ -195,6 +195,8 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 
 	testOutDir := fmt.Sprintf("%s-%s-%d", nameToSlug(fileNameWithoutExt), nameToSlug(c.Name), time.Now().Unix())
 
+	id := fmt.Sprintf("%s-%s-%d", nameToSlug(fileNameWithoutExt), nameToSlug(c.Name), time.Now().Unix())
+
 	for i := 0; i < totalParams; i++ {
 		valueSelections := make(map[ParamType]interface{})
 		for j, p := range params {
@@ -207,6 +209,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 		}
 
 		testParams[i] = TestRun{
+			ID:          id,
 			Params:      *params,
 			OutputDir:   fmt.Sprintf("%s-%d", testOutDir, i),
 			Name:        c.Name,

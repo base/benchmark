@@ -128,12 +128,14 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			// ignore outputDir
+			// ignore outputDir and id
 			for i := range tt.want {
 				tt.want[i].OutputDir = ""
+				tt.want[i].ID = ""
 			}
 			for i := range got {
 				got[i].OutputDir = ""
+				got[i].ID = ""
 			}
 			require.ElementsMatch(t, tt.want, got)
 		})

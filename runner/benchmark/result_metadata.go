@@ -26,6 +26,7 @@ type BenchmarkRunResult struct {
 
 // BenchmarkRun is the output JSON metadata for a benchmark run.
 type BenchmarkRun struct {
+	ID              string                 `json:"id"`
 	SourceFile      string                 `json:"sourceFile"`
 	OutputDir       string                 `json:"outputDir"`
 	TestName        string                 `json:"testName"`
@@ -56,6 +57,7 @@ func BenchmarkMetadataFromTestPlan(testPlan TestPlan) BenchmarkRuns {
 
 	for _, params := range testPlan {
 		metadata.Runs = append(metadata.Runs, BenchmarkRun{
+			ID:              params.ID,
 			SourceFile:      params.TestFile,
 			TestName:        params.Name,
 			TestDescription: params.Description,

@@ -40,6 +40,7 @@ export interface ChartConfig {
 }
 
 export interface BenchmarkRun {
+  id: string;
   sourceFile: string;
   testName: string;
   testDescription: string;
