@@ -14,6 +14,7 @@ import (
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -23,8 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
-
-const GET_RESULT_SELECTOR = "de292789"
 
 type ContractPayloadWorkerConfig struct {
 	Bytecode          []byte
@@ -190,6 +189,30 @@ func (t *ContractPayloadWorker) waitForReceipt(ctx context.Context, txHash commo
 	})
 }
 
+func (t *ContractPayloadWorker) debugContract() (*big.Int, error) {
+	contractAddress := t.contractAddress
+
+	fromAddress := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
+
+	functionSignature := "getResult()"
+	funcSelector := crypto.Keccak256([]byte(functionSignature))[:4]
+
+	msg := ethereum.CallMsg{
+		From: fromAddress,
+		To:   &contractAddress,
+		Data: funcSelector,
+	}
+
+	ctx := context.Background()
+	res, err := t.client.CallContract(ctx, msg, nil)
+	if err != nil {
+		return nil, fmt.Errorf("contract call failed: %w", err)
+	}
+
+	result := new(big.Int).SetBytes(res)
+	return result, nil
+}
+
 func (t *ContractPayloadWorker) sendContractTx(ctx context.Context) error {
 	contractAddress := t.contractAddress
 
@@ -260,8 +283,15 @@ func (t *ContractPayloadWorker) sendContractTx(ctx context.Context) error {
 func (t *ContractPayloadWorker) SendTxs(ctx context.Context) error {
 	for i := 0; i < t.CallsPerBlock; i++ {
 		err := t.sendContractTx(ctx)
+
 		if err != nil {
+			t.log.Error("Failed to send transaction", "error", err)
 			return err
+		}
+
+		debugResult, err := t.debugContract()
+		if err == nil {
+			t.log.Debug("getResult()", "result", debugResult)
 		}
 	}
 
