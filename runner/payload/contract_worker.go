@@ -5,6 +5,10 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
@@ -16,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/pkg/errors"
 )
 
 const GET_RESULT_SELECTOR = "de292789"
@@ -26,6 +31,47 @@ type ContractPayloadWorkerConfig struct {
 	Input1            string
 	Calldata          []byte
 	CallsPerBlock     int
+}
+
+func ValidateContractPayload(payloadType benchmark.TransactionPayload, configDir string) (ContractPayloadWorkerConfig, error) {
+	selectors := strings.Split(string(payloadType), ":")
+
+	if len(selectors) != 6 {
+		return ContractPayloadWorkerConfig{}, errors.New("invalid contract payload type")
+	}
+
+	var callsPerBlock int
+	callsPerBlock, err := strconv.Atoi(selectors[1])
+	if err != nil {
+		return ContractPayloadWorkerConfig{}, errors.New("invalid calls per block")
+	}
+
+	functionSignature := selectors[2]
+	input1 := selectors[3]
+
+	calldata := common.FromHex(selectors[4])
+
+	bytecodeFile := selectors[5]
+
+	dir := filepath.Dir(configDir)
+
+	bytecodePath := filepath.Join(dir, bytecodeFile)
+	log.Info("loading bytecode from", "path", bytecodePath)
+
+	bytecodeHex, err := os.ReadFile(bytecodePath)
+	if err != nil {
+		return ContractPayloadWorkerConfig{}, errors.New("failed to read bytecode file")
+	}
+	bytecode := common.FromHex(string(bytecodeHex))
+
+	config := ContractPayloadWorkerConfig{
+		Bytecode:          bytecode,
+		FunctionSignature: functionSignature,
+		Input1:            input1,
+		Calldata:          calldata,
+		CallsPerBlock:     callsPerBlock,
+	}
+	return config, nil
 }
 
 type ContractPayloadWorker struct {
@@ -57,7 +103,7 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 	chainID := params.Genesis(time.Now()).Config.ChainID
 	priv, err := crypto.ToECDSA(prefundedPrivateKey)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert private key: %w", err)
+		return nil, nil, err
 	}
 
 	t := &ContractPayloadWorker{

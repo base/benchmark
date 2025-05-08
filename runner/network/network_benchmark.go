@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -140,8 +139,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
 	case strings.HasPrefix(string(payloadType), "contract"):
 		var config payload.ContractPayloadWorkerConfig
-		config, err = nb.validateContractPayload(payloadType)
-
+		config, err = payload.ValidateContractPayload(payloadType, nb.config.ConfigPath())
 		if err != nil {
 			return nil, 0, err
 		}
@@ -254,35 +252,6 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		benchmarkCancel()
 		return payloads, lastSetupBlock + 1, nil
 	}
-}
-
-func (*NetworkBenchmark) validateContractPayload(payloadType benchmark.TransactionPayload) (payload.ContractPayloadWorkerConfig, error) {
-	selectors := strings.Split(string(payloadType), ":")
-
-	if len(selectors) != 6 {
-		return payload.ContractPayloadWorkerConfig{}, errors.New("invalid contract payload type")
-	}
-
-	var callsPerBlock int
-	callsPerBlock, err := strconv.Atoi(selectors[1])
-	if err != nil {
-		return payload.ContractPayloadWorkerConfig{}, errors.New("invalid calls per block")
-	}
-
-	functionSignature := selectors[2]
-	input1 := selectors[3]
-
-	calldata := common.FromHex(selectors[4])
-	bytecode := common.FromHex(selectors[5])
-
-	config := payload.ContractPayloadWorkerConfig{
-		Bytecode:          bytecode,
-		FunctionSignature: functionSignature,
-		Input1:            input1,
-		Calldata:          calldata,
-		CallsPerBlock:     callsPerBlock,
-	}
-	return config, nil
 }
 
 func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {
