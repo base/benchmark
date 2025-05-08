@@ -2,7 +2,9 @@ package network
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"math/rand"
 	"os"
 	"path"
 	"strconv"
@@ -13,15 +15,18 @@ import (
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/consensus"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/payload"
+
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
@@ -101,6 +106,82 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	return nb.benchmarkValidator(ctx, payloads, firstTestBlock)
 }
 
+func (nb *NetworkBenchmark) fundTestAccount(ctx context.Context, mempool mempool.FakeMempool, client types.ExecutionClient, amount *big.Int) error {
+	nb.log.Info("Funding test account")
+
+	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
+	addr := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+
+	// fund the test account if needed (check if the account has a balance)
+	balance, err := client.Client().BalanceAt(ctx, addr, nil)
+	if err != nil {
+		nb.log.Warn("failed to get balance", "err", err)
+		return err
+	}
+
+	blockNumber := uint64(0)
+	blockHeader, err := client.Client().HeaderByNumber(ctx, nil)
+	if err != nil {
+		nb.log.Warn("failed to get block header", "err", err)
+		return err
+	}
+	blockNumber = blockHeader.Number.Uint64()
+
+	random := rand.New(rand.NewSource(int64(blockNumber)))
+	randomHash := common.BigToHash(big.NewInt(random.Int63()))
+
+	// if balance is already good, return
+	if balance.Cmp(amount) >= 0 {
+		return nil
+	}
+
+	depositTx := ethTypes.NewTx(
+		&ethTypes.DepositTx{
+			From:                common.Address{1},
+			To:                  &addr,
+			SourceHash:          randomHash,
+			IsSystemTransaction: false,
+			Mint:                amount,
+			Value:               amount,
+			Gas:                 210000,
+			Data:                []byte{},
+		},
+	)
+
+	txHash := depositTx.Hash()
+
+	mempool.AddTransactions([]*ethTypes.Transaction{depositTx})
+
+	// wait for the transaction to be mined
+	receipt, err := retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*ethTypes.Receipt, error) {
+		receipt, err := client.Client().TransactionReceipt(ctx, txHash)
+		if err != nil {
+			return nil, err
+		}
+		return receipt, nil
+	})
+	nb.log.Info("Included deposit tx in block", "block", receipt.BlockNumber)
+	if err != nil {
+		return fmt.Errorf("failed to get transaction receipt: %w", err)
+	}
+	if receipt.Status != 1 {
+		return fmt.Errorf("transaction failed with status: %d", receipt.Status)
+	}
+
+	// ensure balance
+	balance, err = client.Client().BalanceAt(ctx, addr, nil)
+	if err != nil {
+		return fmt.Errorf("failed to get balance: %w", err)
+	}
+	if balance.Cmp(amount) < 0 {
+		nb.log.Warn("balance is not equal to amount", "balance", balance, "amount", amount)
+		return errors.New("balance is not equal to amount")
+	}
+	nb.log.Info("funded test account", "balance", balance, "account", addr.Hex())
+
+	return nil
+}
+
 func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.ExecutableData, uint64, error) {
 	sequencerClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.sequencerOptions)
 	if err != nil {
@@ -137,7 +218,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.config.TxFuzzBinary())
 	case payloadType == "transfer-only":
 		mempool, worker, err = payload.NewTransferPayloadWorker(
-			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount)
+			ctx, nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.genesis)
 	case strings.HasPrefix(string(payloadType), "contract"):
 		var config payload.ContractPayloadWorkerConfig
 		config, err = nb.validateContractPayload(payloadType)
@@ -147,7 +228,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		}
 
 		mempool, worker, err = payload.NewContractPayloadWorker(
-			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, config)
+			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, config, nb.genesis)
 	default:
 		return nil, 0, errors.New("invalid payload type")
 	}
@@ -164,6 +245,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	}()
 
 	benchmarkCtx, benchmarkCancel := context.WithCancel(ctx)
+	defer benchmarkCancel()
 
 	errChan := make(chan error)
 	payloadResult := make(chan []engine.ExecutableData)
@@ -171,7 +253,14 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	setupComplete := make(chan struct{})
 
 	go func() {
-		err := worker.Setup(benchmarkCtx)
+		err := nb.fundTestAccount(benchmarkCtx, mempool, sequencerClient, amount)
+		if err != nil {
+			nb.log.Warn("failed to fund test account", "err", err)
+			errChan <- err
+			return
+		}
+
+		err = worker.Setup(benchmarkCtx)
 		if err != nil {
 			nb.log.Warn("failed to setup payload worker", "err", err)
 			errChan <- err
@@ -182,11 +271,20 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 
 	var lastSetupBlock uint64
 
+	headBlockHeader, err := sequencerClient.Client().HeaderByNumber(ctx, nil)
+	if err != nil {
+		nb.log.Warn("failed to get head block header", "err", err)
+		return nil, 0, err
+	}
+	headBlockHash := headBlockHeader.Hash()
+	headBlockNumber := headBlockHeader.Number.Uint64()
+
 	go func() {
-		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, nb.genesis, consensus.ConsensusClientOptions{
+
+		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
 			BlockTime: nb.params.BlockTime,
 			GasLimit:  nb.params.GasLimit,
-		})
+		}, headBlockHash, headBlockNumber)
 
 		payloads := make([]engine.ExecutableData, 0)
 
@@ -248,10 +346,8 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 
 	select {
 	case err := <-errChan:
-		benchmarkCancel()
 		return nil, 0, err
 	case payloads := <-payloadResult:
-		benchmarkCancel()
 		return payloads, lastSetupBlock + 1, nil
 	}
 }
@@ -307,12 +403,22 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		}
 	}()
 
-	consensusClient := consensus.NewSyncingConsensusClient(nb.log, validatorClient.Client(), validatorClient.AuthClient(), nb.genesis, consensus.ConsensusClientOptions{
+	headBlockHeader, err := validatorClient.Client().HeaderByNumber(ctx, nil)
+	if err != nil {
+		nb.log.Warn("failed to get head block header", "err", err)
+	}
+	headBlockHash := headBlockHeader.Hash()
+	headBlockNumber := headBlockHeader.Number.Uint64()
+
+	consensusClient := consensus.NewSyncingConsensusClient(nb.log, validatorClient.Client(), validatorClient.AuthClient(), consensus.ConsensusClientOptions{
 		BlockTime: nb.params.BlockTime,
-	})
+	}, headBlockHash, headBlockNumber)
 
 	err = consensusClient.Start(ctx, payloads, metricsCollector, firstTestBlock)
-	if err != nil && !errors.Is(err, context.Canceled) {
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return err
+		}
 		nb.log.Warn("failed to run consensus client", "err", err)
 		return err
 	}

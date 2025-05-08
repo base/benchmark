@@ -14,8 +14,11 @@ import (
 // This can be implemented as either a static workload of known gas usage, or a dynamic workload
 // that is loaded from a file after being simulated first.
 type FakeMempool interface {
+	// AddTransactions adds transactions to the mempool (thread-safe).
+	AddTransactions(transactions []*types.Transaction)
+
 	// NextBlock returns the next block of transactions to be included in the chain.
-	NextBlock() [][]byte
+	NextBlock() (sendTxs [][]byte, sequencerTxs [][]byte)
 }
 
 type StaticWorkloadMempool struct {
@@ -25,7 +28,11 @@ type StaticWorkloadMempool struct {
 
 	addressNonce map[common.Address]uint64
 
-	currentBlock [][]byte
+	// normal block txs submitted through mempool
+	currentBlockTxs [][]byte
+
+	// sequencer txs included in payload attributes
+	currentBlockSequencerTxs [][]byte
 }
 
 func NewStaticWorkloadMempool(log log.Logger) *StaticWorkloadMempool {
@@ -54,7 +61,11 @@ func (m *StaticWorkloadMempool) AddTransactions(transactions []*types.Transactio
 			panic(err)
 		}
 
-		m.currentBlock = append(m.currentBlock, bytes)
+		if transaction.Type() != types.DepositTxType {
+			m.currentBlockTxs = append(m.currentBlockTxs, bytes)
+		} else {
+			m.currentBlockSequencerTxs = append(m.currentBlockSequencerTxs, bytes)
+		}
 	}
 }
 
@@ -65,17 +76,16 @@ func (m *StaticWorkloadMempool) GetTransactionCount(address common.Address) uint
 	return m.addressNonce[address]
 }
 
-func (m *StaticWorkloadMempool) NextBlock() [][]byte {
+func (m *StaticWorkloadMempool) NextBlock() ([][]byte, [][]byte) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if len(m.currentBlock) == 0 {
-		return [][]byte{}
-	}
+	block := m.currentBlockTxs
+	blockSequencerTxs := m.currentBlockSequencerTxs
+	m.currentBlockTxs = nil
+	m.currentBlockSequencerTxs = nil
 
-	block := m.currentBlock
-	m.currentBlock = nil
-	return block
+	return block, blockSequencerTxs
 }
 
 var _ FakeMempool = &StaticWorkloadMempool{}

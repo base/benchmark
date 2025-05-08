@@ -30,6 +30,10 @@ type Service interface {
 }
 
 type service struct {
+	// tracks the state of the datadirs for each test
+	// this is used to avoid copying the datadirs for each test
+	dataDirState benchmark.SnapshotManager
+
 	config  config.Config
 	version string
 	log     log.Logger
@@ -37,9 +41,10 @@ type service struct {
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
 	return &service{
-		config:  cfg,
-		version: version,
-		log:     log,
+		dataDirState: benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
+		config:       cfg,
+		version:      version,
+		log:          log,
 	}
 }
 
@@ -54,8 +59,8 @@ func readBenchmarkConfig(path string) ([]benchmark.TestDefinition, error) {
 	return config, err
 }
 
-func (s *service) setupInternalDirectories(testDir string, params benchmark.Params, genesis *core.Genesis) (*config.InternalClientOptions, error) {
-	err := os.Mkdir(testDir, 0755)
+func (s *service) setupInternalDirectories(testDir string, params benchmark.Params, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string) (*config.InternalClientOptions, error) {
+	err := os.MkdirAll(testDir, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create test directory")
 	}
@@ -79,10 +84,22 @@ func (s *service) setupInternalDirectories(testDir string, params benchmark.Para
 		return nil, errors.Wrap(err, "failed to write chain config")
 	}
 
-	dataDirPath := path.Join(testDir, "data")
-	err = os.Mkdir(dataDirPath, 0755)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create data directory")
+	var dataDirPath string
+	if snapshot != nil && snapshot.Command != "" {
+		// if we have a snapshot, restore it if needed or reuse from a previous test
+		snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to ensure snapshot")
+		}
+
+		dataDirPath = snapshotDir
+	} else {
+		// if no snapshot, just create a new datadir
+		dataDirPath = path.Join(testDir, "data")
+		err = os.Mkdir(dataDirPath, 0755)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to create data directory")
+		}
 	}
 
 	var jwtSecret [32]byte
@@ -216,17 +233,76 @@ func (s *service) exportOutput(testName string, returnedError error, testDirs *c
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string) (*benchmark.BenchmarkRunResult, error) {
-	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
+func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.SnapshotDefinition) (*core.Genesis, error) {
+	usingSnapshot := snapshotConfig != nil && snapshotConfig.Command != ""
+	var genesis *core.Genesis
 
-	// for devnets, just create a new genesis with the current time
-	genesisTime := time.Now()
-	genesis := params.Genesis(genesisTime)
+	if usingSnapshot {
+		s.log.Info("Using snapshot", "command", snapshotConfig.Command, "genesis_file", snapshotConfig.GenesisFile)
+
+		// read genesis file
+		genesisFile, err := os.Open(snapshotConfig.GenesisFile)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open genesis file")
+		}
+
+		defer func() {
+			_ = genesisFile.Close()
+		}()
+
+		genesis = new(core.Genesis)
+		err = json.NewDecoder(genesisFile).Decode(genesis)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to decode genesis file")
+		}
+	} else {
+		// for devnets, just create a new genesis with the current time
+		genesisTime := time.Now()
+		genesis = benchmark.DefaultDevnetGenesis(genesisTime)
+	}
+
+	return genesis, nil
+}
+
+func (s *service) setupDataDirs(workingDir string, params benchmark.Params, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
 
 	// create temp directory for this test
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
 	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
+
+	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, genesis, snapshot, "sequencer")
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
+	}
+
+	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator")
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
+	}
+
+	return sequencerOptions, validatorOptions, nil
+}
+
+func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition) (*benchmark.BenchmarkRunResult, error) {
+	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
+
+	// get genesis block
+	genesis, err := s.getGenesisForSnapshotConfig(snapshotConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get genesis block")
+	}
+
+	// create temp directory for this test
+	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
+	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
+	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
+
+	// setup data directories (restore from snapshot if needed)
+	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to setup data dirs")
+	}
 
 	defer func() {
 		// clean up test directory
@@ -242,18 +318,8 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 		}
 	}()
 
-	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, &genesis)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to setup internal directories")
-	}
-
-	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, &genesis)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to setup internal directories")
-	}
-
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, &genesis, s.config)
+	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, genesis, s.config)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
@@ -308,49 +374,63 @@ func (s *service) Run(ctx context.Context) error {
 	numSuccess := 0
 	numFailure := 0
 
-	var testPlan benchmark.TestPlan
+	var testPlans []benchmark.TestPlan
 
 	for _, c := range config {
-		matrix, err := benchmark.ResolveTestRunsFromMatrix(c, s.config.ConfigPath())
+		testPlan, err := benchmark.NewTestPlanFromConfig(c, s.config.ConfigPath())
 		if err != nil {
 			return errors.Wrap(err, "failed to create params matrix")
 		}
 
 		// add all the params to the test plan
-		testPlan = append(testPlan, matrix...)
+		testPlans = append(testPlans, *testPlan)
 	}
 
-	metadata := benchmark.BenchmarkMetadataFromTestPlan(testPlan)
-
-	err = s.writeTestMetadata(metadata)
+	// ensure output directory exists
+	err = os.MkdirAll(s.config.OutputDir(), 0755)
 	if err != nil {
-		return errors.Wrap(err, "failed to write test metadata")
+		return errors.Wrap(err, "failed to create output directory")
 	}
 
-	for testIdx, c := range testPlan {
-		outputDir := path.Join(s.config.OutputDir(), c.OutputDir)
+	metadata := benchmark.BenchmarkMetadataFromTestPlans(testPlans)
+	runIdx := 0
 
-		// ensure output directory exists
-		err = os.MkdirAll(outputDir, 0755)
-		if err != nil {
-			return errors.Wrap(err, "failed to create output directory")
-		}
-
-		metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir)
-		if err != nil && !errors.Is(err, context.Canceled) {
-			log.Error("Failed to run test", "err", err)
-			metricSummary = &benchmark.BenchmarkRunResult{
-				Success: false,
-			}
-			numFailure++
-		} else {
-			numSuccess++
-		}
-		metadata.AddResult(testIdx, *metricSummary)
-
+	for _, testPlan := range testPlans {
 		err = s.writeTestMetadata(metadata)
 		if err != nil {
 			return errors.Wrap(err, "failed to write test metadata")
+		}
+
+		for _, c := range testPlan.Runs {
+			outputDir := path.Join(s.config.OutputDir(), c.OutputDir)
+
+			// ensure output directory exists
+			err = os.MkdirAll(outputDir, 0755)
+			if err != nil {
+				return errors.Wrap(err, "failed to create output directory")
+			}
+
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot)
+			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return err
+				} else {
+					log.Error("Failed to run test", "err", err)
+					metricSummary = &benchmark.BenchmarkRunResult{
+						Success: false,
+					}
+					numFailure++
+				}
+			} else {
+				numSuccess++
+			}
+			metadata.AddResult(runIdx, *metricSummary)
+
+			err = s.writeTestMetadata(metadata)
+			if err != nil {
+				return errors.Wrap(err, "failed to write test metadata")
+			}
+			runIdx++
 		}
 	}
 

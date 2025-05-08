@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
@@ -29,14 +28,16 @@ import (
 // SequencerConsensusClient is a fake consensus client that generates blocks on a timer.
 type SequencerConsensusClient struct {
 	*BaseConsensusClient
-	mempool mempool.FakeMempool
+	lastTimestamp uint64
+	mempool       mempool.FakeMempool
 }
 
 // NewSequencerConsensusClient creates a new consensus client using the given genesis hash and timestamp.
-func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, genesis *core.Genesis, options ConsensusClientOptions) *SequencerConsensusClient {
-	base := NewBaseConsensusClient(log, client, authClient, genesis, options)
+func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64) *SequencerConsensusClient {
+	base := NewBaseConsensusClient(log, client, authClient, options, headBlockHash, headBlockNumber)
 	return &SequencerConsensusClient{
 		BaseConsensusClient: base,
+		lastTimestamp:       uint64(time.Now().Unix()),
 		mempool:             mempool,
 	}
 }
@@ -82,7 +83,7 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 	return w.Bytes(), nil
 }
 
-func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttributes, error) {
+func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte) (*eth.PayloadAttributes, error) {
 	gasLimit := eth.Uint64Quantity(f.options.GasLimit)
 
 	var b8 eth.Bytes8
@@ -127,12 +128,18 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 		return nil, fmt.Errorf("failed to encode L1 info tx: %w", err)
 	}
 
+	sequencerTxsHexBytes := make([]hexutil.Bytes, len(sequencerTxs)+1)
+	sequencerTxsHexBytes[0] = hexutil.Bytes(opaqueL1Tx)
+	for i, tx := range sequencerTxs {
+		sequencerTxsHexBytes[i+1] = hexutil.Bytes(tx)
+	}
+
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),
 		PrevRandao:            eth.Bytes32{},
 		SuggestedFeeRecipient: common.Address{'C'},
 		Withdrawals:           &types.Withdrawals{},
-		Transactions:          []hexutil.Bytes{opaqueL1Tx},
+		Transactions:          sequencerTxsHexBytes,
 		GasLimit:              &gasLimit,
 		ParentBeaconBlockRoot: &common.Hash{},
 		NoTxPool:              false,
@@ -146,14 +153,27 @@ func (f *SequencerConsensusClient) generatePayloadAttributes() (*eth.PayloadAttr
 func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics) (*engine.ExecutableData, error) {
 	startTime := time.Now()
 
-	transactionsToInclude := f.mempool.NextBlock()
-	sendCallsPerBatch := 100
-	batches := (len(transactionsToInclude) + sendCallsPerBatch - 1) / sendCallsPerBatch
+	sendTxs, sequencerTxs := f.mempool.NextBlock()
 
-	f.log.Info("Sending transactions", "num_transactions", len(transactionsToInclude), "num_batches", batches)
+	if len(sendTxs) > 0 {
+		// Attempt to parse the first transaction to get its hash for logging
+		firstTx := new(types.Transaction)
+		if err := firstTx.UnmarshalBinary(sendTxs[0]); err == nil {
+			f.log.Info("Propose: Fetched transactions from mempool", "count", len(sendTxs), "first_tx_hash_for_sending", firstTx.Hash().Hex())
+		} else {
+			f.log.Warn("Propose: Fetched transactions from mempool, but failed to parse first tx for hash", "count", len(sendTxs), "parse_error", err)
+		}
+	} else {
+		f.log.Info("Propose: Fetched transactions from mempool", "count", len(sendTxs))
+	}
+
+	sendCallsPerBatch := 100
+	batches := (len(sendTxs) + sendCallsPerBatch - 1) / sendCallsPerBatch
+
+	f.log.Info("Sending transactions", "num_transactions", len(sendTxs), "num_batches", batches)
 
 	for i := 0; i < batches; i++ {
-		batch := transactionsToInclude[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(transactionsToInclude))]
+		batch := sendTxs[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(sendTxs))]
 		results := make([]interface{}, len(batch))
 
 		batchCall := make([]rpc.BatchElem, len(batch))
@@ -172,19 +192,19 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 		for _, tx := range batchCall {
 			if tx.Error != nil {
-				return nil, errors.Wrap(tx.Error, "failed to send transaction")
+				return nil, errors.Wrapf(tx.Error, "failed to send transaction %#v", tx.Args[0])
 			}
 		}
 	}
 
 	duration := time.Since(startTime)
-	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(transactionsToInclude))
+	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(sendTxs))
 	blockMetrics.AddExecutionMetric(metrics.SendTxsLatencyMetric, duration)
 	startBlockBuildingTime := time.Now()
 
 	f.log.Info("Starting block building")
 
-	payloadAttrs, err := f.generatePayloadAttributes()
+	payloadAttrs, err := f.generatePayloadAttributes(sequencerTxs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate payload attributes")
 	}

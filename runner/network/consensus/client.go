@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
@@ -32,23 +31,18 @@ type BaseConsensusClient struct {
 
 	headBlockHash   common.Hash
 	headBlockNumber uint64
-	lastTimestamp   uint64
 
 	currentPayloadID *engine.PayloadID
 }
 
 // NewBaseConsensusClient creates a new base consensus client.
-func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, options ConsensusClientOptions) *BaseConsensusClient {
-	genesisHash := genesis.ToBlock().Hash()
-	genesisTimestamp := genesis.Timestamp
-
+func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64) *BaseConsensusClient {
 	return &BaseConsensusClient{
 		log:              log,
 		client:           client,
 		authClient:       authClient,
-		headBlockHash:    genesisHash,
-		headBlockNumber:  genesis.Number,
-		lastTimestamp:    genesisTimestamp,
+		headBlockHash:    headBlockHash,
+		headBlockNumber:  headBlockNumber,
 		options:          options,
 		currentPayloadID: nil,
 	}
@@ -59,12 +53,12 @@ type basicBlockType struct{}
 
 // HasOptimismWithdrawalsRoot implements types.BlockType.
 func (b basicBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
-	return false
+	return true
 }
 
 // IsIsthmus implements types.BlockType.
 func (b basicBlockType) IsIsthmus(blkTime uint64) bool {
-	return false
+	return true
 }
 
 var _ types.BlockType = basicBlockType{}
@@ -93,7 +87,7 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
-	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV3", payloadID)
+	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", payloadID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get payload")
 	}
@@ -103,19 +97,23 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 	return payloadResp.ExecutionPayload, nil
 }
 
-// newPayload calls engine_newPayloadV3 with the given executable data.
+// newPayload calls engine_newPayloadV4 with the given executable data.
 func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
-	block, err := engine.ExecutableDataToBlockNoHash(*params, []common.Hash{}, &common.Hash{}, nil, basicBlockType{})
+	newParams := *params
+
+	// newParams.WithdrawalsRoot = &common.Hash{}
+
+	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, basicBlockType{})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload to block")
 	}
 
-	params.BlockHash = block.Hash()
+	newParams.BlockHash = block.Hash()
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV3", params, []common.Hash{}, common.Hash{})
+	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", newParams, []common.Hash{}, common.Hash{}, []common.Hash{})
 
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")

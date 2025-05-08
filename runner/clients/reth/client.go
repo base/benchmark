@@ -69,6 +69,14 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--txpool.pending-max-size", "100")
 	args = append(args, "--txpool.queued-max-size", "100")
 
+	// delete datadir/txpool-transactions-backup.rlp if it exists
+	txpoolBackupPath := fmt.Sprintf("%s/txpool-transactions-backup.rlp", r.options.DataDirPath)
+	if _, err := os.Stat(txpoolBackupPath); err == nil {
+		if err := os.Remove(txpoolBackupPath); err != nil {
+			return errors.Wrap(err, "failed to remove txpool backup")
+		}
+	}
+
 	// read jwt secret
 	jwtSecretStr, err := os.ReadFile(r.options.JWTSecretPath)
 	if err != nil {

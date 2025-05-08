@@ -13,11 +13,14 @@ import (
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 )
 
@@ -33,10 +36,10 @@ type NewWorkerFn func(logger log.Logger, elRPCURL string, params benchmark.Param
 type TransferOnlyPayloadWorker struct {
 	log log.Logger
 
-	accounts         []*ecdsa.PrivateKey
-	accountAddresses []common.Address
-	accountNonces    map[common.Address]uint64
-	accountBalances  map[common.Address]*big.Int
+	privateKeys []*ecdsa.PrivateKey
+	addresses   []common.Address
+	nextNonce   map[common.Address]uint64
+	balance     map[common.Address]*big.Int
 
 	params  benchmark.Params
 	chainID *big.Int
@@ -50,7 +53,7 @@ type TransferOnlyPayloadWorker struct {
 
 const numAccounts = 1000
 
-func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (mempool.FakeMempool, Worker, error) {
+func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int, genesis *core.Genesis) (mempool.FakeMempool, Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)
@@ -58,7 +61,7 @@ func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 		return nil, nil, err
 	}
 
-	chainID := params.Genesis(time.Now()).Config.ChainID
+	chainID := genesis.Config.ChainID
 	priv, err := crypto.ToECDSA(prefundedPrivateKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert private key: %w", err)
@@ -74,18 +77,18 @@ func NewTransferPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 		prefundAmount:    prefundAmount,
 	}
 
-	if err := t.generateAccounts(); err != nil {
+	if err := t.generateAccounts(ctx); err != nil {
 		return nil, nil, err
 	}
 
 	return mempool, t, nil
 }
 
-func (t *TransferOnlyPayloadWorker) generateAccounts() error {
-	t.accounts = make([]*ecdsa.PrivateKey, 0, numAccounts)
-	t.accountAddresses = make([]common.Address, 0, numAccounts)
-	t.accountNonces = make(map[common.Address]uint64)
-	t.accountBalances = make(map[common.Address]*big.Int)
+func (t *TransferOnlyPayloadWorker) generateAccounts(ctx context.Context) error {
+	t.privateKeys = make([]*ecdsa.PrivateKey, 0, numAccounts)
+	t.addresses = make([]common.Address, 0, numAccounts)
+	t.nextNonce = make(map[common.Address]uint64)
+	t.balance = make(map[common.Address]*big.Int)
 
 	src := rand.New(rand.NewSource(100))
 	for i := 0; i < numAccounts; i++ {
@@ -94,10 +97,37 @@ func (t *TransferOnlyPayloadWorker) generateAccounts() error {
 			return err
 		}
 
-		t.accounts = append(t.accounts, key)
-		t.accountAddresses = append(t.accountAddresses, crypto.PubkeyToAddress(key.PublicKey))
-		t.accountNonces[crypto.PubkeyToAddress(key.PublicKey)] = 0
-		t.accountBalances[crypto.PubkeyToAddress(key.PublicKey)] = big.NewInt(0)
+		t.privateKeys = append(t.privateKeys, key)
+		t.addresses = append(t.addresses, crypto.PubkeyToAddress(key.PublicKey))
+		t.nextNonce[crypto.PubkeyToAddress(key.PublicKey)] = 0
+		t.balance[crypto.PubkeyToAddress(key.PublicKey)] = big.NewInt(0)
+	}
+
+	// fetch nonce and balance for all accounts
+	batchElems := make([]rpc.BatchElem, 0, numAccounts)
+	for _, addr := range t.addresses {
+		batchElems = append(batchElems, rpc.BatchElem{
+			Method: "eth_getTransactionCount",
+			Args:   []interface{}{addr, "latest"},
+			Result: new(string),
+		})
+	}
+
+	err := t.client.Client().BatchCallContext(ctx, batchElems)
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch account nonces")
+	}
+
+	for i, elem := range batchElems {
+		if elem.Error != nil {
+			return errors.Wrapf(elem.Error, "failed to fetch account nonce for %s", t.addresses[i].Hex())
+		}
+		nonce, err := hexutil.DecodeUint64((*elem.Result.(*string)))
+		if err != nil {
+			return errors.Wrapf(err, "failed to decode nonce for %s", t.addresses[i].Hex())
+		}
+		// next nonce
+		t.nextNonce[t.addresses[i]] = nonce
 	}
 
 	return nil
@@ -109,20 +139,56 @@ func (t *TransferOnlyPayloadWorker) Stop(ctx context.Context) error {
 }
 
 func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
+	// check balance > prefundAmount
+	balance, err := t.client.BalanceAt(ctx, crypto.PubkeyToAddress(t.prefundedAccount.PublicKey), nil)
+	log.Info("Prefunded account balance", "balance", balance.String())
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch prefunded account balance")
+	}
+
+	if balance.Cmp(t.prefundAmount) < 0 {
+		return fmt.Errorf("prefunded account balance %s is less than prefund amount %s", balance.String(), t.prefundAmount.String())
+	}
+
 	// 21000 * numAccounts
 	gasCost := new(big.Int).Mul(big.NewInt(21000*params.GWei), big.NewInt(numAccounts))
-	// (prefundAmount - gasCost) / numAccounts
-	perAccount := new(big.Int).Div(new(big.Int).Sub(t.prefundAmount, gasCost), big.NewInt(numAccounts))
+
+	// Aim to distribute roughly half of the balance to leave a buffer
+	halfBalance := new(big.Int).Div(balance, big.NewInt(2))
+	valueToDistribute := new(big.Int).Sub(halfBalance, gasCost)
+
+	// Ensure valueToDistribute is not negative if gasCost is very high or balance is very low
+	if valueToDistribute.Sign() < 0 {
+		valueToDistribute.SetInt64(0)
+	}
+
+	perAccount := new(big.Int).Div(valueToDistribute, big.NewInt(numAccounts))
+
+	// Ensure perAccount is at least 1 wei if we are distributing anything, otherwise it will be 0
+	if valueToDistribute.Sign() > 0 && perAccount.Sign() == 0 {
+		perAccount.SetInt64(1)
+	}
 
 	sendCalls := make([]*types.Transaction, 0, numAccounts)
 
-	nonce := uint64(0)
+	var nonceHex string
+	// fetch nonce for prefunded account
+	prefundAddress := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
+	err = t.client.Client().CallContext(ctx, &nonceHex, "eth_getTransactionCount", prefundAddress.Hex(), "latest")
+	if err != nil {
+		return errors.Wrap(err, "failed to fetch prefunded account nonce")
+	}
+
+	nonce, err := hexutil.DecodeUint64(nonceHex)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode prefunded account nonce")
+	}
 
 	var lastTxHash common.Hash
 
 	// prefund accounts
 	for i := range numAccounts {
-		transferTx, err := t.createTransferTx(t.prefundedAccount, nonce, t.accountAddresses[i], perAccount)
+		transferTx, err := t.createTransferTx(t.prefundedAccount, nonce, t.addresses[i], perAccount)
 		if err != nil {
 			return errors.Wrap(err, "failed to create transfer transaction")
 		}
@@ -140,11 +206,11 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 
 	t.log.Debug("Last receipt", "status", receipt.Status)
 
-	t.log.Debug("Prefunded accounts", "numAccounts", len(t.accountAddresses), "perAccount", perAccount)
+	t.log.Debug("Prefunded accounts", "numAccounts", len(t.addresses), "perAccount", perAccount)
 
 	// update account amounts
 	for i := 0; i < numAccounts; i++ {
-		t.accountBalances[t.accountAddresses[i]] = perAccount
+		t.balance[t.addresses[i]] = perAccount
 	}
 
 	return nil
@@ -166,7 +232,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	acctIdx := 0
 
 	for gasUsed < (t.params.GasLimit - 100_000) {
-		transferTx, err := t.createTransferTx(t.accounts[acctIdx], t.accountNonces[t.accountAddresses[acctIdx]], t.accountAddresses[(acctIdx+1)%numAccounts], big.NewInt(1))
+		transferTx, err := t.createTransferTx(t.privateKeys[acctIdx], t.nextNonce[t.addresses[acctIdx]], t.addresses[(acctIdx+1)%numAccounts], big.NewInt(1))
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
 			return err
@@ -176,7 +242,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 
 		gasUsed += transferTx.Gas()
 
-		t.accountNonces[t.accountAddresses[acctIdx]]++
+		t.nextNonce[t.addresses[acctIdx]]++
 		// 21000 gas per transfer
 		acctIdx = (acctIdx + 1) % numAccounts
 	}

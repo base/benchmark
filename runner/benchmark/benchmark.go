@@ -2,12 +2,12 @@ package benchmark
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/config"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
 	gethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -112,22 +112,19 @@ func (p Params) ClientOptions(prevClientOptions config.ClientOptions) config.Cli
 	return prevClientOptions
 }
 
-// Genesis returns the genesis block for a given genesis time.
-func (p Params) Genesis(genesisTime time.Time) core.Genesis {
+const MAX_GAS_LIMIT = math.MaxUint64
+
+// DefaultGenesis returns the genesis block for a devnet.
+func DefaultDevnetGenesis(genesisTime time.Time) *core.Genesis {
 	zero := uint64(0)
 	fifty := uint64(50)
 
 	allocs := make(gethTypes.GenesisAlloc)
-	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-	allocs[common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")] = gethTypes.Account{
-		Balance: new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether)), // 100,000 ETH
-	}
-
-	return core.Genesis{
+	return &core.Genesis{
 		Nonce:      0,
 		Timestamp:  uint64(genesisTime.Unix()),
 		ExtraData:  eip1559.EncodeHoloceneExtraData(50, 1),
-		GasLimit:   p.GasLimit,
+		GasLimit:   MAX_GAS_LIMIT, // adjust gas limit in FCU call, not here
 		Difficulty: big.NewInt(1),
 		Alloc:      allocs,
 		Config: &params.ChainConfig{
@@ -151,7 +148,7 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 			TerminalTotalDifficulty: big.NewInt(1),
 			ShanghaiTime:            new(uint64),
 			CancunTime:              new(uint64),
-			PragueTime:              nil,
+			PragueTime:              new(uint64),
 			VerkleTime:              nil,
 			// OP-Stack forks are disabled, since we use this for L1.
 			BedrockBlock: big.NewInt(0),
@@ -161,9 +158,8 @@ func (p Params) Genesis(genesisTime time.Time) core.Genesis {
 			FjordTime:    &zero,
 			GraniteTime:  &zero,
 			HoloceneTime: &zero,
-			// Disabled due to reth/geth mismatch
-			IsthmusTime: nil,
-			InteropTime: nil,
+			IsthmusTime:  &zero,
+			InteropTime:  nil,
 			Optimism: &params.OptimismConfig{
 				EIP1559Elasticity:        1,
 				EIP1559Denominator:       50,

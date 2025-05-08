@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -46,7 +47,7 @@ type ContractPayloadWorker struct {
 	nonce   uint64
 }
 
-func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int, config ContractPayloadWorkerConfig) (mempool.FakeMempool, Worker, error) {
+func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int, config ContractPayloadWorkerConfig, genesis *core.Genesis) (mempool.FakeMempool, Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)
@@ -54,7 +55,7 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 		return nil, nil, err
 	}
 
-	chainID := params.Genesis(time.Now()).Config.ChainID
+	chainID := genesis.Config.ChainID
 	priv, err := crypto.ToECDSA(prefundedPrivateKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to convert private key: %w", err)

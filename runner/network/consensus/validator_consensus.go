@@ -7,7 +7,7 @@ import (
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -18,8 +18,8 @@ type SyncingConsensusClient struct {
 }
 
 // NewSyncingConsensusClient creates a new consensus client.
-func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, genesis *core.Genesis, options ConsensusClientOptions) *SyncingConsensusClient {
-	base := NewBaseConsensusClient(log, client, authClient, genesis, options)
+func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64) *SyncingConsensusClient {
+	base := NewBaseConsensusClient(log, client, authClient, options, headBlockHash, headBlockNumber)
 	return &SyncingConsensusClient{
 		BaseConsensusClient: base,
 	}

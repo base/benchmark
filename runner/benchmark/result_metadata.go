@@ -49,21 +49,23 @@ func (runs *BenchmarkRuns) AddResult(testIdx int, runResult BenchmarkRunResult) 
 	runs.Runs[testIdx].Result = &runResult
 }
 
-func BenchmarkMetadataFromTestPlan(testPlan TestPlan) BenchmarkRuns {
+func BenchmarkMetadataFromTestPlans(testPlans []TestPlan) BenchmarkRuns {
 	metadata := BenchmarkRuns{
-		Runs:      make([]BenchmarkRun, 0, len(testPlan)),
+		Runs:      make([]BenchmarkRun, 0),
 		CreatedAt: time.Now(),
 	}
 
-	for _, params := range testPlan {
-		metadata.Runs = append(metadata.Runs, BenchmarkRun{
-			ID:              params.ID,
-			SourceFile:      params.TestFile,
-			TestName:        params.Name,
-			TestDescription: params.Description,
-			TestConfig:      params.Params.ToConfig(),
-			OutputDir:       params.OutputDir,
-		})
+	for _, testPlan := range testPlans {
+		for _, params := range testPlan.Runs {
+			metadata.Runs = append(metadata.Runs, BenchmarkRun{
+				ID:              params.ID,
+				SourceFile:      params.TestFile,
+				TestName:        params.Name,
+				TestDescription: params.Description,
+				TestConfig:      params.Params.ToConfig(),
+				OutputDir:       params.OutputDir,
+			})
+		}
 	}
 
 	return metadata

@@ -3,6 +3,8 @@ package benchmark
 import (
 	"errors"
 	"fmt"
+	"os"
+	"os/exec"
 	"path"
 	"regexp"
 	"strings"
@@ -95,12 +97,60 @@ func (bp *Param) Check() error {
 	return nil
 }
 
+// SnapshotDefinition is the user-facing YAML configuration for specifying
+// a snapshot to be restored before running a benchmark.
+type SnapshotDefinition struct {
+	Command     string `yaml:"command"`
+	GenesisFile string `yaml:"genesis_file"`
+	ForceClean  *bool  `yaml:"force_clean"`
+}
+
+// CreateSnapshot copies the snapshot to the output directory for the given
+// node type.
+func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) error {
+	// default to true if not set
+	forceClean := s.ForceClean == nil || *s.ForceClean
+	if _, err := os.Stat(outputDir); err == nil && forceClean {
+		// TODO: we could reuse it here potentially
+		if err := os.RemoveAll(outputDir); err != nil {
+			return fmt.Errorf("failed to remove existing snapshot: %w", err)
+		}
+	}
+
+	// get absolute path of outputDir
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path of outputDir: %w", err)
+	}
+
+	outputDir = path.Join(currentDir, outputDir)
+
+	var cmdBin string
+	var args []string
+	// split out default args from command
+	parts := strings.SplitN(s.Command, " ", 2)
+	if len(parts) < 2 {
+		cmdBin = parts[0]
+	} else {
+		cmdBin = parts[0]
+		args = strings.Split(parts[1], " ")
+	}
+
+	args = append(args, nodeType, outputDir)
+
+	cmd := exec.Command(cmdBin, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
-	Name        string  `yaml:"name"`
-	Description string  `yaml:"desciption"`
-	Variables   []Param `yaml:"variables"`
+	Name        string              `yaml:"name"`
+	Snapshot    *SnapshotDefinition `yaml:"snapshot"`
+	Description string              `yaml:"description"`
+	Variables   []Param             `yaml:"variables"`
 }
 
 func (bc *TestDefinition) Check() error {
@@ -120,20 +170,21 @@ func (bc *TestDefinition) Check() error {
 }
 
 // TestPlan represents a list of test runs to be executed.
-type TestPlan []TestRun
+type TestPlan struct {
+	Runs     []TestRun
+	Snapshot *SnapshotDefinition
+}
 
-func NewTestPlanFromConfig(c []TestDefinition, testFileName string) (TestPlan, error) {
-	testPlan := make(TestPlan, 0, len(c))
-
-	for _, m := range c {
-		params, err := ResolveTestRunsFromMatrix(m, testFileName)
-		if err != nil {
-			return nil, err
-		}
-		testPlan = append(testPlan, params...)
+func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, error) {
+	testRuns, err := ResolveTestRunsFromMatrix(c, testFileName)
+	if err != nil {
+		return nil, err
 	}
 
-	return testPlan, nil
+	return &TestPlan{
+		Runs:     testRuns,
+		Snapshot: c.Snapshot,
+	}, nil
 }
 
 var alphaNumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
