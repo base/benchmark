@@ -1,8 +1,8 @@
 <div align="center">
   <h1 style="font-size:32pt">Base Benchmark</h1>
-  <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status: Beta">
-  <img src="https://img.shields.io/badge/language-Go-00ADD8" alt="Language: Go">
-  <img src="https://img.shields.io/github/license/base/benchmark" alt="License">
+  <a href="https://shields.io/"><img src="https://shields.io/badge/status-beta-yellow" alt="Status: Beta"></a>
+  <a href="https://go.dev/"><img src="https://shields.io/badge/language-Go-00ADD8" alt="Language: Go"></a>
+  <a href="https://github.com/base/benchmark/blob/main/LICENSE"><img src="https://shields.io/github/license/base/benchmark" alt="License"></a>
 </div>
 
 Base Benchmark is a performance testing framework for Ethereum execution clients. Compare client performance, identify bottlenecks, and ensure reliability before deployment.
