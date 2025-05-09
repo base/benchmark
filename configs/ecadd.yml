@@ -5,6 +5,7 @@ payloads:
     calls_per_block: 1
     function_signature: ecadd(uint256,bytes)
     gas_per_tx: 10000000
+    contract_bytecode: Precompile
 
 benchmarks:
   - name: EC Add Precompile

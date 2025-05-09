@@ -3,11 +3,12 @@ package contract
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
+	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"os"
-	"path"
+	"path/filepath"
 	"time"
 
 	"github.com/base/base-bench/runner/config"
@@ -34,6 +35,14 @@ type ContractPayloadDefinition struct {
 	CallsPerBlock     int    `yaml:"calls_per_block"`
 }
 
+type Bytecode struct {
+	Object string `json:"object"`
+}
+
+type Contract struct {
+	Bytecode Bytecode `json:"bytecode"`
+}
+
 type contractPayloadWorker struct {
 	log log.Logger
 
@@ -50,7 +59,8 @@ type contractPayloadWorker struct {
 	mempool *mempool.StaticWorkloadMempool
 	nonce   uint64
 
-	config config.Config
+	config   config.Config
+	bytecode []byte
 }
 
 func NewContractPayloadWorker(log log.Logger, elRPCURL string, runParams benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, config config.Config, params interface{}) (worker.Worker, error) {
@@ -72,6 +82,23 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, runParams benchty
 		return nil, fmt.Errorf("invalid contract transaction payload: %#v", params)
 	}
 
+	bytecodeFile := payloadConfig.ContractBytecode
+
+	bytecodePath := filepath.Join("contracts/out/" + bytecodeFile + ".sol/" + bytecodeFile + ".json")
+	data, err := os.ReadFile(bytecodePath)
+	if err != nil {
+		return nil, errors.New("failed to read bytecode file")
+	}
+
+	var c Contract
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, errors.New("failed to unmarshal bytecode file")
+	}
+
+	bytecodeHex := c.Bytecode.Object
+
+	bytecode := common.FromHex(string(bytecodeHex))
+
 	t := &contractPayloadWorker{
 		log:              log,
 		client:           client,
@@ -82,6 +109,7 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, runParams benchty
 		prefundAmount:    prefundAmount,
 		params:           *payloadConfig,
 		config:           config,
+		bytecode:         bytecode,
 	}
 
 	return t, nil
@@ -114,25 +142,7 @@ func (t *contractPayloadWorker) deployContract(ctx context.Context) error {
 
 	amount := big.NewInt(0)
 
-	configDir := path.Dir(t.config.ConfigPath())
-	bytecodePath := path.Join(configDir, t.params.ContractBytecode)
-	bytecodeFile, err := os.Open(bytecodePath)
-	if err != nil {
-		return fmt.Errorf("failed to open contract bytecode file: %w", err)
-	}
-	defer func() { _ = bytecodeFile.Close() }()
-
-	bytecodeHex, err := io.ReadAll(bytecodeFile)
-	if err != nil {
-		return fmt.Errorf("failed to read contract bytecode: %w", err)
-	}
-
-	bytecode, err := hexutil.Decode(string(bytecodeHex))
-	if err != nil {
-		return fmt.Errorf("failed to decode contract bytecode: %w", err)
-	}
-
-	tx_unsigned := types.NewContractCreation(nonce, amount, gasLimit, gasPrice, bytecode)
+	tx_unsigned := types.NewContractCreation(nonce, amount, gasLimit, gasPrice, t.bytecode)
 
 	signer := types.LatestSignerForChainID(t.chainID)
 

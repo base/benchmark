@@ -6,7 +6,7 @@ payloads:
     function_signature: ecpairing(uint256,bytes)
     gas_per_tx: 10000000
     calldata: 0x
-    contract_bytecode: ./contracts/ecpairing.hex
+    contract_bytecode: Precompile
 
 benchmarks:
   - name: Basic EC Pairing Precompile

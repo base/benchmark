@@ -4,6 +4,7 @@ payloads:
     type: contract
     calls_per_block: 1
     function_signature: moveErc20(uint256,bytes)
+    contract_bytecode: ERC20Transfer
     gas_per_tx: 10000000
 
 benchmarks:

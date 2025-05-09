@@ -14,8 +14,7 @@ benchmarks:
     variables:
       - type: payload
         values:
-          - contract:1:ecpairing(uint256,bytes):600000000:0x:./contracts/precompiles.hex
-          - contract:1:ecpairing(uint256,bytes):700000000:0x:./contracts/precompiles.hex
+          - ecpairing
       - type: node_type
         values:
           - geth

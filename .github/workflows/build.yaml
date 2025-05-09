@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up Go
         uses: actions/setup-go@v3
@@ -63,12 +65,19 @@ jobs:
         run: |
           go mod download
 
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
       - name: Cache binaries
         uses: actions/cache@v3
         id: cache-bin
         with:
           path: ${{ runner.temp }}/bin
           key: ${{ runner.os }}-binaries
+
+      - name: Build Contracts
+        run: |
+          forge build --force
 
       - name: Download geth and reth
         if: steps.cache-bin.outputs.cache-hit != 'true'
@@ -109,7 +118,8 @@ jobs:
             --config ./configs/proof-program.yml \
             --root-dir ${{ runner.temp }}/data-dir \
             --output-dir ${{ runner.temp }}/output \
-            --geth-bin ${{ runner.temp }}/bin/geth
+            --geth-bin ${{ runner.temp }}/bin/geth \
+            --reth-bin ${{ runner.temp }}/bin/reth
 
       - name: Run Basic Benchmarks
         id: unit
@@ -131,4 +141,17 @@ jobs:
             --config ./configs/contract.yml \
             --root-dir ${{ runner.temp }}/data-dir \
             --output-dir ${{ runner.temp }}/output \
-            --geth-bin ${{ runner.temp }}/bin/geth
+            --geth-bin ${{ runner.temp }}/bin/geth \
+            --reth-bin ${{ runner.temp }}/bin/reth
+
+      - name: Run ERC20 Benchmark
+        id: erc20
+        run: |
+          go run benchmark/cmd/main.go \
+            --log.level info \
+            run \
+            --config ./configs/erc20.yml \
+            --root-dir ${{ runner.temp }}/data-dir \
+            --output-dir ${{ runner.temp }}/output \
+            --geth-bin ${{ runner.temp }}/bin/geth \
+            --reth-bin ${{ runner.temp }}/bin/reth

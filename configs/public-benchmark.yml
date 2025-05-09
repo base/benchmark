@@ -8,18 +8,21 @@ payloads:
     calls_per_block: 1
     function_signature: ecpairing(uint256,bytes)
     gas_per_tx: 10000000
+    contract_bytecode: Precompile
   - name: EC Mul Precompile
     id: ecmul
     type: contract
     calls_per_block: 1
     function_signature: ecmul(uint256,bytes)
     gas_per_tx: 10000000
+    contract_bytecode: Precompile
   - name: SStore Performance
     id: sstore
     type: contract
     calls_per_block: 1
     function_signature: sstore(uint256,bytes)
     gas_per_tx: 10000000
+    contract_bytecode: Precompile
 
 benchmarks:
   - name: Transfer-only execution speed
