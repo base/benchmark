@@ -5,11 +5,10 @@
   variables:
     - type: transaction_workload
       values:
-        - contract:1:moveErc20(uint256,bytes):700000000:0x:./contracts/erc20.hex
-        - contract:1:moveErc20(uint256,bytes):1000000000:0x:./contracts/erc20.hex        
+        - contract:1:moveErc20(uint256,bytes):1000000000:0x:ERC20Transfer
     - type: node_type
       values:
-        - geth
+        # - geth
         - reth
     - type: num_blocks
       value: 10
