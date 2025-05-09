@@ -150,6 +150,7 @@ type TestDefinition struct {
 	Name        string              `yaml:"name"`
 	Snapshot    *SnapshotDefinition `yaml:"snapshot"`
 	Description string              `yaml:"description"`
+	Tags        *map[string]string  `yaml:"tags"`
 	Variables   []Param             `yaml:"variables"`
 }
 
@@ -257,6 +258,10 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 		params, err := NewParamsFromValues(valueSelections)
 		if err != nil {
 			return nil, err
+		}
+
+		if c.Tags != nil {
+			params.Tags = *c.Tags
 		}
 
 		testParams[i] = TestRun{

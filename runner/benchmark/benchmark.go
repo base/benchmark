@@ -24,14 +24,21 @@ type Params struct {
 	BlockTime          time.Duration
 	Env                map[string]string
 	NumBlocks          int
+	Tags               map[string]string
 }
 
 func (p Params) ToConfig() map[string]interface{} {
-	return map[string]interface{}{
+	params := map[string]interface{}{
 		"NodeType":           p.NodeType,
 		"GasLimit":           p.GasLimit,
 		"TransactionPayload": p.TransactionPayload,
 	}
+
+	for k, v := range p.Tags {
+		params[k] = v
+	}
+
+	return params
 }
 
 // TestRun is a single run of a benchmark. Each config should result in multiple test runs.
