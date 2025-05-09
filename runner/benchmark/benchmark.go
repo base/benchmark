@@ -25,6 +25,7 @@ type Params struct {
 	Env                map[string]string
 	NumBlocks          int
 	Tags               map[string]string
+	SnapshotCmdHash    *string
 }
 
 func (p Params) ToConfig() map[string]interface{} {
@@ -32,6 +33,10 @@ func (p Params) ToConfig() map[string]interface{} {
 		"NodeType":           p.NodeType,
 		"GasLimit":           p.GasLimit,
 		"TransactionPayload": p.TransactionPayload,
+	}
+
+	if p.SnapshotCmdHash != nil {
+		params["Snapshot"] = *p.SnapshotCmdHash
 	}
 
 	for k, v := range p.Tags {

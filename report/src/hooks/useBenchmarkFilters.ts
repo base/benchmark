@@ -3,7 +3,7 @@ import { isEqual } from "lodash";
 import { type BenchmarkRun } from "../types";
 import { useSearchParamsState } from "../utils/useSearchParamsState";
 import { getBenchmarkVariables } from "../filter";
-type FilterValue = string | number | boolean;
+type FilterValue = string | number | boolean | undefined;
 type FilterSelectionsParams = Record<string, FilterValue>;
 type FilterSelections = {
   params: FilterSelectionsParams;
@@ -39,6 +39,17 @@ export function useBenchmarkFilters(
         allPossibleValues[key].add(value);
       }
     }
+
+    // If some are undefined, we need an `n/a` value
+    for (const key of Object.keys(allPossibleValues)) {
+      for (const run of runsWithRoles) {
+        if (run.testConfig[key] === undefined) {
+          allPossibleValues[key].add(undefined);
+          break;
+        }
+      }
+    }
+
     return Object.fromEntries(
       Object.entries(allPossibleValues)
         .filter(([, values]) => values.size > 1)
