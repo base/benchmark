@@ -3,10 +3,8 @@ src = "contracts/src"
 test = "contracts/test"
 out = "contracts/out"
 script = "contracts/script"
+cache_path = "contracts/cache"
+cache = true
 libs = ["contracts/lib"]
-
-remappings = [
-    '@openzeppelin/contracts/=contracts/lib/openzeppelin/contracts',
-]
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
