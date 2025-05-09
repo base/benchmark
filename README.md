@@ -19,6 +19,14 @@ Base Benchmark provides comprehensive testing capabilities:
 
 ## 📋 Quick Start
 
+[Install Forge](https://book.getfoundry.sh/getting-started/installation)
+
+Recursively clone github submodules: 
+
+```bash
+git submodule update --init --recursive
+```
+
 ```bash
 # Build the application
 make build

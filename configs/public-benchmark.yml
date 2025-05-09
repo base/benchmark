@@ -31,8 +31,8 @@
       value: 505000000
     - type: transaction_workload
       values:
-        - contract:1:ecpairing(uint256,bytes):200000000:0x:./contracts/precompiles.hex
-        - contract:1:ecpairing(uint256,bytes):400000000:0x:./contracts/precompiles.hex
+        - contract:1:ecpairing(uint256,bytes):200000000:0x:Precompile
+        - contract:1:ecpairing(uint256,bytes):400000000:0x:Precompile
 - name: EC Mul Precompile
   description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
   benchmark:
@@ -40,7 +40,7 @@
   variables:
     - type: transaction_workload
       values:
-        - contract:1:ecmul(uint256,bytes):1000000000:0x:./contracts/precompiles.hex
+        - contract:1:ecmul(uint256,bytes):1000000000:0x:Precompile
     - type: node_type
       values:
         - geth
@@ -56,7 +56,7 @@
   variables:
     - type: transaction_workload
       values:
-        - contract:1:writer(uint256,bytes):1000000000:0x:./contracts/precompiles.hex
+        - contract:1:writer(uint256,bytes):1000000000:0x:Precompile
     - type: node_type
       values:
         - geth

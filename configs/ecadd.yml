@@ -5,7 +5,7 @@
   variables:
     - type: transaction_workload
       values:
-        - contract:1:ecadd(uint256,bytes):1000000000:0x:./contracts/precompiles.hex
+        - contract:1:ecadd(uint256,bytes):1000000000:0x:Precompile
     - type: node_type
       values:
         - geth
