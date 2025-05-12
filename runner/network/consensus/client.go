@@ -49,19 +49,19 @@ func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient
 }
 
 // BasicBlockType implements what chain config would usually implement.
-type basicBlockType struct{}
+type IsthmusBlockType struct{}
 
 // HasOptimismWithdrawalsRoot implements types.BlockType.
-func (b basicBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
+func (b IsthmusBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
 	return true
 }
 
 // IsIsthmus implements types.BlockType.
-func (b basicBlockType) IsIsthmus(blkTime uint64) bool {
+func (b IsthmusBlockType) IsIsthmus(blkTime uint64) bool {
 	return true
 }
 
-var _ types.BlockType = basicBlockType{}
+var _ types.BlockType = IsthmusBlockType{}
 
 func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs *eth.PayloadAttributes) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
@@ -103,7 +103,7 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 
 	// newParams.WithdrawalsRoot = &common.Hash{}
 
-	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, basicBlockType{})
+	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, IsthmusBlockType{})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload to block")
 	}

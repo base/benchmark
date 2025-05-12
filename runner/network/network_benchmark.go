@@ -1,8 +1,10 @@
 package network
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"math/big"
 	"math/rand"
 	"os"
@@ -14,6 +16,11 @@ import (
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum-optimism/optimism/op-batcher/batcher"
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
+	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
+	derive_params "github.com/ethereum-optimism/optimism/op-node/rollup/derive/params"
+	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 
 	"github.com/base/base-bench/runner/logger"
@@ -100,9 +107,95 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to run sequencer: %w", err)
 	}
-	return nb.benchmarkValidator(ctx, payloads, firstTestBlock)
+	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock)
+	if err != nil {
+		return fmt.Errorf("failed to run validator: %w", err)
+	}
+	err = nb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock)
+	if err != nil {
+		return fmt.Errorf("failed to run fault proof program: %w", err)
+	}
+	return nil
+}
+
+func (nb *NetworkBenchmark) getRollupConfig() *rollup.Config {
+	rollupCfg := &rollup.Config{
+		Genesis: rollup.Genesis{
+			L1: eth.BlockID{
+				Hash:   common.Hash{},
+				Number: 0,
+			},
+			L2: eth.BlockID{
+				Hash:   nb.genesis.ToBlock().Hash(),
+				Number: 0,
+			},
+		},
+		BlockTime:               1, // TODO?
+		MaxSequencerDrift:       20,
+		SeqWindowSize:           24,
+		L1ChainID:               big.NewInt(1),
+		L2ChainID:               nb.genesis.Config.ChainID,
+		RegolithTime:            nb.genesis.Config.RegolithTime,
+		CanyonTime:              nb.genesis.Config.CanyonTime,
+		EcotoneTime:             nb.genesis.Config.EcotoneTime,
+		FjordTime:               nb.genesis.Config.FjordTime,
+		GraniteTime:             nb.genesis.Config.GraniteTime,
+		HoloceneTime:            nb.genesis.Config.HoloceneTime,
+		IsthmusTime:             nb.genesis.Config.IsthmusTime,
+		InteropTime:             nb.genesis.Config.InteropTime,
+		BatchInboxAddress:       common.Address{1},
+		DepositContractAddress:  common.Address{1},
+		L1SystemConfigAddress:   common.Address{1},
+		ProtocolVersionsAddress: common.Address{1},
+	}
+	return rollupCfg
+}
+
+func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {
+	// generate batches based on the payloads
+	target := batcher.MaxDataSize(1, 20000000)
+
+	cfg := nb.getRollupConfig()
+
+	chainSpec := rollup.NewChainSpec(cfg)
+	ch, err := derive.NewSpanChannelOut(target, derive.Zlib, chainSpec)
+	// use singular batches in all other cases
+
+	if err != nil {
+		return fmt.Errorf("failed to create span channel: %w", err)
+	}
+
+	for _, payload := range payloads {
+		block, err := engine.ExecutableDataToBlock(payload, []common.Hash{}, &common.Hash{}, [][]byte{}, consensus.IsthmusBlockType{})
+		if err != nil {
+			return errors.Wrap(err, "failed to convert payload to block")
+		}
+
+		_, err = ch.AddBlock(cfg, block)
+		if err != nil {
+			return fmt.Errorf("failed to add block to channel: %w", err)
+		}
+
+	}
+
+	err = ch.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close channel: %w", err)
+	}
+
+	data := new(bytes.Buffer)
+	data.WriteByte(derive_params.DerivationVersion0)
+
+	if _, err := ch.OutputFrame(data, 20000000-1); err != nil && err != io.EOF {
+		return fmt.Errorf("failed to output frame: %w", err)
+	}
+
+	log.Info("Generated batch", "size", data.Len(), "blockNumber", firstTestBlock)
+
+	return nil
+
 }
 
 func (nb *NetworkBenchmark) fundTestAccount(ctx context.Context, mempool mempool.FakeMempool, client types.ExecutionClient, amount *big.Int) error {

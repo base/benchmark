@@ -44,7 +44,7 @@ func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authC
 
 // marshalBinaryWithSignature creates the call data for an L1Info transaction.
 func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]byte, error) {
-	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoEcotoneLen))
+	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoIsthmusLen))
 	if err := solabi.WriteSignature(w, signature); err != nil {
 		return nil, err
 	}
@@ -80,6 +80,12 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 	if err := solabi.WriteAddress(w, info.BatcherAddr); err != nil {
 		return nil, err
 	}
+	if err := binary.Write(w, binary.BigEndian, info.OperatorFeeScalar); err != nil {
+		return nil, err
+	}
+	if err := binary.Write(w, binary.BigEndian, info.OperatorFeeConstant); err != nil {
+		return nil, err
+	}
 	return w.Bytes(), nil
 }
 
@@ -92,12 +98,14 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	timestamp := max(f.lastTimestamp+1, uint64(time.Now().Unix()))
 
 	l1BlockInfo := &derive.L1BlockInfo{
-		Number:         1,
-		Time:           f.lastTimestamp,
-		BaseFee:        big.NewInt(1),
-		BlockHash:      common.Hash{},
-		SequenceNumber: 0,
-		BatcherAddr:    common.Address{},
+		Number:              1,
+		Time:                f.lastTimestamp,
+		BaseFee:             big.NewInt(1),
+		BlockHash:           common.Hash{},
+		SequenceNumber:      0,
+		BatcherAddr:         common.Address{},
+		OperatorFeeScalar:   0,
+		OperatorFeeConstant: 0,
 	}
 
 	source := derive.L1InfoDepositSource{
@@ -105,7 +113,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		SeqNumber:   0,
 	}
 
-	data, err := marshalBinaryWithSignature(l1BlockInfo, derive.L1InfoFuncEcotoneBytes4)
+	data, err := marshalBinaryWithSignature(l1BlockInfo, derive.L1InfoFuncIsthmusBytes4)
 	if err != nil {
 		return nil, err
 	}
