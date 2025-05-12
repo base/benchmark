@@ -2,6 +2,7 @@ package logger
 
 import (
 	"io"
+	"log/slog"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -15,6 +16,8 @@ type LogWriter struct {
 	logger log.Logger
 	// should never contain new lines
 	buffer []byte
+
+	level slog.Level
 }
 
 // escapeMessage checks if the provided string needs escaping/quoting, similarly
@@ -45,6 +48,15 @@ func NewLogWriter(logger log.Logger) *LogWriter {
 	return &LogWriter{
 		logger: logger,
 		buffer: make([]byte, 0, maxBufferedLogLineSize),
+		level:  slog.LevelDebug,
+	}
+}
+
+func NewLogWriterWithLevel(logger log.Logger, level slog.Level) *LogWriter {
+	return &LogWriter{
+		logger: logger,
+		buffer: make([]byte, 0, maxBufferedLogLineSize),
+		level:  level,
 	}
 }
 
@@ -54,7 +66,7 @@ func (lw *LogWriter) flushBuffer() {
 		return
 	}
 
-	lw.logger.Debug(escapeMessage("+ " + string(lw.buffer)))
+	lw.logger.Write(lw.level, escapeMessage("+ "+string(lw.buffer)))
 	lw.buffer = lw.buffer[:0]
 }
 
