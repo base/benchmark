@@ -84,6 +84,7 @@ func (p *L1ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 	handled, response, err := p.OverrideRequest(request.Method, request.Params)
 	if err != nil {
+		p.log.Error("Error handling request", "method", request.Method, "err", err)
 		http.Error(w, fmt.Sprintf("Error handling request: %v", err), http.StatusInternalServerError)
 		return
 	}

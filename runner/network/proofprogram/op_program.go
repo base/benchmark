@@ -175,7 +175,10 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 
 	l1Proxy := proxy.NewL1ProxyServer(o.log, 8099)
 
-	go l1Proxy.Run(ctx)
+	err = l1Proxy.Run(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to start l1 proxy: %w", err)
+	}
 	defer l1Proxy.Stop()
 
 	o.log.Info("Dialing L2 RPC", "url", o.l2RPCURL)
@@ -235,9 +238,9 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 
 	// start op-program
 	zeroHash := common.Hash{}
-	cmd := exec.Command(o.opProgramBin,
-		"--l1", "127.0.0.1:8099",
-		"--l1.beacon", "127.0.0.1:8099",
+	cmd := exec.CommandContext(ctx, o.opProgramBin,
+		"--l1", "http://127.0.0.1:8099",
+		"--l1.beacon", "http://127.0.0.1:8099",
 		"--l1.head", o.chain[0].Hash().Hex(),
 		"--l2", o.l2RPCURL,
 		"--l2.head", l2HeadHash.Hex(),
