@@ -13,9 +13,9 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/base/base-bench/runner/clients/proxy"
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/network/consensus"
+	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	"github.com/ethereum-optimism/optimism/op-batcher/batcher"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
@@ -25,7 +25,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
@@ -43,19 +42,17 @@ type opProgram struct {
 	opProgramBin string
 	l2RPCURL     string
 
-	chain []types.Block
+	chain *fakel1.FakeL1Chain
 }
 
-func makeChain() []types.Block {
+func makeChain() *fakel1.FakeL1Chain {
 	l1Genesis := core.Genesis{
 		Config: &params.ChainConfig{
 			ChainID: big.NewInt(1),
 		},
 	}
 
-	chain := make([]types.Block, 0)
-	chain = append(chain, *l1Genesis.ToBlock())
-	return chain
+	return fakel1.NewFakeL1ChainWithGenesis(&l1Genesis)
 }
 
 func NewOPProgram(genesis *core.Genesis, log log.Logger, opProgramBin string, l2RPCURL string) ProofProgram {
@@ -74,10 +71,15 @@ func (o *opProgram) getRollupConfig() *rollup.Config {
 
 	deltaTime := uint64(0)
 
+	l1Genesis, err := o.chain.GetBlockByNumber(0)
+	if err != nil {
+		panic(err)
+	}
+
 	rollupCfg := &rollup.Config{
 		Genesis: rollup.Genesis{
 			L1: eth.BlockID{
-				Hash:   o.chain[0].Hash(),
+				Hash:   l1Genesis.Hash(),
 				Number: 0,
 			},
 			L2: eth.BlockID{
@@ -173,7 +175,7 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 		return fmt.Errorf("failed to create span batch: %w", err)
 	}
 
-	l1Proxy := proxy.NewL1ProxyServer(o.log, 8099)
+	l1Proxy := fakel1.NewL1ProxyServer(o.log, 8099, o.chain, o.genesis.Config)
 
 	err = l1Proxy.Run(ctx)
 	if err != nil {
@@ -236,12 +238,17 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 		return fmt.Errorf("failed to encode rollup.json: %w", err)
 	}
 
+	l1Head, err := o.chain.GetBlockByNumber(1)
+	if err != nil {
+		return fmt.Errorf("failed to get l1 head: %w", err)
+	}
+
 	// start op-program
 	zeroHash := common.Hash{}
 	cmd := exec.CommandContext(ctx, o.opProgramBin,
 		"--l1", "http://127.0.0.1:8099",
 		"--l1.beacon", "http://127.0.0.1:8099",
-		"--l1.head", o.chain[0].Hash().Hex(),
+		"--l1.head", l1Head.Hash().Hex(),
 		"--l2", o.l2RPCURL,
 		"--l2.head", l2HeadHash.Hex(),
 		"--l2.blocknumber", l2HeadNumber.String(),
