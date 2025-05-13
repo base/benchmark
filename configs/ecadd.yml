@@ -1,5 +1,5 @@
 - name: EC Add Precompile
-  description: EC Add Operation - https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+  description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
   benchmark:
     - sequencer
   variables:

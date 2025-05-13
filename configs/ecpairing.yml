@@ -1,5 +1,5 @@
 - name: EC Pairing Precompile
-  description: This shows that at 60% of gas target as input, geth fails but reth succeeds. Both get payload times are unacceptable (over 2s)
+  description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
   benchmark:
     - sequencer
   variables:
