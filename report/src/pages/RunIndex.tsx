@@ -136,7 +136,7 @@ function RunIndex() {
             <div key={section.key} className="mb-10">
               <h2 className="text-lg font-semibold mb-2">{section.testName}</h2>
               <p className="text-sm text-slate-500 mb-2">
-                Test ID: {section.key}
+                {section.runs?.[0]?.testDescription}
               </p>
               <table className="min-w-full divide-y divide-slate-200 rounded-lg mb-8">
                 <thead>
