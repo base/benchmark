@@ -18,8 +18,9 @@ function RunIndex() {
     Record<string, string | number>
   >({});
 
-  // Add state for expanded sections
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(),
+  );
 
   // Calculate filter options and filtered runs
   const { filterOptions, matchedRuns } = useMemo(() => {
@@ -51,7 +52,7 @@ function RunIndex() {
         run.id = run.outputDir;
       }
     });
-    console.log(matchedRuns);
+
     const groups = groupBy(matchedRuns, "testConfig.GasLimit");
 
     // Build sections array with diffKeyStart
@@ -136,8 +137,12 @@ function RunIndex() {
         const isExpanded = expandedSections.has(section.key);
 
         // Compute pass/fail counts
-        const numPassed = section.runs.filter(run => run.result?.success).length;
-        const numFailed = section.runs.filter(run => run.result && !run.result.success).length;
+        const numPassed = section.runs.filter(
+          (run) => run.result?.success,
+        ).length;
+        const numFailed = section.runs.filter(
+          (run) => run.result && !run.result.success,
+        ).length;
 
         return (
           <div key={section.key} className="mb-10">
@@ -156,9 +161,15 @@ function RunIndex() {
                 });
               }}
             >
-                <span className="inline-block w-5 text-center">
-                {isExpanded ? "▼" : "►"}</span>
-              <span>{formatValue(Number(section.runs?.[0]?.testConfig?.GasLimit), "gas/s")}</span>
+              <span className="inline-block w-5 text-center">
+                {isExpanded ? "▼" : "►"}
+              </span>
+              <span>
+                {formatValue(
+                  Number(section.runs?.[0]?.testConfig?.GasLimit),
+                  "gas/s",
+                )}
+              </span>
               {/* Pass/Fail summary */}
               <span className="text-base font-normal text-slate-500">
                 <span className="text-green-600">{numPassed} Passed</span>
@@ -171,7 +182,7 @@ function RunIndex() {
               <table className="min-w-full divide-y divide-slate-200 rounded-lg mb-8">
                 <thead>
                   <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
+                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Test Name
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
@@ -235,7 +246,6 @@ function RunIndex() {
                         })()}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                        
                         {run.result?.success ? (
                           <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
                             Success
