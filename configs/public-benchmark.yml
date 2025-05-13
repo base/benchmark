@@ -1,5 +1,5 @@
 - name: Transfer-only execution speed
-  description: Transfer-only execution speed
+  description: Tests a block that contains many transactions that repeatedly transfer ETH balance to various addresses.
   variables:
     - type: transaction_workload
       values:
@@ -17,7 +17,7 @@
         - 60000000
         - 90000000
 - name: EC Pairing Precompile
-  description: This shows that at 60% of gas target as input, geth fails but reth succeeds. Both get payload times are unacceptable (over 2s)
+  description: This test creates a block with a single transaction that repeatedly calls EC Pairing precompile.
   benchmark:
     - sequencer
   variables:
@@ -34,13 +34,13 @@
         - contract:1:ecpairing(uint256,bytes):200000000:0x:./contracts/precompiles.hex
         - contract:1:ecpairing(uint256,bytes):400000000:0x:./contracts/precompiles.hex
 - name: EC Mul Precompile
-  description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+  description: This test creates a block with a single transaction that repeatedly calls EC Mul precompile.
   benchmark:
     - sequencer
   variables:
     - type: transaction_workload
       values:
-        - contract:1:ecmul(uint256,bytes):1000000000:0x:./contracts/precompiles.hex
+        - contract:1:ecmul(uint256,bytes):1000000000:0x:
     - type: node_type
       values:
         - geth
@@ -50,7 +50,7 @@
     - type: gas_limit
       value: 1005000000
 - name: SStore Performance
-  description: https://github.com/base/fp-test-cases/blob/main/src/Writer.sol
+  description: This test creates a block with a single transaction that repeatedly calls SStore operation.
   benchmark:
     - sequencer
   variables:
