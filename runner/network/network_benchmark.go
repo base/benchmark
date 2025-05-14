@@ -220,7 +220,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 			ctx, nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.genesis)
 	case strings.HasPrefix(string(payloadType), "contract"):
 		var config payload.ContractPayloadWorkerConfig
-		config, err = payload.ValidateContractPayload(payloadType, nb.config.ConfigPath())
+		config, err = payload.ValidateContractPayload(payloadType)
 		if err != nil {
 			return nil, 0, err
 		}

@@ -3,6 +3,7 @@ package payload
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -33,7 +34,15 @@ type ContractPayloadWorkerConfig struct {
 	CallsPerBlock     int
 }
 
-func ValidateContractPayload(payloadType benchmark.TransactionPayload, configDir string) (ContractPayloadWorkerConfig, error) {
+type Bytecode struct {
+	Object string `json:"object"`
+}
+
+type Contract struct {
+	Bytecode Bytecode `json:"bytecode"`
+}
+
+func ValidateContractPayload(payloadType benchmark.TransactionPayload) (ContractPayloadWorkerConfig, error) {
 	selectors := strings.Split(string(payloadType), ":")
 
 	if len(selectors) != 6 {
@@ -53,15 +62,19 @@ func ValidateContractPayload(payloadType benchmark.TransactionPayload, configDir
 
 	bytecodeFile := selectors[5]
 
-	dir := filepath.Dir(configDir)
-
-	bytecodePath := filepath.Join(dir, bytecodeFile)
-	log.Info("loading bytecode from", "path", bytecodePath)
-
-	bytecodeHex, err := os.ReadFile(bytecodePath)
+	bytecodePath := filepath.Join("contracts/out/" + bytecodeFile + ".sol/" + bytecodeFile + ".json")
+	data, err := os.ReadFile(bytecodePath)
 	if err != nil {
 		return ContractPayloadWorkerConfig{}, errors.New("failed to read bytecode file")
 	}
+
+	var c Contract
+	if err := json.Unmarshal(data, &c); err != nil {
+		return ContractPayloadWorkerConfig{}, errors.New("failed to unmarshal bytecode file")
+	}
+
+	bytecodeHex := c.Bytecode.Object
+
 	bytecode := common.FromHex(string(bytecodeHex))
 
 	config := ContractPayloadWorkerConfig{

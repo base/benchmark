@@ -9,7 +9,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Set up Go
         uses: actions/setup-go@v3
@@ -29,6 +31,13 @@ jobs:
         with:
           path: ${{ runner.temp }}/bin
           key: ${{ runner.os }}-binaries
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+    
+      - name: Build Contracts
+        run: |
+          forge build --force
 
       - name: Download geth and reth
         if: steps.cache-bin.outputs.cache-hit != 'true'
