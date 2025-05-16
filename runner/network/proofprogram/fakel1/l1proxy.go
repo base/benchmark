@@ -30,12 +30,12 @@ type L1ProxyServer struct {
 	chainCfg *params.ChainConfig
 }
 
-func NewL1ProxyServer(log log.Logger, port int, chain *FakeL1Chain, chainCfg *params.ChainConfig) *L1ProxyServer {
+func NewL1ProxyServer(log log.Logger, port int, chain *FakeL1Chain) *L1ProxyServer {
 	return &L1ProxyServer{
 		log:      log,
 		port:     port,
 		chain:    chain,
-		chainCfg: chainCfg,
+		chainCfg: chain.genesis.Config,
 	}
 }
 
@@ -115,6 +115,7 @@ func (p *L1ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *L1ProxyServer) OverrideRequest(ctx context.Context, method string, rawParams json.RawMessage) (json.RawMessage, error) {
+	p.log.Info("got request", "method", method, "params", rawParams)
 	switch method {
 	case "eth_getBlockByNumber":
 		var params []interface{}
@@ -162,8 +163,6 @@ func (p *L1ProxyServer) OverrideRequest(ctx context.Context, method string, rawP
 		if !ok {
 			return nil, fmt.Errorf("expected includeTxs to be a bool, got %T", params[1])
 		}
-
-		log.Info("raw message", "rawParams", string(rawParams))
 
 		blockHashBytes, err := hexutil.Decode(blockHash)
 		if err != nil {

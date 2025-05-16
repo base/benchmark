@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/base/base-bench/runner/network/blocks"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
@@ -47,21 +47,6 @@ func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient
 		currentPayloadID: nil,
 	}
 }
-
-// BasicBlockType implements what chain config would usually implement.
-type IsthmusBlockType struct{}
-
-// HasOptimismWithdrawalsRoot implements types.BlockType.
-func (b IsthmusBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
-	return true
-}
-
-// IsIsthmus implements types.BlockType.
-func (b IsthmusBlockType) IsIsthmus(blkTime uint64) bool {
-	return true
-}
-
-var _ types.BlockType = IsthmusBlockType{}
 
 func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs *eth.PayloadAttributes) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
@@ -103,7 +88,7 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 
 	// newParams.WithdrawalsRoot = &common.Hash{}
 
-	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, IsthmusBlockType{})
+	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, blocks.IsthmusBlockType{})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload to block")
 	}

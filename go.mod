@@ -6,7 +6,6 @@ require (
 	github.com/ethereum-optimism/optimism v1.12.2
 	github.com/ethereum/go-ethereum v1.15.3
 	github.com/go-yaml/yaml v2.1.0+incompatible
-	github.com/goccy/go-json v0.10.4
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.62.0
 	github.com/stretchr/testify v1.10.0

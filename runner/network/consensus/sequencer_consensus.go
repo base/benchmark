@@ -10,6 +10,7 @@ import (
 
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/mempool"
+	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -30,15 +31,17 @@ type SequencerConsensusClient struct {
 	*BaseConsensusClient
 	lastTimestamp uint64
 	mempool       mempool.FakeMempool
+	l1Chain       *fakel1.FakeL1Chain
 }
 
 // NewSequencerConsensusClient creates a new consensus client using the given genesis hash and timestamp.
-func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64) *SequencerConsensusClient {
+func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64, l1Chain *fakel1.FakeL1Chain) *SequencerConsensusClient {
 	base := NewBaseConsensusClient(log, client, authClient, options, headBlockHash, headBlockNumber)
 	return &SequencerConsensusClient{
 		BaseConsensusClient: base,
 		lastTimestamp:       uint64(time.Now().Unix()),
 		mempool:             mempool,
+		l1Chain:             l1Chain,
 	}
 }
 
@@ -97,11 +100,16 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 
 	timestamp := max(f.lastTimestamp+1, uint64(time.Now().Unix()))
 
+	block, err := f.l1Chain.GetBlockByNumber(0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block by number: %w", err)
+	}
+
 	l1BlockInfo := &derive.L1BlockInfo{
-		Number:              1,
+		Number:              block.NumberU64(),
 		Time:                f.lastTimestamp,
 		BaseFee:             big.NewInt(1),
-		BlockHash:           common.Hash{},
+		BlockHash:           block.Hash(),
 		SequenceNumber:      0,
 		BatcherAddr:         common.Address{},
 		OperatorFeeScalar:   0,

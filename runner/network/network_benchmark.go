@@ -2,6 +2,8 @@ package network
 
 import (
 	"context"
+	"crypto/ecdsa"
+	cryptoRand "crypto/rand"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -21,12 +23,14 @@ import (
 	"github.com/base/base-bench/runner/network/consensus"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/proofprogram"
+	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	"github.com/base/base-bench/runner/payload"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
@@ -98,20 +102,76 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 	return client, nil
 }
 
+func makeChain() *fakel1.FakeL1Chain {
+	zero := uint64(0)
+	// bigZero := big.NewInt(0)
+	l1Genesis := core.Genesis{
+		Config: &params.ChainConfig{
+			ChainID:             big.NewInt(1),
+			HomesteadBlock:      big.NewInt(0),
+			DAOForkBlock:        nil,
+			DAOForkSupport:      false,
+			EIP150Block:         big.NewInt(0),
+			EIP155Block:         big.NewInt(0),
+			EIP158Block:         big.NewInt(0),
+			ByzantiumBlock:      big.NewInt(0),
+			ConstantinopleBlock: big.NewInt(0),
+			PetersburgBlock:     big.NewInt(0),
+			IstanbulBlock:       big.NewInt(0),
+			MuirGlacierBlock:    big.NewInt(0),
+			BerlinBlock:         big.NewInt(0),
+			LondonBlock:         big.NewInt(0),
+			ArrowGlacierBlock:   big.NewInt(0),
+			GrayGlacierBlock:    big.NewInt(0),
+			ShanghaiTime:        &zero,
+			CancunTime:          &zero,
+			// To enable post-Merge consensus at genesis
+			MergeNetsplitBlock:      big.NewInt(0),
+			TerminalTotalDifficulty: big.NewInt(0),
+			// use default Ethereum prod blob schedules
+			BlobScheduleConfig: params.DefaultBlobSchedule,
+		},
+		Nonce:      0,
+		Timestamp:  0,
+		ExtraData:  []byte{},
+		GasLimit:   30_000_000,
+		Difficulty: big.NewInt(0),
+		Mixhash:    common.Hash{},
+		Coinbase:   common.Address{},
+		BaseFee:    big.NewInt(1e9),
+	}
+
+	return fakel1.NewFakeL1ChainWithGenesis(&l1Genesis)
+}
+
+// generateDeterministicKey generates a deterministic private key using a seeded random source
+func generateDeterministicKey(seed int64) (*ecdsa.PrivateKey, error) {
+	// source := rand.New(rand.NewSource(seed))
+
+	return ecdsa.GenerateKey(crypto.S256(), cryptoRand.Reader)
+}
+
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx)
+	l1Chain := makeChain()
+	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)
 	}
-	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock)
+	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run validator: %w", err)
 	}
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string) error {
-	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, "./op-program", l2RPCURL)
+func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string, l1Chain *fakel1.FakeL1Chain) error {
+	// Generate a deterministic batcher key using the first test block as seed
+	batcherKey, err := generateDeterministicKey(int64(firstTestBlock))
+	if err != nil {
+		return fmt.Errorf("failed to generate batcher key: %w", err)
+	}
+
+	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, "./op-program", l2RPCURL, l1Chain, batcherKey)
 
 	return opProgram.Run(ctx, payloads, firstTestBlock)
 }
@@ -170,6 +230,9 @@ func (nb *NetworkBenchmark) fundTestAccount(ctx context.Context, mempool mempool
 		}
 		return receipt, nil
 	})
+	if receipt == nil {
+		return fmt.Errorf("failed to get transaction receipt: %w", err)
+	}
 	nb.log.Info("Included deposit tx in block", "block", receipt.BlockNumber)
 	if err != nil {
 		return fmt.Errorf("failed to get transaction receipt: %w", err)
@@ -192,7 +255,7 @@ func (nb *NetworkBenchmark) fundTestAccount(ctx context.Context, mempool mempool
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.ExecutableData, uint64, error) {
+func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *fakel1.FakeL1Chain) ([]engine.ExecutableData, uint64, error) {
 	sequencerClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.sequencerOptions)
 	if err != nil {
 		return nil, 0, err
@@ -293,7 +356,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
 			BlockTime: nb.params.BlockTime,
 			GasLimit:  nb.params.GasLimit,
-		}, headBlockHash, headBlockNumber)
+		}, headBlockHash, headBlockNumber, l1Chain)
 
 		payloads := make([]engine.ExecutableData, 0)
 
@@ -361,7 +424,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.Ex
 	}
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *fakel1.FakeL1Chain) error {
 	validatorClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.validatorOptions)
 	if err != nil {
 		return err
@@ -403,7 +466,7 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		return err
 	}
 
-	err = nb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock, validatorClient.ClientURL())
+	err = nb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock, validatorClient.ClientURL(), l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run fault proof program: %w", err)
 	}
