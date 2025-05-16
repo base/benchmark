@@ -257,8 +257,7 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 		}
 	} else {
 		// for devnets, just create a new genesis with the current time
-		genesisTime := time.Now()
-		genesis = benchmark.DefaultDevnetGenesis(genesisTime)
+		genesis = benchmark.DefaultDevnetGenesis()
 	}
 
 	return genesis, nil

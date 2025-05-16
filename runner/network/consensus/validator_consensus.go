@@ -28,21 +28,16 @@ func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authCli
 // Propose starts block generation, waits BlockTime, and generates a block.
 func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.ExecutableData, blockMetrics *metrics.BlockMetrics) error {
 	f.log.Info("Updating fork choice before validating payload", "payload_index", payload.Number)
-	startTime := time.Now()
-	_, err := f.updateForkChoice(ctx, nil)
-	if err != nil {
-		return err
-	}
-	duration := time.Since(startTime)
-	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
 
 	f.log.Info("Validate payload", "payload_index", payload.Number)
-	startTime = time.Now()
-	err = f.newPayload(ctx, payload)
+	startTime := time.Now()
+	err := f.newPayload(ctx, payload)
 	if err != nil {
 		return err
 	}
-	duration = time.Since(startTime)
+
+	f.headBlockHash = payload.BlockHash
+	duration := time.Since(startTime)
 	f.log.Info("Validated payload", "payload_index", payload.Number, "duration", duration)
 	blockMetrics.AddExecutionMetric(metrics.NewPayloadLatencyMetric, duration)
 
@@ -52,6 +47,14 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 
 	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasUsed))
 	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
+
+	startTime = time.Now()
+	_, err = f.updateForkChoice(ctx, nil)
+	if err != nil {
+		return err
+	}
+	duration = time.Since(startTime)
+	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
 
 	return nil
 }
