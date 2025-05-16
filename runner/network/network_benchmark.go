@@ -101,8 +101,14 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 	return client, nil
 }
 
-func makeChain() (*fakel1.FakeL1Chain, error) {
+func makeChain(prefundAddr []common.Address) (*fakel1.FakeL1Chain, error) {
 	zero := uint64(0)
+	alloc := make(ethTypes.GenesisAlloc)
+	for _, addr := range prefundAddr {
+		alloc[addr] = ethTypes.Account{
+			Balance: new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether)),
+		}
+	}
 	// bigZero := big.NewInt(0)
 	l1Genesis := core.Genesis{
 		Config: &params.ChainConfig{
@@ -131,6 +137,7 @@ func makeChain() (*fakel1.FakeL1Chain, error) {
 			BlobScheduleConfig: params.DefaultBlobSchedule,
 		},
 		Nonce:      0,
+		Alloc:      alloc,
 		Timestamp:  0,
 		ExtraData:  []byte{},
 		GasLimit:   30_000_000,
@@ -151,7 +158,19 @@ func generateDeterministicKey(seed int64) (*ecdsa.PrivateKey, error) {
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	l1Chain, err := makeChain()
+	// Generate a deterministic batcher key using the first test block as seed
+	batcherKey, err := generateDeterministicKey(100)
+	if err != nil {
+		return fmt.Errorf("failed to generate batcher key: %w", err)
+	}
+
+	batcherAddr := crypto.PubkeyToAddress(batcherKey.PublicKey)
+
+	prefundAccts := []common.Address{
+		batcherAddr,
+	}
+
+	l1Chain, err := makeChain(prefundAccts)
 	if err != nil {
 		return fmt.Errorf("failed to make chain: %w", err)
 	}
@@ -159,19 +178,14 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)
 	}
-	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain)
+	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, batcherKey)
 	if err != nil {
 		return fmt.Errorf("failed to run validator: %w", err)
 	}
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string, l1Chain *fakel1.FakeL1Chain) error {
-	// Generate a deterministic batcher key using the first test block as seed
-	batcherKey, err := generateDeterministicKey(int64(firstTestBlock))
-	if err != nil {
-		return fmt.Errorf("failed to generate batcher key: %w", err)
-	}
+func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) error {
 
 	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, "./op-program", l2RPCURL, l1Chain, batcherKey)
 
@@ -426,7 +440,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *fak
 	}
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *fakel1.FakeL1Chain) error {
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) error {
 	validatorClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.validatorOptions)
 	if err != nil {
 		return err
@@ -468,7 +482,7 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		return err
 	}
 
-	err = nb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock, validatorClient.ClientURL(), l1Chain)
+	err = nb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock, validatorClient.ClientURL(), l1Chain, batcherKey)
 	if err != nil {
 		return fmt.Errorf("failed to run fault proof program: %w", err)
 	}

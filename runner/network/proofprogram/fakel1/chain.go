@@ -41,6 +41,16 @@ type FakeL1Chain struct {
 	blobStore *BlobsStore
 }
 
+func (f *FakeL1Chain) GetNonce(addr common.Address) (uint64, error) {
+	fmt.Printf("getting nonce for %s with latest block %d\n", addr.Hex(), f.chain.CurrentBlock().Number.Uint64())
+	statedb, err := f.chain.State()
+	if err != nil {
+		return 0, err
+	}
+	nonce := statedb.GetNonce(addr)
+	return nonce, nil
+}
+
 func (f *FakeL1Chain) GetBlockByHash(hash common.Hash) (*types.Block, error) {
 	return f.chain.GetBlockByHash(hash), nil
 }
@@ -159,6 +169,10 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 
 	}
 
+	for _, receipt := range receipts {
+		fmt.Printf("receipt: %#v\n", receipt)
+	}
+
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
 	header.Root = statedb.IntermediateRoot(true)
 
@@ -255,7 +269,10 @@ func NewFakeL1ChainWithGenesis(genesis *core.Genesis) (*FakeL1Chain, error) {
 		l1BlobSidecars: make([]*types.BlobTxSidecar, 0),
 	}
 
-	l1Chain.BuildAndMine([]*types.Transaction{})
+	err = l1Chain.BuildAndMine([]*types.Transaction{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to build and mine genesis: %w", err)
+	}
 
 	return l1Chain, nil
 }

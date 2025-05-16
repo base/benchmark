@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/holiman/uint256"
 	"github.com/pkg/errors"
@@ -37,7 +38,7 @@ func NewBatcher(rollupCfg *rollup.Config, batcherKey *ecdsa.PrivateKey, chain *f
 	return &Batcher{
 		rollupCfg:   rollupCfg,
 		batcherKey:  batcherKey,
-		batcherAddr: common.Address{}, // TODO: derive from key
+		batcherAddr: crypto.PubkeyToAddress(batcherKey.PublicKey),
 		chain:       chain,
 		maxL1TxSize: 128 * 1024,
 	}
@@ -127,6 +128,14 @@ func (b *Batcher) CreateAndSendBatch(payloads []engine.ExecutableData, parentHas
 	}
 
 	txs := make([]*types.Transaction, 0)
+
+	nonce, err := b.chain.GetNonce(b.batcherAddr)
+	if err != nil {
+		return fmt.Errorf("failed to get nonce: %w", err)
+	}
+
+	fmt.Printf("got nonce: %d\n", nonce)
+
 	for _, frame := range frames {
 		var blob eth.Blob
 		if err := blob.FromData(frame); err != nil {
@@ -164,8 +173,10 @@ func (b *Batcher) CreateAndSendBatch(payloads []engine.ExecutableData, parentHas
 			GasFeeCap:  uint256.MustFromBig(big.NewInt(1e9)),
 			BlobFeeCap: blobFeeCap,
 			Value:      uint256.NewInt(0),
-			Nonce:      0,
+			Nonce:      nonce,
 		}
+
+		nonce++
 
 		signer := types.NewPragueSigner(b.rollupCfg.L1ChainID)
 
@@ -178,7 +189,10 @@ func (b *Batcher) CreateAndSendBatch(payloads []engine.ExecutableData, parentHas
 		txs = append(txs, tx)
 	}
 
-	b.chain.BuildAndMine(txs)
+	err = b.chain.BuildAndMine(txs)
+	if err != nil {
+		return fmt.Errorf("failed to build and mine txs: %w", err)
+	}
 
 	return nil
 }

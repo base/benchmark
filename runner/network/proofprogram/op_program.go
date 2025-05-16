@@ -145,7 +145,7 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 		return fmt.Errorf("failed to encode rollup.json: %w", err)
 	}
 
-	l1Head, err := o.chain.GetLatestBlock()
+	l1Head, err := o.chain.GetBlockByNumber(0)
 	if err != nil {
 		return fmt.Errorf("failed to get l1 head: %w", err)
 	}
