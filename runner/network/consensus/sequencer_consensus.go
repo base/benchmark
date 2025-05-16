@@ -32,16 +32,18 @@ type SequencerConsensusClient struct {
 	lastTimestamp uint64
 	mempool       mempool.FakeMempool
 	l1Chain       *fakel1.FakeL1Chain
+	batcherAddr   common.Address
 }
 
 // NewSequencerConsensusClient creates a new consensus client using the given genesis hash and timestamp.
-func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64, l1Chain *fakel1.FakeL1Chain) *SequencerConsensusClient {
+func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authClient client.RPC, mempool mempool.FakeMempool, options ConsensusClientOptions, headBlockHash common.Hash, headBlockNumber uint64, l1Chain *fakel1.FakeL1Chain, batcherAddr common.Address) *SequencerConsensusClient {
 	base := NewBaseConsensusClient(log, client, authClient, options, headBlockHash, headBlockNumber)
 	return &SequencerConsensusClient{
 		BaseConsensusClient: base,
 		lastTimestamp:       uint64(time.Now().Unix()),
 		mempool:             mempool,
 		l1Chain:             l1Chain,
+		batcherAddr:         batcherAddr,
 	}
 }
 

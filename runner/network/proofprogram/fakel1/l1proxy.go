@@ -183,6 +183,32 @@ func (p *L1ProxyServer) OverrideRequest(ctx context.Context, method string, rawP
 			return nil, fmt.Errorf("failed to marshal block: %w", err)
 		}
 		return blockJSON, nil
+	case "eth_getBlockReceipts":
+		var params []interface{}
+		if err := json.Unmarshal(rawParams, &params); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal params: %w", err)
+		}
+
+		if len(params) != 1 {
+			return nil, fmt.Errorf("expected 1 param, got %d", len(params))
+		}
+
+		blockHash, ok := params[0].(string)
+		if !ok {
+			return nil, fmt.Errorf("expected block hash to be a string, got %T", params[0])
+		}
+
+		blockHashBytes, err := hexutil.Decode(blockHash)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode block hash: %w", err)
+		}
+
+		receipts, err := p.chain.GetReceipts(ctx, common.BytesToHash(blockHashBytes))
+		if err != nil {
+			return nil, fmt.Errorf("failed to get receipts: %w", err)
+		}
+
+		return json.Marshal(receipts)
 	default:
 		return nil, fmt.Errorf("unsupported method: %s", method)
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 // GetRollupConfig creates a rollup configuration for the given genesis and chain
-func GetRollupConfig(genesis *core.Genesis, chain *fakel1.FakeL1Chain) *rollup.Config {
+func GetRollupConfig(genesis *core.Genesis, chain *fakel1.FakeL1Chain, batcherAddr common.Address) *rollup.Config {
 	var eipParams eth.Bytes8
 	copy(eipParams[:], eip1559.EncodeHolocene1559Params(50, 1))
 
@@ -36,7 +36,7 @@ func GetRollupConfig(genesis *core.Genesis, chain *fakel1.FakeL1Chain) *rollup.C
 			},
 			L2Time: genesis.Timestamp,
 			SystemConfig: eth.SystemConfig{
-				BatcherAddr: common.Address{1},
+				BatcherAddr: batcherAddr,
 				Overhead:    eth.Bytes32{0},
 				Scalar: eth.EncodeScalar(eth.EcotoneScalars{
 					BlobBaseFeeScalar: 0,

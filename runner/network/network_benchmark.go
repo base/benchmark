@@ -174,7 +174,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to make chain: %w", err)
 	}
-	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
+	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain, batcherAddr)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)
 	}
@@ -271,7 +271,7 @@ func (nb *NetworkBenchmark) fundTestAccount(ctx context.Context, mempool mempool
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *fakel1.FakeL1Chain) ([]engine.ExecutableData, uint64, error) {
+func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *fakel1.FakeL1Chain, batcherAddr common.Address) ([]engine.ExecutableData, uint64, error) {
 	sequencerClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.sequencerOptions)
 	if err != nil {
 		return nil, 0, err
@@ -372,7 +372,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *fak
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
 			BlockTime: nb.params.BlockTime,
 			GasLimit:  nb.params.GasLimit,
-		}, headBlockHash, headBlockNumber, l1Chain)
+		}, headBlockHash, headBlockNumber, l1Chain, batcherAddr)
 
 		payloads := make([]engine.ExecutableData, 0)
 

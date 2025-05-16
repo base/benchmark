@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -39,7 +40,7 @@ type opProgram struct {
 }
 
 func NewOPProgram(genesis *core.Genesis, log log.Logger, opProgramBin string, l2RPCURL string, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) ProofProgram {
-	rollupCfg := configutil.GetRollupConfig(genesis, l1Chain)
+	rollupCfg := configutil.GetRollupConfig(genesis, l1Chain, crypto.PubkeyToAddress(batcherKey.PublicKey))
 	batcher := NewBatcher(rollupCfg, batcherKey, l1Chain)
 
 	return &opProgram{
@@ -145,7 +146,7 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 		return fmt.Errorf("failed to encode rollup.json: %w", err)
 	}
 
-	l1Head, err := o.chain.GetBlockByNumber(0)
+	l1Head, err := o.chain.GetLatestBlock()
 	if err != nil {
 		return fmt.Errorf("failed to get l1 head: %w", err)
 	}
