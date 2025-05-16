@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"crypto/ecdsa"
-	cryptoRand "crypto/rand"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -102,7 +101,7 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 	return client, nil
 }
 
-func makeChain() *fakel1.FakeL1Chain {
+func makeChain() (*fakel1.FakeL1Chain, error) {
 	zero := uint64(0)
 	// bigZero := big.NewInt(0)
 	l1Genesis := core.Genesis{
@@ -146,13 +145,16 @@ func makeChain() *fakel1.FakeL1Chain {
 
 // generateDeterministicKey generates a deterministic private key using a seeded random source
 func generateDeterministicKey(seed int64) (*ecdsa.PrivateKey, error) {
-	// source := rand.New(rand.NewSource(seed))
+	source := rand.New(rand.NewSource(seed))
 
-	return ecdsa.GenerateKey(crypto.S256(), cryptoRand.Reader)
+	return ecdsa.GenerateKey(crypto.S256(), source)
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	l1Chain := makeChain()
+	l1Chain, err := makeChain()
+	if err != nil {
+		return fmt.Errorf("failed to make chain: %w", err)
+	}
 	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)

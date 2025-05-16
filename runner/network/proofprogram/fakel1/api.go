@@ -45,12 +45,6 @@ import (
 	"github.com/ethereum/go-ethereum/trie"
 )
 
-// estimateGasErrorRatio is the amount of overestimation eth_estimateGas is
-// allowed to produce in order to speed up calculations.
-const estimateGasErrorRatio = 0.015
-
-var errBlobTxNotSupported = errors.New("signing blob transactions not supported")
-
 // EthereumAPI provides an API to access Ethereum related information.
 type EthereumAPI struct {
 	b Backend
@@ -790,7 +784,7 @@ func RPCMarshalBlock(ctx context.Context, block *types.Block, inclTx bool, fullT
 			return tx.Hash()
 		}
 		if fullTx {
-			formatTx = func(idx int, tx *types.Transaction) interface{} {
+			formatTx = func(idx int, _ *types.Transaction) interface{} {
 				return newRPCTransactionFromBlockIndex(ctx, block, uint64(idx), config, backend)
 			}
 		}
@@ -1013,16 +1007,6 @@ func depositTxReceipt(ctx context.Context, blockHash common.Hash, index uint64, 
 		return nil
 	}
 	return receipts[index]
-}
-
-// newRPCRawTransactionFromBlockIndex returns the bytes of a transaction given a block and a transaction index.
-func newRPCRawTransactionFromBlockIndex(b *types.Block, index uint64) hexutil.Bytes {
-	txs := b.Transactions()
-	if index >= uint64(len(txs)) {
-		return nil
-	}
-	blob, _ := txs[index].MarshalBinary()
-	return blob
 }
 
 // marshalReceipt marshals a transaction receipt into a JSON object.
