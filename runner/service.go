@@ -325,7 +325,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 	}
 	err = benchmark.Run(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to run benchmark")
 	}
 
 	err = s.exportOutput(testName, err, sequencerOptions, outputDir, "sequencer")

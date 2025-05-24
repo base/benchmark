@@ -1,6 +1,7 @@
 package benchmark
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/sha3"
 )
 
 // BenchmarkType is the type of benchmark to run, testing either sequencer speed or fault proof program speed.
@@ -258,6 +261,14 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 		params, err := NewParamsFromValues(valueSelections)
 		if err != nil {
 			return nil, err
+		}
+
+		if c.Snapshot != nil && c.Snapshot.Command != "" {
+			// replace all non-alphanumeric characters with '-' (max 1 per group)
+			snapshotID := nameToSlug(c.Snapshot.Command)
+			snapshotID = hex.EncodeToString([]byte(sha3.NewLegacyKeccak256().Sum([]byte(snapshotID)))[:8])
+			snapshotID = strings.ToLower(snapshotID)
+			params.SnapshotCmdHash = &snapshotID
 		}
 
 		if c.Tags != nil {
