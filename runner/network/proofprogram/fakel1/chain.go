@@ -2,6 +2,7 @@ package fakel1
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"os"
@@ -32,13 +33,13 @@ import (
 type FakeL1Chain struct {
 	chain *core.BlockChain
 
-	l1Signer       types.Signer
-	l1BlobSidecars []*types.BlobTxSidecar
-	genesis        *core.Genesis
-	log            log.Logger
-	l1Database     ethdb.Database
+	l1Signer   types.Signer
+	genesis    *core.Genesis
+	log        log.Logger
+	l1Database ethdb.Database
 
-	blobStore *BlobsStore
+	l1BlobSidecars []*types.BlobTxSidecar
+	blobStore      *BlobsStore
 }
 
 func (f *FakeL1Chain) GetNonce(addr common.Address) (uint64, error) {
@@ -49,6 +50,66 @@ func (f *FakeL1Chain) GetNonce(addr common.Address) (uint64, error) {
 	}
 	nonce := statedb.GetNonce(addr)
 	return nonce, nil
+}
+
+func (f *FakeL1Chain) BeaconGenesis() opEth.APIGenesisResponse {
+	return opEth.APIGenesisResponse{
+		Data: opEth.ReducedGenesisData{
+			GenesisTime: opEth.Uint64String(f.genesis.Timestamp),
+		},
+	}
+}
+func (f *FakeL1Chain) ConfigSpec() opEth.APIConfigResponse {
+	return opEth.APIConfigResponse{
+		Data: opEth.ReducedConfigData{
+			SecondsPerSlot: 1,
+		},
+	}
+}
+
+//type APIBlobSidecar struct {
+// 	Index             Uint64String            `json:"index"`
+// 	Blob              Blob                    `json:"blob"`
+// 	KZGCommitment     Bytes48                 `json:"kzg_commitment"`
+// 	KZGProof          Bytes48                 `json:"kzg_proof"`
+// 	SignedBlockHeader SignedBeaconBlockHeader `json:"signed_block_header"`
+// 	InclusionProof    []Bytes32               `json:"kzg_commitment_inclusion_proof"`
+// }
+
+func (f *FakeL1Chain) GetSidecarsBySlot(ctx context.Context, slot uint64) (*opEth.APIGetBlobSidecarsResponse, error) {
+	slotTime := f.genesis.Timestamp + slot
+
+	returnedSidecars, err := f.blobStore.GetAllSidecars(ctx, slotTime)
+	if err != nil {
+		return nil, err
+	}
+	sidecars := make([]*opEth.APIBlobSidecar, len(returnedSidecars))
+
+	var mockBeaconBlockRoot [32]byte
+	mockBeaconBlockRoot[0] = 42
+	binary.LittleEndian.PutUint64(mockBeaconBlockRoot[32-8:], slot)
+
+	fmt.Printf("returned sidecars for slot %d: %#v\n", slot, returnedSidecars)
+
+	for i, sidecar := range returnedSidecars {
+		sidecars[i] = &opEth.APIBlobSidecar{
+			Index:         opEth.Uint64String(sidecar.Index),
+			Blob:          sidecar.Blob,
+			KZGCommitment: sidecar.KZGCommitment,
+			KZGProof:      sidecar.KZGProof,
+			SignedBlockHeader: opEth.SignedBeaconBlockHeader{
+				Message: opEth.BeaconBlockHeader{
+					StateRoot: mockBeaconBlockRoot,
+					Slot:      opEth.Uint64String(slot),
+				},
+			},
+			InclusionProof: make([]opEth.Bytes32, 0),
+		}
+	}
+
+	return &opEth.APIGetBlobSidecarsResponse{
+		Data: sidecars,
+	}, nil
 }
 
 func (f *FakeL1Chain) GetBlockByHash(hash common.Hash) (*types.Block, error) {
@@ -161,8 +222,11 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 				return fmt.Errorf("L1 must be cancun to process blob tx")
 			}
 			sidecar := tx.BlobTxSidecar()
+			slot := (header.Time - f.genesis.Timestamp)
+			log.Info("adding blob tx sidecar", "slot", slot, "number", header.Number, "blob_hashes", sidecar.BlobHashes())
 			if sidecar != nil {
 				f.l1BlobSidecars = append(f.l1BlobSidecars, sidecar)
+				f.log.Info("added blob tx sidecar", "slot", slot, "number", header.Number, "blob_hashes", sidecar.BlobHashes())
 			}
 			*header.BlobGasUsed += receipt.BlobGasUsed
 		}
@@ -195,13 +259,16 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 		return fmt.Errorf("l1 trie write error: %v", err)
 	}
 	// now that the blob txs are in a canonical block, flush them to the blob store
+	i := 0
 	for _, sidecar := range f.l1BlobSidecars {
-		for i, h := range sidecar.BlobHashes() {
-			blob := (*opEth.Blob)(&sidecar.Blobs[i])
+		for idx, h := range sidecar.BlobHashes() {
+			blob := (*opEth.Blob)(&sidecar.Blobs[idx])
 			indexedHash := opEth.IndexedBlobHash{Index: uint64(i), Hash: h}
 			f.blobStore.StoreBlob(block.Time(), indexedHash, blob)
+			i++
 		}
 	}
+	f.l1BlobSidecars = make([]*types.BlobTxSidecar, 0)
 	_, err = f.chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		return fmt.Errorf("failed to insert block into l1 chain: %v", err)

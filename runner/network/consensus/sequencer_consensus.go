@@ -113,7 +113,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		BaseFee:             big.NewInt(1),
 		BlockHash:           block.Hash(),
 		SequenceNumber:      0,
-		BatcherAddr:         common.Address{},
+		BatcherAddr:         f.batcherAddr,
 		OperatorFeeScalar:   0,
 		OperatorFeeConstant: 0,
 	}

@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -42,7 +43,10 @@ func NewL1ProxyServer(log log.Logger, port int, chain *FakeL1Chain) *L1ProxyServ
 func (p *L1ProxyServer) Run(ctx context.Context) error {
 	// Start the proxy server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", p.handleRequest)
+	mux.HandleFunc("/", p.handleRPCRequest)
+	mux.HandleFunc("/eth/v1/beacon/genesis", p.handleBeaconRequestForPath("/eth/v1/beacon/genesis"))
+	mux.HandleFunc("/eth/v1/config/spec", p.handleBeaconRequestForPath("/eth/v1/config/spec"))
+	mux.HandleFunc("/eth/v1/beacon/blob_sidecars/{slot}", p.handleBeaconRequestForPath("/eth/v1/beacon/blob_sidecars/{slot}"))
 
 	p.server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", p.port),
@@ -71,7 +75,57 @@ func (p *L1ProxyServer) ClientURL() string {
 	return fmt.Sprintf("http://localhost:%d", p.port)
 }
 
-func (p *L1ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
+func (p *L1ProxyServer) handleBeaconRequestForPath(path string) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var response json.RawMessage
+		switch path {
+		case "/eth/v1/beacon/genesis":
+			genesis := p.chain.BeaconGenesis()
+			response, _ = json.Marshal(genesis)
+		case "/eth/v1/config/spec":
+			spec := p.chain.ConfigSpec()
+			response, _ = json.Marshal(spec)
+		case "/eth/v1/beacon/blob_sidecars/{slot}":
+			slotStr := r.PathValue("slot")
+			log.Debug("Handling blob sidecars request", "slot", slotStr)
+			slotInt, err := strconv.Atoi(slotStr)
+			if err != nil {
+				http.Error(w, "Invalid slot parameter", http.StatusBadRequest)
+				return
+			}
+			slot := uint64(slotInt)
+			ctx := context.Background()
+			blobSidecars, err := p.chain.GetSidecarsBySlot(ctx, slot)
+			if err != nil {
+				p.log.Error("Error getting blob sidecars", "slot", slot, "err", err)
+				http.Error(w, fmt.Sprintf("Error getting blob sidecars: %v", err), http.StatusInternalServerError)
+				return
+			}
+			response, err = json.Marshal(blobSidecars)
+			if err != nil {
+				p.log.Error("Error marshaling blob sidecars", "slot", slot, "err", err)
+				http.Error(w, fmt.Sprintf("Error marshaling blob sidecars: %v", err), http.StatusInternalServerError)
+				return
+			}
+
+		default:
+			http.NotFound(w, r)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			p.log.Error("Error encoding response", "err", err)
+		}
+	}
+}
+
+func (p *L1ProxyServer) handleRPCRequest(w http.ResponseWriter, r *http.Request) {
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusBadRequest)
