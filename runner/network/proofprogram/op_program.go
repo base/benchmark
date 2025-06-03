@@ -19,12 +19,10 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/pkg/errors"
 )
 
@@ -183,18 +181,7 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 
 	if err = cmd.Run(); err != nil {
 		log.Info("expected claim block", "number", expectedClaimBlock.Number(), "hash", expectedClaimBlock.Hash().Hex(), "root", expectedClaimBlock.Root().Hex(), "l2BlockNumber", l2HeadNumber, "claimOutputRoot", common.Hash(claimOutputRoot).Hex(), "l2OutputRoot", common.Hash(l2OutputRoot).Hex(), "parent", expectedClaimBlock.ParentHash(), "parent_beacon_hash", expectedClaimBlock.BeaconRoot().Hex())
-
-		txs := expectedClaimBlock.Transactions()
-		expectedTxHash := types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
-		txData := make([]string, 0, len(txs))
-		for _, tx := range txs {
-			txData = append(txData, tx.Hash().Hex())
-		}
 		return fmt.Errorf("failed to run op-program: %w", err)
-	}
-
-	if err = cmd.Wait(); err != nil {
-		return fmt.Errorf("op-program exited with error: %w", err)
 	}
 
 	return nil
