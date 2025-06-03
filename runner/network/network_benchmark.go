@@ -14,7 +14,6 @@ import (
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
-	"github.com/base/base-bench/runner/network/consensus"
 	"github.com/base/base-bench/runner/network/proofprogram"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 
@@ -82,7 +81,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) (err error) {
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)
 	}
-	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain.chain, &nb.testConfig.BatcherKey)
+	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, &nb.testConfig.BatcherKey)
 	if err != nil {
 		return fmt.Errorf("failed to run validator: %w", err)
 	}
@@ -138,7 +137,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	return benchmark.Run(ctx, metricsCollector)
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) error {
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain, batcherKey *ecdsa.PrivateKey) error {
 	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions)
 	if err != nil {
 		return err
@@ -160,32 +159,9 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		}
 	}()
 
-	headBlockHeader, err := validatorClient.Client().HeaderByNumber(ctx, nil)
-	if err != nil {
-		nb.log.Warn("failed to get head block header", "err", err)
-	}
-	headBlockHash := headBlockHeader.Hash()
-	headBlockNumber := headBlockHeader.Number.Uint64()
+	benchmark := newValidatorBenchmark(nb.log, *nb.testConfig, validatorClient, l1Chain, nb.proofConfig)
 
-	consensusClient := consensus.NewSyncingConsensusClient(nb.log, validatorClient.Client(), validatorClient.AuthClient(), consensus.ConsensusClientOptions{
-		BlockTime: nb.testConfig.Params.BlockTime,
-	}, headBlockHash, headBlockNumber)
-
-	err = consensusClient.Start(ctx, payloads, metricsCollector, firstTestBlock)
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return err
-		}
-		nb.log.Warn("failed to run consensus client", "err", err)
-		return err
-	}
-
-	err = nb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock, validatorClient.ClientURL(), l1Chain, batcherKey)
-	if err != nil {
-		return fmt.Errorf("failed to run fault proof program: %w", err)
-	}
-
-	return nil
+	return benchmark.Run(ctx, payloads, firstTestBlock, metricsCollector)
 }
 
 func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
