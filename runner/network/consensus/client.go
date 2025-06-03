@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/base/base-bench/runner/network/blocks"
@@ -104,8 +103,6 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")
 	}
-
-	fmt.Printf("New payload response: %+v %s\n", resp.PayloadStatus, resp.PayloadStatus.Status)
 
 	return nil
 }

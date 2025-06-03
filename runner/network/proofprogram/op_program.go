@@ -12,7 +12,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/base/base-bench/_docs/trie"
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/network/configutil"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
@@ -25,6 +24,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/pkg/errors"
 )
 
@@ -184,17 +184,12 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 	if err = cmd.Run(); err != nil {
 		log.Info("expected claim block", "number", expectedClaimBlock.Number(), "hash", expectedClaimBlock.Hash().Hex(), "root", expectedClaimBlock.Root().Hex(), "l2BlockNumber", l2HeadNumber, "claimOutputRoot", common.Hash(claimOutputRoot).Hex(), "l2OutputRoot", common.Hash(l2OutputRoot).Hex(), "parent", expectedClaimBlock.ParentHash(), "parent_beacon_hash", expectedClaimBlock.BeaconRoot().Hex())
 
-		fmt.Printf("block header: %#+v\n", expectedClaimBlock.Header())
-
 		txs := expectedClaimBlock.Transactions()
 		expectedTxHash := types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
 		txData := make([]string, 0, len(txs))
 		for _, tx := range txs {
 			txData = append(txData, tx.Hash().Hex())
 		}
-		fmt.Printf("txs: %v\n", txData)
-		fmt.Printf("expected tx hash: %s\n", expectedTxHash.Hex())
-
 		return fmt.Errorf("failed to run op-program: %w", err)
 	}
 

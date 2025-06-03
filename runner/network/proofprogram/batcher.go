@@ -136,8 +136,6 @@ func (b *Batcher) CreateAndSendBatch(payloads []engine.ExecutableData, parentHas
 		return fmt.Errorf("failed to get nonce: %w", err)
 	}
 
-	fmt.Printf("got nonce: %d\n", nonce)
-
 	for _, frame := range frames {
 		var blob eth.Blob
 		if err := blob.FromData(frame); err != nil {

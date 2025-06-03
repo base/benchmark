@@ -132,8 +132,6 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		return nil, nil, err
 	}
 
-	log.Info("Generating L1 info transaction", "tx", hexutil.Bytes(data))
-
 	// Set a very large gas limit with `IsSystemTransaction` to ensure
 	// that the L1 Attributes Transaction does not run out of gas.
 	out := &types.DepositTx{

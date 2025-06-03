@@ -25,7 +25,6 @@ import (
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	"github.com/base/base-bench/runner/payload"
 
-	opCrypto "github.com/ethereum-optimism/optimism/op-service/crypto"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -150,28 +149,17 @@ func makeChain(prefundAddr []common.Address, l2GenesisTimestamp uint64) (*fakel1
 		BaseFee:    big.NewInt(1e9),
 	}
 
-	fmt.Println("L1 Genesis:", l1Genesis.ToBlock().Hash().Hex(), "Timestamp:", l1Genesis.Timestamp)
-
 	return fakel1.NewFakeL1ChainWithGenesis(&l1Genesis, l2GenesisTimestamp)
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	// Generate a deterministic batcher key using the first test block as seed
 	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
 	batcherKey, err := crypto.ToECDSA(batcherKeyBytes)
 	if err != nil {
 		return fmt.Errorf("failed to convert batcher key bytes to ECDSA: %w", err)
 	}
-	keyStr := opCrypto.EncodePrivKeyToString(batcherKey)
-	if err != nil {
-		return fmt.Errorf("failed to generate batcher key: %w", err)
-	}
-
-	fmt.Println("Batcher Key:", keyStr)
 
 	batcherAddr := crypto.PubkeyToAddress(batcherKey.PublicKey)
-	fmt.Println("Batcher Address:", batcherAddr.Hex())
-
 	prefundAccts := []common.Address{
 		batcherAddr,
 	}

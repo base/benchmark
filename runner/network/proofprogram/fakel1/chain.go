@@ -44,7 +44,6 @@ type FakeL1Chain struct {
 }
 
 func (f *FakeL1Chain) GetNonce(addr common.Address) (uint64, error) {
-	fmt.Printf("getting nonce for %s with latest block %d\n", addr.Hex(), f.chain.CurrentBlock().Number.Uint64())
 	statedb, err := f.chain.State()
 	if err != nil {
 		return 0, err
@@ -68,15 +67,6 @@ func (f *FakeL1Chain) ConfigSpec() opEth.APIConfigResponse {
 	}
 }
 
-//type APIBlobSidecar struct {
-// 	Index             Uint64String            `json:"index"`
-// 	Blob              Blob                    `json:"blob"`
-// 	KZGCommitment     Bytes48                 `json:"kzg_commitment"`
-// 	KZGProof          Bytes48                 `json:"kzg_proof"`
-// 	SignedBlockHeader SignedBeaconBlockHeader `json:"signed_block_header"`
-// 	InclusionProof    []Bytes32               `json:"kzg_commitment_inclusion_proof"`
-// }
-
 func (f *FakeL1Chain) GetSidecarsBySlot(ctx context.Context, slot uint64) (*opEth.APIGetBlobSidecarsResponse, error) {
 	slotTime := f.genesis.Timestamp + slot
 
@@ -89,8 +79,6 @@ func (f *FakeL1Chain) GetSidecarsBySlot(ctx context.Context, slot uint64) (*opEt
 	var mockBeaconBlockRoot [32]byte
 	mockBeaconBlockRoot[0] = 42
 	binary.LittleEndian.PutUint64(mockBeaconBlockRoot[32-8:], slot)
-
-	fmt.Printf("returned sidecars for slot %d: %#v\n", slot, returnedSidecars)
 
 	for i, sidecar := range returnedSidecars {
 		sidecars[i] = &opEth.APIBlobSidecar{
@@ -233,10 +221,6 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 			*header.BlobGasUsed += receipt.BlobGasUsed
 		}
 
-	}
-
-	for _, receipt := range receipts {
-		fmt.Printf("receipt: %#v\n", receipt)
 	}
 
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
