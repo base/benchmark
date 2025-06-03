@@ -114,8 +114,6 @@ jobs:
       - name: Run Basic Benchmarks
         id: unit
         run: |
-          mkdir ${{ runner.temp }}/data-dir
-          mkdir ${{ runner.temp }}/output
           go run benchmark/cmd/main.go \
             --log.level info \
             run \
