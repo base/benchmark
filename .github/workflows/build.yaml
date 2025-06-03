@@ -96,6 +96,21 @@ jobs:
           echo "binaries compiled:"
           ls -la ${{ runner.temp }}/bin
 
+      - name: Run op-program Benchmark
+        id: op-program
+        run: |
+          curl https://mise.run | sh
+          pushd op-program
+          mise x -- ./build.sh
+          popd
+          go run benchmark/cmd/main.go \
+            --log.level info \
+            run \
+            --config ./configs/proof-program.yml \
+            --root-dir ${{ runner.temp }}/data-dir \
+            --output-dir ${{ runner.temp }}/output \
+            --geth-bin ${{ runner.temp }}/bin/geth
+
       - name: Run Basic Benchmarks
         id: unit
         run: |
@@ -116,20 +131,6 @@ jobs:
             --log.level info \
             run \
             --config ./configs/contract.yml \
-            --root-dir ${{ runner.temp }}/data-dir \
-            --output-dir ${{ runner.temp }}/output \
-            --geth-bin ${{ runner.temp }}/bin/geth
-      - name: Run op-program Benchmark
-        id: op-program
-        run: |
-          curl https://mise.run | sh
-          pushd op-program
-          mise x -- ./build.sh
-          popd op-program
-          go run benchmark/cmd/main.go \
-            --log.level info \
-            run \
-            --config ./configs/proof-program.yml \
             --root-dir ${{ runner.temp }}/data-dir \
             --output-dir ${{ runner.temp }}/output \
             --geth-bin ${{ runner.temp }}/bin/geth

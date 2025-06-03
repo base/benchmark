@@ -15,7 +15,7 @@ fi
 
 # clone OP repo
 if [ ! -d "op" ]; then
-    git clone git@github.com:ethereum-optimism/optimism.git
+    git clone https://github.com/ethereum-optimism/optimism.git
     git -C optimism checkout op-program/$OP_PROGRAM_VERSION
     echo "Cloned OP repo at version op-program/$OP_PROGRAM_VERSION."
 else
