@@ -27,15 +27,17 @@ const (
 	ExecutionLayerLogFileName = "el.log"
 )
 
+// TestConfig holds all configuration needed for a benchmark test
 type TestConfig struct {
 	Params     benchmark.Params
 	Config     config.Config
 	Genesis    core.Genesis
 	BatcherKey ecdsa.PrivateKey
-	// BatcherAddr is lazily initialized to avoid unnecessary computation.
+	// BatcherAddr is lazily initialized to avoid unnecessary computation
 	batcherAddr *common.Address
 }
 
+// BatcherAddr returns the batcher address, computing it if necessary
 func (c *TestConfig) BatcherAddr() common.Address {
 	if c.batcherAddr == nil {
 		batcherAddr := crypto.PubkeyToAddress(c.BatcherKey.PublicKey)
@@ -44,7 +46,7 @@ func (c *TestConfig) BatcherAddr() common.Address {
 	return *c.batcherAddr
 }
 
-// NetworkBenchmark handles the lifecycle for a single benchmark run.
+// NetworkBenchmark handles the lifecycle for a single benchmark run
 type NetworkBenchmark struct {
 	log log.Logger
 
@@ -56,9 +58,13 @@ type NetworkBenchmark struct {
 
 	testConfig  *TestConfig
 	proofConfig *benchmark.ProofProgramOptions
+
+	// New fields for metrics
+	metricsCollector metrics.MetricsCollector
+	metricsWriter    metrics.MetricsWriter
 }
 
-// NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client.
+// NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
 func NewNetworkBenchmark(config *TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:              log,
@@ -69,81 +75,85 @@ func NewNetworkBenchmark(config *TestConfig, log log.Logger, sequencerOptions *c
 	}, nil
 }
 
-func (nb *NetworkBenchmark) Run(ctx context.Context) (err error) {
-	// create an L1 chain in case we want to run a fault proof benchmark
+// Run executes the benchmark test
+func (nb *NetworkBenchmark) Run(ctx context.Context) error {
+	// Create an L1 chain if needed for fault proof benchmark
 	var l1Chain *l1Chain
 	if nb.proofConfig != nil {
+		var err error
 		l1Chain, err = newL1Chain(nb.testConfig)
 		if err != nil {
 			return fmt.Errorf("failed to create L1 chain: %w", err)
 		}
 	}
 
-	// benchmark the sequencer first to build payloads
+	// Benchmark the sequencer first to build payloads
 	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
-		return fmt.Errorf("failed to run sequencer: %w", err)
+		return fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
 
-	// then benchmark the validator to sync the payloads (also handles fpp benchmark)
-	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, &nb.testConfig.BatcherKey)
-	if err != nil {
-		return fmt.Errorf("failed to run validator: %w", err)
+	// Benchmark the validator to sync the payloads
+	if err := nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, &nb.testConfig.BatcherKey); err != nil {
+		return fmt.Errorf("failed to run validator benchmark: %w", err)
 	}
+
 	return nil
 }
 
 func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, error) {
 	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.sequencerOptions)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to setup sequencer node: %w", err)
 	}
 
+	// Ensure client is stopped even if benchmark fails
 	defer sequencerClient.Stop()
 
 	// Create metrics collector and writer
 	metricsCollector := metrics.NewMetricsCollector(nb.log, sequencerClient.Client(), nb.testConfig.Params.NodeType, sequencerClient.MetricsPort())
 	metricsWriter := metrics.NewFileMetricsWriter(nb.sequencerOptions.MetricsPath)
 
+	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		sequencerMetrics := metricsCollector.GetMetrics()
-
-		nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
-
-		if err := metricsWriter.Write(sequencerMetrics); err != nil {
-			nb.log.Error("Failed to write metrics", "error", err)
+		if sequencerMetrics != nil {
+			nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
+			if err := metricsWriter.Write(sequencerMetrics); err != nil {
+				nb.log.Error("Failed to write sequencer metrics", "error", err)
+			}
 		}
 	}()
 
 	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain)
-
 	return benchmark.Run(ctx, metricsCollector)
 }
 
 func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain, batcherKey *ecdsa.PrivateKey) error {
 	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup validator node: %w", err)
 	}
 
+	// Ensure client is stopped even if benchmark fails
 	defer validatorClient.Stop()
 
 	// Create metrics collector and writer
 	metricsCollector := metrics.NewMetricsCollector(nb.log, validatorClient.Client(), nb.testConfig.Params.NodeType, validatorClient.MetricsPort())
 	metricsWriter := metrics.NewFileMetricsWriter(nb.validatorOptions.MetricsPath)
 
+	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		validatorMetrics := metricsCollector.GetMetrics()
-
-		nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
-
-		if err := metricsWriter.Write(validatorMetrics); err != nil {
-			nb.log.Error("Failed to write metrics", "error", err)
+		if validatorMetrics != nil {
+			nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
+			if err := metricsWriter.Write(validatorMetrics); err != nil {
+				nb.log.Error("Failed to write validator metrics", "error", err)
+			}
 		}
 	}()
 
 	benchmark := newValidatorBenchmark(nb.log, *nb.testConfig, validatorClient, l1Chain, nb.proofConfig)
-
 	return benchmark.Run(ctx, payloads, firstTestBlock, metricsCollector)
 }
 
@@ -160,24 +170,29 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
 }
 
 func setupNode(ctx context.Context, l log.Logger, params benchmark.Params, options *config.InternalClientOptions) (types.ExecutionClient, error) {
-	// TODO: serialize these nicer so we can pass them directly
+	if options == nil {
+		return nil, errors.New("client options cannot be nil")
+	}
+
 	nodeType := clients.Geth
 	switch params.NodeType {
 	case "geth":
 		nodeType = clients.Geth
 	case "reth":
 		nodeType = clients.Reth
+	default:
+		return nil, fmt.Errorf("unsupported node type: %s", params.NodeType)
 	}
-	clientLogger := l.With("nodeType", params.NodeType)
 
+	clientLogger := l.With("nodeType", params.NodeType)
 	client := clients.NewClient(nodeType, clientLogger, options)
 
-	fileWriter, err := os.OpenFile(path.Join(options.TestDirPath, ExecutionLayerLogFileName), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	logPath := path.Join(options.TestDirPath, ExecutionLayerLogFileName)
+	fileWriter, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to open log file")
+		return nil, fmt.Errorf("failed to open log file at %s: %w", logPath, err)
 	}
 
-	// wrap loggers with a file writer to output/el-log.log
 	stdoutLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 	stderrLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 
@@ -186,9 +201,8 @@ func setupNode(ctx context.Context, l log.Logger, params benchmark.Params, optio
 		Stderr: stderrLogger,
 	}
 
-	err = client.Run(ctx, runtimeConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to run EL client")
+	if err := client.Run(ctx, runtimeConfig); err != nil {
+		return nil, fmt.Errorf("failed to run execution layer client: %w", err)
 	}
 
 	return client, nil
