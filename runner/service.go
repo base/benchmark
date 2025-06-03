@@ -12,6 +12,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
@@ -332,8 +333,20 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 		}
 	}()
 
+	privKey, err := crypto.HexToECDSA("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse batcher private key")
+	}
+
+	config := &network.TestConfig{
+		Params:     params,
+		Config:     s.config,
+		Genesis:    *genesis,
+		BatcherKey: *privKey,
+	}
+
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, genesis, s.config, proofConfig)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
