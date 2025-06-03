@@ -52,10 +52,12 @@ type NetworkBenchmark struct {
 
 	genesis *core.Genesis
 	config  config.Config
+
+	proofConfig *benchmark.ProofProgramOptions
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client.
-func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, genesis *core.Genesis, config config.Config) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, genesis *core.Genesis, config config.Config, proofConfig *benchmark.ProofProgramOptions) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:              log,
 		sequencerOptions: sequencerOptions,
@@ -63,6 +65,7 @@ func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, sequencer
 		genesis:          genesis,
 		params:           benchParams,
 		config:           config,
+		proofConfig:      proofConfig,
 	}, nil
 }
 
@@ -101,7 +104,7 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 	return client, nil
 }
 
-func makeChain(prefundAddr []common.Address, l2GenesisTimestamp uint64) (*fakel1.FakeL1Chain, error) {
+func makeChain(prefundAddr []common.Address) core.Genesis {
 	zero := uint64(0)
 	alloc := make(ethTypes.GenesisAlloc)
 	for _, addr := range prefundAddr {
@@ -149,14 +152,19 @@ func makeChain(prefundAddr []common.Address, l2GenesisTimestamp uint64) (*fakel1
 		BaseFee:    big.NewInt(1e9),
 	}
 
-	return fakel1.NewFakeL1ChainWithGenesis(&l1Genesis, l2GenesisTimestamp)
+	return l1Genesis
 }
 
-func (nb *NetworkBenchmark) Run(ctx context.Context) error {
+func (nb *NetworkBenchmark) setupL1(ctx context.Context) (*fakel1.FakeL1Chain, *ecdsa.PrivateKey, error) {
+	blobsFolder := path.Join(nb.config.DataDir(), "blobs")
+	if err := os.MkdirAll(blobsFolder, 0755); err != nil {
+		return nil, nil, fmt.Errorf("failed to create blobs folder: %w", err)
+	}
+
 	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
 	batcherKey, err := crypto.ToECDSA(batcherKeyBytes)
 	if err != nil {
-		return fmt.Errorf("failed to convert batcher key bytes to ECDSA: %w", err)
+		return nil, nil, fmt.Errorf("failed to convert batcher key bytes to ECDSA: %w", err)
 	}
 
 	batcherAddr := crypto.PubkeyToAddress(batcherKey.PublicKey)
@@ -165,10 +173,34 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	}
 
 	// use current time as the timestamp to base the L1 chain on
-	l1Chain, err := makeChain(prefundAccts, uint64(time.Now().Add(-time.Minute).Unix()))
+	l1Genesis := makeChain(prefundAccts)
+	l2FirstBlockTime := uint64(time.Now().Add(-time.Minute).Unix())
+
+	chain, err := fakel1.NewFakeL1ChainWithGenesis(blobsFolder, &l1Genesis, l2FirstBlockTime)
 	if err != nil {
-		return fmt.Errorf("failed to make chain: %w", err)
+		return nil, nil, fmt.Errorf("failed to make chain: %w", err)
 	}
+
+	return chain, batcherKey, nil
+}
+
+func (nb *NetworkBenchmark) Run(ctx context.Context) (err error) {
+	var l1Chain *fakel1.FakeL1Chain
+	var batcherKey *ecdsa.PrivateKey
+	if nb.proofConfig != nil {
+		l1Chain, _, err = nb.setupL1(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to setup L1 chain: %w", err)
+		}
+	}
+
+	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
+	batcherKey, err = crypto.ToECDSA(batcherKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to convert batcher key bytes to ECDSA: %w", err)
+	}
+
+	batcherAddr := crypto.PubkeyToAddress(batcherKey.PublicKey)
 	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain, batcherAddr)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)
@@ -181,8 +213,23 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 }
 
 func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) error {
+	if nb.proofConfig == nil {
+		nb.log.Info("Skipping fault proof program benchmark as it is not enabled")
+		return nil
+	}
 
-	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, "./op-program/versions/v1.6.1-rc.1/op-program", l2RPCURL, l1Chain, batcherKey)
+	version := nb.proofConfig.Version
+	if version == "" {
+		return fmt.Errorf("proof_program.version is not set")
+	}
+
+	// ensure binary exists
+	binaryPath := path.Join("op-program", "versions", version, "op-program")
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		return fmt.Errorf("proof program binary does not exist at %s", binaryPath)
+	}
+
+	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, binaryPath, l2RPCURL, l1Chain, batcherKey)
 
 	return opProgram.Run(ctx, payloads, firstTestBlock)
 }
@@ -363,7 +410,6 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *fak
 	headBlockNumber := headBlockHeader.Number.Uint64()
 
 	go func() {
-
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
 			BlockTime: nb.params.BlockTime,
 			GasLimit:  nb.params.GasLimit,

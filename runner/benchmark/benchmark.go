@@ -61,12 +61,12 @@ var DefaultParams = &Params{
 }
 
 // NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
-func NewParamsFromValues(assignments map[ParamType]interface{}) (*Params, error) {
+func NewParamsFromValues(assignments map[string]interface{}) (*Params, error) {
 	params := *DefaultParams
 
 	for k, v := range assignments {
 		switch k {
-		case ParamTypeTxWorkload:
+		case "transaction_workload":
 			if vPtrStr, ok := v.(*string); ok {
 				params.TransactionPayload = TransactionPayload(*vPtrStr)
 			} else if vStr, ok := v.(string); ok {
@@ -74,19 +74,19 @@ func NewParamsFromValues(assignments map[ParamType]interface{}) (*Params, error)
 			} else {
 				return nil, fmt.Errorf("invalid transaction workload %s", v)
 			}
-		case ParamTypeNode:
+		case "node_type":
 			if vStr, ok := v.(string); ok {
 				params.NodeType = vStr
 			} else {
 				return nil, fmt.Errorf("invalid node type %s", v)
 			}
-		case ParamTypeGasLimit:
+		case "gas_limit":
 			if vInt, ok := v.(int); ok {
 				params.GasLimit = uint64(vInt)
 			} else {
 				return nil, fmt.Errorf("invalid gas limit %s", v)
 			}
-		case ParamTypeEnv:
+		case "env":
 			if vStr, ok := v.(string); ok {
 				entries := strings.Split(vStr, ";")
 				params.Env = make(map[string]string)
@@ -100,7 +100,7 @@ func NewParamsFromValues(assignments map[ParamType]interface{}) (*Params, error)
 			} else {
 				return nil, fmt.Errorf("invalid env %s", v)
 			}
-		case ParamTypeNumBlocks:
+		case "num_blocks":
 			if vInt, ok := v.(int); ok {
 				params.NumBlocks = vInt
 			} else {

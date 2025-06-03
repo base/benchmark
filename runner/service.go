@@ -264,7 +264,6 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 }
 
 func (s *service) setupDataDirs(workingDir string, params benchmark.Params, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
-
 	// create temp directory for this test
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
@@ -283,7 +282,17 @@ func (s *service) setupDataDirs(workingDir string, params benchmark.Params, gene
 	return sequencerOptions, validatorOptions, nil
 }
 
-func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition) (*benchmark.BenchmarkRunResult, error) {
+func (s *service) setupBlobsDir(workingDir string) error {
+	// create temp directory for blobs
+	blobsDir := path.Join(workingDir, "blobs")
+	err := os.MkdirAll(blobsDir, 0755)
+	if err != nil {
+		return errors.Wrap(err, "failed to create blobs directory")
+	}
+	return nil
+}
+
+func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions) (*benchmark.BenchmarkRunResult, error) {
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
 	// get genesis block
@@ -303,6 +312,12 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 		return nil, errors.Wrap(err, "failed to setup data dirs")
 	}
 
+	if proofConfig != nil {
+		if err := s.setupBlobsDir(workingDir); err != nil {
+			return nil, errors.Wrap(err, "failed to setup blobs directory")
+		}
+	}
+
 	defer func() {
 		// clean up test directory
 		err := os.RemoveAll(sequencerTestDir)
@@ -318,7 +333,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 	}()
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, genesis, s.config)
+	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, genesis, s.config, proofConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
@@ -409,7 +424,7 @@ func (s *service) Run(ctx context.Context) error {
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot)
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return err

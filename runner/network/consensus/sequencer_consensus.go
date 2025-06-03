@@ -103,16 +103,26 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 
 	timestamp := f.lastTimestamp + 1
 
-	block, err := f.l1Chain.GetBlockByNumber(1)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get block by number: %w", err)
+	number := uint64(0)
+	time := uint64(0)
+	baseFee := big.NewInt(1)
+	blockHash := common.Hash{}
+	if f.l1Chain != nil {
+		block, err := f.l1Chain.GetBlockByNumber(1)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get block by number: %w", err)
+		}
+		number = block.NumberU64()
+		time = block.Time()
+		baseFee = block.BaseFee()
+		blockHash = block.Hash()
 	}
 
 	l1BlockInfo := &derive.L1BlockInfo{
-		Number:              block.NumberU64(),
-		Time:                block.Time(),
-		BaseFee:             block.BaseFee(),
-		BlockHash:           block.Hash(),
+		Number:              number,
+		Time:                time,
+		BaseFee:             baseFee,
+		BlockHash:           blockHash,
 		SequenceNumber:      f.headBlockNumber,
 		BatcherAddr:         f.batcherAddr,
 		BlobBaseFee:         big.NewInt(1),
@@ -156,7 +166,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		sequencerTxsHexBytes[i+1] = hexutil.Bytes(tx)
 	}
 
-	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(block.NumberU64())).Bytes())
+	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(number)).Bytes())
 
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),

@@ -15,6 +15,19 @@ type ClientOptions struct {
 	gethoptions.GethOptions
 }
 
+// InternalProofProgramOptions are options that the user can set when running the proof program.
+type ProofProgramOptions struct {
+	Enabled *bool
+	Version *string
+}
+
+// InternalProofProgramOptions are options that are used internally by the proof program runner.
+type InternalProofProgramOptions struct {
+	ProofProgramOptions
+
+	BlobsDir string
+}
+
 // InternalClientOptions are options that are set internally by the runner.
 type InternalClientOptions struct {
 	ClientOptions

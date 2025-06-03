@@ -168,105 +168,117 @@ func (p *L1ProxyServer) handleRPCRequest(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+func (p *L1ProxyServer) handleGetBlockByHash(ctx context.Context, rawParams json.RawMessage) (json.RawMessage, error) {
+	var params []interface{}
+	if err := json.Unmarshal(rawParams, &params); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal params: %w", err)
+	}
+	if len(params) != 2 {
+		return nil, fmt.Errorf("expected 2 params, got %d", len(params))
+	}
+	blockHash, ok := params[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("expected block hash to be a string, got %T", params[0])
+	}
+
+	includeTxs, ok := params[1].(bool)
+	if !ok {
+		return nil, fmt.Errorf("expected includeTxs to be a bool, got %T", params[1])
+	}
+
+	blockHashBytes, err := hexutil.Decode(blockHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode block hash: %w", err)
+	}
+	block, err := p.chain.GetBlockByHash(common.BytesToHash(blockHashBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block by hash: %w", err)
+	}
+
+	if block == nil {
+		return nil, fmt.Errorf("block not found for hash: %s", blockHash)
+	}
+
+	rpcBlock, err := RPCMarshalBlock(ctx, block, true, includeTxs, p.chainCfg, p.chain)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal block: %w", err)
+	}
+
+	blockJSON, err := json.Marshal(rpcBlock)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal block: %w", err)
+	}
+	return blockJSON, nil
+}
+
+func (p *L1ProxyServer) handleGetBlockByNumber(ctx context.Context, rawParams json.RawMessage) (json.RawMessage, error) {
+	var params []interface{}
+	if err := json.Unmarshal(rawParams, &params); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal params: %w", err)
+	}
+
+	if len(params) != 2 {
+		return nil, fmt.Errorf("expected 2 params, got %d", len(params))
+	}
+
+	blockNumber, ok := params[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("expected block number to be a string, got %T", params[0])
+	}
+	blockNumberInt, err := hexutil.DecodeUint64(blockNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode block number: %w", err)
+	}
+
+	block, err := p.chain.GetBlockByNumber(blockNumberInt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get block by number: %w", err)
+	}
+	blockJSON, err := json.Marshal(block)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal block: %w", err)
+	}
+
+	return blockJSON, nil
+}
+
+func (p *L1ProxyServer) handleGetBlockReceipts(ctx context.Context, rawParams json.RawMessage) (json.RawMessage, error) {
+	var params []interface{}
+	if err := json.Unmarshal(rawParams, &params); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal params: %w", err)
+	}
+
+	if len(params) != 1 {
+		return nil, fmt.Errorf("expected 1 param, got %d", len(params))
+	}
+
+	blockHash, ok := params[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("expected block hash to be a string, got %T", params[0])
+	}
+
+	blockHashBytes, err := hexutil.Decode(blockHash)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode block hash: %w", err)
+	}
+
+	receipts, err := p.chain.GetReceipts(ctx, common.BytesToHash(blockHashBytes))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get receipts: %w", err)
+	}
+
+	return json.Marshal(receipts)
+}
+
 func (p *L1ProxyServer) OverrideRequest(ctx context.Context, method string, rawParams json.RawMessage) (json.RawMessage, error) {
 	p.log.Info("got request", "method", method, "params", string([]byte(rawParams)))
 	switch method {
 	case "eth_getBlockByNumber":
-		var params []interface{}
-		if err := json.Unmarshal(rawParams, &params); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal params: %w", err)
-		}
-
-		if len(params) != 2 {
-			return nil, fmt.Errorf("expected 2 params, got %d", len(params))
-		}
-
-		blockNumber, ok := params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected block number to be a string, got %T", params[0])
-		}
-		blockNumberInt, err := hexutil.DecodeUint64(blockNumber)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode block number: %w", err)
-		}
-
-		block, err := p.chain.GetBlockByNumber(blockNumberInt)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get block by number: %w", err)
-		}
-		blockJSON, err := json.Marshal(block)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal block: %w", err)
-		}
-
-		return blockJSON, nil
+		return p.handleGetBlockByNumber(ctx, rawParams)
 	case "eth_getBlockByHash":
-		var params []interface{}
-		if err := json.Unmarshal(rawParams, &params); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal params: %w", err)
-		}
-		if len(params) != 2 {
-			return nil, fmt.Errorf("expected 2 params, got %d", len(params))
-		}
-		blockHash, ok := params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected block hash to be a string, got %T", params[0])
-		}
-
-		includeTxs, ok := params[1].(bool)
-		if !ok {
-			return nil, fmt.Errorf("expected includeTxs to be a bool, got %T", params[1])
-		}
-
-		blockHashBytes, err := hexutil.Decode(blockHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode block hash: %w", err)
-		}
-		block, err := p.chain.GetBlockByHash(common.BytesToHash(blockHashBytes))
-		if err != nil {
-			return nil, fmt.Errorf("failed to get block by hash: %w", err)
-		}
-
-		if block == nil {
-			return nil, fmt.Errorf("block not found for hash: %s", blockHash)
-		}
-
-		rpcBlock, err := RPCMarshalBlock(ctx, block, true, includeTxs, p.chainCfg, p.chain)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal block: %w", err)
-		}
-
-		blockJSON, err := json.Marshal(rpcBlock)
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal block: %w", err)
-		}
-		return blockJSON, nil
+		return p.handleGetBlockByHash(ctx, rawParams)
 	case "eth_getBlockReceipts":
-		var params []interface{}
-		if err := json.Unmarshal(rawParams, &params); err != nil {
-			return nil, fmt.Errorf("failed to unmarshal params: %w", err)
-		}
-
-		if len(params) != 1 {
-			return nil, fmt.Errorf("expected 1 param, got %d", len(params))
-		}
-
-		blockHash, ok := params[0].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected block hash to be a string, got %T", params[0])
-		}
-
-		blockHashBytes, err := hexutil.Decode(blockHash)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode block hash: %w", err)
-		}
-
-		receipts, err := p.chain.GetReceipts(ctx, common.BytesToHash(blockHashBytes))
-		if err != nil {
-			return nil, fmt.Errorf("failed to get receipts: %w", err)
-		}
-
-		return json.Marshal(receipts)
+		return p.handleGetBlockReceipts(ctx, rawParams)
 	default:
 		return nil, fmt.Errorf("unsupported method: %s", method)
 	}

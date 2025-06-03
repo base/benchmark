@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
-	"os"
 
 	"github.com/base/base-bench/runner/network/blocks"
 	opEth "github.com/ethereum-optimism/optimism/op-service/eth"
@@ -125,15 +124,16 @@ func (f *FakeL1Chain) GetLatestBlock() (*types.Header, error) {
 
 func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 	parent := f.chain.CurrentBlock()
+	timestamp := f.l2GenesisTimestamp + parent.Number.Uint64() + 1
 	header := &types.Header{
 		ParentHash:      parent.Hash(),
 		Coinbase:        parent.Coinbase,
 		Difficulty:      common.Big0,
 		Number:          new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:        parent.GasLimit,
-		Time:            f.l2GenesisTimestamp + parent.Number.Uint64() + 1, // increment by 1 second
+		Time:            timestamp,
 		Extra:           parent.Extra,
-		MixDigest:       common.Hash{}, // TODO: maybe randomize this (prev-randao value)
+		MixDigest:       common.Hash{},
 		WithdrawalsHash: &types.EmptyWithdrawalsHash,
 		RequestsHash:    &types.EmptyRequestsHash,
 	}
@@ -262,14 +262,7 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 	return nil
 }
 
-func NewFakeL1ChainWithGenesis(genesis *core.Genesis, l2GenesisTimestamp uint64) (*FakeL1Chain, error) {
-	// mkdir ./blobs if not exists
-	// TODO: move to a nicer spot
-	tempBlobDir := "./blobs"
-	if err := os.MkdirAll(tempBlobDir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create blobs directory: %w", err)
-	}
-
+func NewFakeL1ChainWithGenesis(blobDir string, genesis *core.Genesis, l2GenesisTimestamp uint64) (*FakeL1Chain, error) {
 	ethCfg := &ethconfig.Config{
 		NetworkId:                 genesis.Config.ChainID.Uint64(),
 		Genesis:                   genesis,
@@ -277,7 +270,7 @@ func NewFakeL1ChainWithGenesis(genesis *core.Genesis, l2GenesisTimestamp uint64)
 		StateScheme:               rawdb.HashScheme,
 		NoPruning:                 true,
 		BlobPool: blobpool.Config{
-			Datadir:   tempBlobDir,
+			Datadir:   blobDir,
 			Datacap:   blobpool.DefaultConfig.Datacap,
 			PriceBump: blobpool.DefaultConfig.PriceBump,
 		},
