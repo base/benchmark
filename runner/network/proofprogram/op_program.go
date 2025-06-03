@@ -125,7 +125,7 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 	if err != nil {
 		return fmt.Errorf("failed to create genesis.json: %w", err)
 	}
-	defer genesisFile.Close()
+	defer func() { _ = genesisFile.Close() }()
 	err = json.NewEncoder(genesisFile).Encode(o.l2Genesis)
 	if err != nil {
 		return fmt.Errorf("failed to encode genesis.json: %w", err)
@@ -136,7 +136,7 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 	if err != nil {
 		return fmt.Errorf("failed to create rollup.json: %w", err)
 	}
-	defer rollupFile.Close()
+	defer func() { _ = rollupFile.Close() }()
 	err = json.NewEncoder(rollupFile).Encode(o.batcher.rollupCfg)
 	if err != nil {
 		return fmt.Errorf("failed to encode rollup.json: %w", err)

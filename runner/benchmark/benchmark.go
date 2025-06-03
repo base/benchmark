@@ -134,7 +134,9 @@ func DefaultDevnetGenesis() *core.Genesis {
 	if err != nil {
 		panic(fmt.Sprintf("failed to open genesis.json: %v", err))
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 
 	if err := json.NewDecoder(f).Decode(&genesis); err != nil {
 		panic(fmt.Sprintf("failed to decode genesis.json: %v", err))
