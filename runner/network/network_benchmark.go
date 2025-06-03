@@ -182,7 +182,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 
 func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) error {
 
-	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, "./op-program", l2RPCURL, l1Chain, batcherKey)
+	opProgram := proofprogram.NewOPProgram(nb.genesis, nb.log, "./op-program/versions/v1.6.1-rc.1/op-program", l2RPCURL, l1Chain, batcherKey)
 
 	return opProgram.Run(ctx, payloads, firstTestBlock)
 }
