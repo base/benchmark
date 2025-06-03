@@ -31,7 +31,8 @@ import (
 )
 
 type FakeL1Chain struct {
-	chain *core.BlockChain
+	chain              *core.BlockChain
+	l2GenesisTimestamp uint64
 
 	l1Signer   types.Signer
 	genesis    *core.Genesis
@@ -142,10 +143,11 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 		Difficulty:      common.Big0,
 		Number:          new(big.Int).Add(parent.Number, common.Big1),
 		GasLimit:        parent.GasLimit,
-		Time:            parent.Time + 1,
+		Time:            f.l2GenesisTimestamp + parent.Number.Uint64() + 1, // increment by 1 second
 		Extra:           parent.Extra,
 		MixDigest:       common.Hash{}, // TODO: maybe randomize this (prev-randao value)
 		WithdrawalsHash: &types.EmptyWithdrawalsHash,
+		RequestsHash:    &types.EmptyRequestsHash,
 	}
 
 	statedb, err := state.New(parent.Root, state.NewDatabase(triedb.NewDatabase(f.l1Database, nil), nil))
@@ -276,7 +278,7 @@ func (f *FakeL1Chain) BuildAndMine(txs []*types.Transaction) error {
 	return nil
 }
 
-func NewFakeL1ChainWithGenesis(genesis *core.Genesis) (*FakeL1Chain, error) {
+func NewFakeL1ChainWithGenesis(genesis *core.Genesis, l2GenesisTimestamp uint64) (*FakeL1Chain, error) {
 	// mkdir ./blobs if not exists
 	// TODO: move to a nicer spot
 	tempBlobDir := "./blobs"
@@ -327,18 +329,19 @@ func NewFakeL1ChainWithGenesis(genesis *core.Genesis) (*FakeL1Chain, error) {
 	}
 
 	l1Chain := &FakeL1Chain{
-		genesis:        genesis,
-		blobStore:      NewBlobStore(),
-		chain:          backend.BlockChain(),
-		l1Signer:       types.NewPragueSigner(genesis.Config.ChainID),
-		log:            log.New("chain", "l1"),
-		l1Database:     backend.ChainDb(),
-		l1BlobSidecars: make([]*types.BlobTxSidecar, 0),
+		genesis:            genesis,
+		blobStore:          NewBlobStore(),
+		chain:              backend.BlockChain(),
+		l1Signer:           types.NewPragueSigner(genesis.Config.ChainID),
+		log:                log.New("chain", "l1"),
+		l1Database:         backend.ChainDb(),
+		l1BlobSidecars:     make([]*types.BlobTxSidecar, 0),
+		l2GenesisTimestamp: l2GenesisTimestamp,
 	}
 
 	err = l1Chain.BuildAndMine([]*types.Transaction{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to build and mine genesis: %w", err)
+		return nil, fmt.Errorf("failed to build and mine L1 genesis: %w", err)
 	}
 
 	return l1Chain, nil

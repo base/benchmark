@@ -56,7 +56,9 @@ func (b *Batcher) CreateSpanBatches(payloads []engine.ExecutableData) ([][]byte,
 	frames := make([][]byte, 0)
 
 	for _, payload := range payloads {
-		block, err := engine.ExecutableDataToBlock(payload, []common.Hash{}, &common.Hash{}, [][]byte{}, blocks.IsthmusBlockType{})
+		root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(1).Bytes())
+
+		block, err := engine.ExecutableDataToBlock(payload, []common.Hash{}, &root, [][]byte{}, blocks.IsthmusBlockType{})
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to convert payload to block")
 		}

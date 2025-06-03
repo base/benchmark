@@ -22,12 +22,12 @@ type L1BlockType struct{}
 
 // HasOptimismWithdrawalsRoot implements types.BlockType.
 func (b L1BlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
-	return false
+	return true
 }
 
 // IsIsthmus implements types.BlockType.
 func (b L1BlockType) IsIsthmus(blkTime uint64) bool {
-	return false
+	return true
 }
 
 var _ types.BlockType = L1BlockType{}

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"time"
 
+	"github.com/base/base-bench/_docs/trie"
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/network/configutil"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
@@ -19,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
@@ -107,15 +109,11 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 	}
 	o.log.Info("Latest L2 block", "number", latestL2Block.Number, "hash", latestL2Block.Hash().Hex())
 
-	l2Head, err := ethClient.HeaderByNumber(ctx, big.NewInt(int64(payloads[len(payloads)-1].Number)))
-	if err != nil {
-		return fmt.Errorf("failed to get l2 head: %w", err)
-	}
-	l2HeadNumber := l2Head.Number
+	l2HeadNumber := payloads[len(payloads)-1].Number
 
-	blockBeforeL2Head, err := ethClient.HeaderByNumber(ctx, new(big.Int).Sub(l2HeadNumber, big.NewInt(1)))
+	blockBeforeL2Head, err := ethClient.HeaderByNumber(ctx, big.NewInt(int64(l2HeadNumber-1)))
 	if err != nil {
-		return fmt.Errorf("failed to get block before l2 head: %w", err)
+		return fmt.Errorf("failed to get block before l2 head %d: %w", big.NewInt(int64(l2HeadNumber-1)), err)
 	}
 
 	l2OutputRoot := eth.OutputRoot(&eth.OutputV0{
@@ -146,24 +144,36 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 		return fmt.Errorf("failed to encode rollup.json: %w", err)
 	}
 
-	l1Head, err := o.chain.GetLatestBlock()
+	l1Head, err := o.chain.GetBlockByNumber(3)
 	if err != nil {
 		return fmt.Errorf("failed to get l1 head: %w", err)
 	}
 
+	expectedClaimBlock, err := ethClient.BlockByNumber(ctx, big.NewInt(int64(l2HeadNumber)))
+	if err != nil {
+		return fmt.Errorf("failed to get expected claim block %d: %w", l2HeadNumber, err)
+	}
+
+	if expectedClaimBlock == nil {
+		return fmt.Errorf("expected claim block %d not found", l2HeadNumber)
+	}
+	claimOutputRoot := eth.OutputRoot(&eth.OutputV0{
+		StateRoot:                eth.Bytes32(expectedClaimBlock.Root()),
+		BlockHash:                expectedClaimBlock.Hash(),
+		MessagePasserStorageRoot: eth.Bytes32(*expectedClaimBlock.WithdrawalsRoot()),
+	})
 	o.chain.PrintChain(o.log)
 
 	// start op-program
-	zeroHash := common.Hash{}
 	cmd := exec.CommandContext(ctx, o.opProgramBin,
 		"--l1", "http://127.0.0.1:8099",
 		"--l1.beacon", "http://127.0.0.1:8099",
-		"--l1.head", l1Head.Hash().Hex(),
 		"--l2", o.l2RPCURL,
-		"--l2.head", l2Head.ParentHash.Hex(),
-		"--l2.blocknumber", l2HeadNumber.String(),
-		"--l2.claim", zeroHash.Hex(),
+		"--l1.head", l1Head.Hash().Hex(),
+		"--l2.head", blockBeforeL2Head.Hash().Hex(),
 		"--l2.outputroot", common.Hash(l2OutputRoot).Hex(),
+		"--l2.blocknumber", fmt.Sprintf("%d", l2HeadNumber),
+		"--l2.claim", common.Hash(claimOutputRoot).Hex(),
 		"--l2.genesis", "genesis.json",
 		"--rollup.config", "rollup.json",
 	)
@@ -172,6 +182,19 @@ func (o *opProgram) Run(ctx context.Context, payloads []engine.ExecutableData, f
 	cmd.Stderr = logger.NewLogWriterWithLevel(o.log, slog.LevelInfo)
 
 	if err = cmd.Run(); err != nil {
+		log.Info("expected claim block", "number", expectedClaimBlock.Number(), "hash", expectedClaimBlock.Hash().Hex(), "root", expectedClaimBlock.Root().Hex(), "l2BlockNumber", l2HeadNumber, "claimOutputRoot", common.Hash(claimOutputRoot).Hex(), "l2OutputRoot", common.Hash(l2OutputRoot).Hex(), "parent", expectedClaimBlock.ParentHash(), "parent_beacon_hash", expectedClaimBlock.BeaconRoot().Hex())
+
+		fmt.Printf("block header: %#+v\n", expectedClaimBlock.Header())
+
+		txs := expectedClaimBlock.Transactions()
+		expectedTxHash := types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil))
+		txData := make([]string, 0, len(txs))
+		for _, tx := range txs {
+			txData = append(txData, tx.Hash().Hex())
+		}
+		fmt.Printf("txs: %v\n", txData)
+		fmt.Printf("expected tx hash: %s\n", expectedTxHash.Hex())
+
 		return fmt.Errorf("failed to run op-program: %w", err)
 	}
 

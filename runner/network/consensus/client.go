@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/base/base-bench/runner/network/blocks"
@@ -83,12 +84,12 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 }
 
 // newPayload calls engine_newPayloadV4 with the given executable data.
-func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
+func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData, beaconRoot common.Hash) error {
 	newParams := *params
 
 	// newParams.WithdrawalsRoot = &common.Hash{}
 
-	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, blocks.IsthmusBlockType{})
+	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &beaconRoot, [][]byte{}, blocks.IsthmusBlockType{})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload to block")
 	}
@@ -98,11 +99,13 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", newParams, []common.Hash{}, common.Hash{}, []common.Hash{})
+	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", newParams, []common.Hash{}, beaconRoot, []common.Hash{})
 
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")
 	}
+
+	fmt.Printf("New payload response: %+v %s\n", resp.PayloadStatus, resp.PayloadStatus.Status)
 
 	return nil
 }

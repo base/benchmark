@@ -25,6 +25,7 @@ import (
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	"github.com/base/base-bench/runner/payload"
 
+	opCrypto "github.com/ethereum-optimism/optimism/op-service/crypto"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -101,7 +102,7 @@ func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params 
 	return client, nil
 }
 
-func makeChain(prefundAddr []common.Address) (*fakel1.FakeL1Chain, error) {
+func makeChain(prefundAddr []common.Address, l2GenesisTimestamp uint64) (*fakel1.FakeL1Chain, error) {
 	zero := uint64(0)
 	alloc := make(ethTypes.GenesisAlloc)
 	for _, addr := range prefundAddr {
@@ -109,6 +110,7 @@ func makeChain(prefundAddr []common.Address) (*fakel1.FakeL1Chain, error) {
 			Balance: new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether)),
 		}
 	}
+	blobSchedule := *params.DefaultBlobSchedule
 	// bigZero := big.NewInt(0)
 	l1Genesis := core.Genesis{
 		Config: &params.ChainConfig{
@@ -130,15 +132,16 @@ func makeChain(prefundAddr []common.Address) (*fakel1.FakeL1Chain, error) {
 			GrayGlacierBlock:    big.NewInt(0),
 			ShanghaiTime:        &zero,
 			CancunTime:          &zero,
+			PragueTime:          &zero,
 			// To enable post-Merge consensus at genesis
 			MergeNetsplitBlock:      big.NewInt(0),
 			TerminalTotalDifficulty: big.NewInt(0),
 			// use default Ethereum prod blob schedules
-			BlobScheduleConfig: params.DefaultBlobSchedule,
+			BlobScheduleConfig: &blobSchedule,
 		},
 		Nonce:      0,
 		Alloc:      alloc,
-		Timestamp:  0,
+		Timestamp:  0, // blocks will have better timestamps
 		ExtraData:  []byte{},
 		GasLimit:   30_000_000,
 		Difficulty: big.NewInt(0),
@@ -147,30 +150,34 @@ func makeChain(prefundAddr []common.Address) (*fakel1.FakeL1Chain, error) {
 		BaseFee:    big.NewInt(1e9),
 	}
 
-	return fakel1.NewFakeL1ChainWithGenesis(&l1Genesis)
-}
+	fmt.Println("L1 Genesis:", l1Genesis.ToBlock().Hash().Hex(), "Timestamp:", l1Genesis.Timestamp)
 
-// generateDeterministicKey generates a deterministic private key using a seeded random source
-func generateDeterministicKey(seed int64) (*ecdsa.PrivateKey, error) {
-	source := rand.New(rand.NewSource(seed))
-
-	return ecdsa.GenerateKey(crypto.S256(), source)
+	return fakel1.NewFakeL1ChainWithGenesis(&l1Genesis, l2GenesisTimestamp)
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	// Generate a deterministic batcher key using the first test block as seed
-	batcherKey, err := generateDeterministicKey(100)
+	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
+	batcherKey, err := crypto.ToECDSA(batcherKeyBytes)
+	if err != nil {
+		return fmt.Errorf("failed to convert batcher key bytes to ECDSA: %w", err)
+	}
+	keyStr := opCrypto.EncodePrivKeyToString(batcherKey)
 	if err != nil {
 		return fmt.Errorf("failed to generate batcher key: %w", err)
 	}
 
+	fmt.Println("Batcher Key:", keyStr)
+
 	batcherAddr := crypto.PubkeyToAddress(batcherKey.PublicKey)
+	fmt.Println("Batcher Address:", batcherAddr.Hex())
 
 	prefundAccts := []common.Address{
 		batcherAddr,
 	}
 
-	l1Chain, err := makeChain(prefundAccts)
+	// use current time as the timestamp to base the L1 chain on
+	l1Chain, err := makeChain(prefundAccts, uint64(time.Now().Add(-time.Minute).Unix()))
 	if err != nil {
 		return fmt.Errorf("failed to make chain: %w", err)
 	}

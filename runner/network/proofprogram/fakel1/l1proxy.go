@@ -169,7 +169,7 @@ func (p *L1ProxyServer) handleRPCRequest(w http.ResponseWriter, r *http.Request)
 }
 
 func (p *L1ProxyServer) OverrideRequest(ctx context.Context, method string, rawParams json.RawMessage) (json.RawMessage, error) {
-	p.log.Info("got request", "method", method, "params", rawParams)
+	p.log.Info("got request", "method", method, "params", string([]byte(rawParams)))
 	switch method {
 	case "eth_getBlockByNumber":
 		var params []interface{}
@@ -225,6 +225,10 @@ func (p *L1ProxyServer) OverrideRequest(ctx context.Context, method string, rawP
 		block, err := p.chain.GetBlockByHash(common.BytesToHash(blockHashBytes))
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block by hash: %w", err)
+		}
+
+		if block == nil {
+			return nil, fmt.Errorf("block not found for hash: %s", blockHash)
 		}
 
 		rpcBlock, err := RPCMarshalBlock(ctx, block, true, includeTxs, p.chainCfg, p.chain)

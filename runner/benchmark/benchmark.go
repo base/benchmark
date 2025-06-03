@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/config"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 type TransactionPayload string
@@ -119,8 +122,13 @@ func (p Params) ClientOptions(prevClientOptions config.ClientOptions) config.Cli
 
 const MAX_GAS_LIMIT = math.MaxUint64
 
+var cachedGenesis *core.Genesis
+
 // DefaultGenesis returns the genesis block for a devnet.
 func DefaultDevnetGenesis() *core.Genesis {
+	if cachedGenesis != nil {
+		return cachedGenesis
+	}
 	// read from genesis.json
 	var genesis core.Genesis
 
@@ -134,6 +142,28 @@ func DefaultDevnetGenesis() *core.Genesis {
 	if err := json.NewDecoder(f).Decode(&genesis); err != nil {
 		panic(fmt.Sprintf("failed to decode genesis.json: %v", err))
 	}
+
+	genesis.Alloc = types.GenesisAlloc{
+		params.HistoryStorageAddress: types.Account{
+			Balance: big.NewInt(0),
+			Nonce:   0,
+			Code:    params.HistoryStorageCode,
+		},
+	}
+
+	f.Close()
+
+	f, err = os.OpenFile("./genesis.json", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		panic(fmt.Sprintf("failed to open genesis.json for writing: %v", err))
+	}
+	if err := json.NewEncoder(f).Encode(&genesis); err != nil {
+		panic(fmt.Sprintf("failed to encode genesis.json: %v", err))
+	}
+
+	// write the genesis file to disk
+
+	cachedGenesis = &genesis
 
 	return &genesis
 }

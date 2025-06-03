@@ -6,8 +6,8 @@
         - transfer-only
     - type: node_type
       values:
-        # - geth
-        - reth
+        - geth
+        # - reth
     - type: num_blocks
       value: 2
     - type: gas_limit

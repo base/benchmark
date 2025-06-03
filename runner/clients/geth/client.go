@@ -63,6 +63,8 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	// first init geth
 	args := make([]string, 0)
 	args = append(args, "--datadir", g.options.DataDirPath)
+	args = append(args, "--state.scheme", "hash")
+
 	args = append(args, "init", g.options.ChainCfgPath)
 
 	cmd := exec.CommandContext(ctx, g.options.GethBin, args...)
@@ -92,7 +94,9 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--txpool.accountqueue", "1000000")
 	args = append(args, "--maxpeers", "0")
 	args = append(args, "--nodiscover")
-	args = append(args, "--http.api", "eth,net,web3,miner")
+	args = append(args, "--syncmode", "full")
+	args = append(args, "--http.api", "eth,net,web3,miner,debug")
+	args = append(args, "--gcmode", "archive")
 	args = append(args, "--authrpc.jwtsecret", g.options.JWTSecretPath)
 
 	// TODO: make this configurable
