@@ -45,7 +45,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						Values:    []interface{}{"simple", "complex"},
 					},
 					{
-						ParamType: "transaction_workload",
+						ParamType: "node_type",
 						Values:    []interface{}{"geth", "erigon"},
 					},
 				},
@@ -108,7 +108,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: "transaction_workload",
+						ParamType: "node_type",
 						Value:     stringPtr("geth"),
 					},
 				},

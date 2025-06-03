@@ -153,7 +153,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, er
 	}
 
 	// default to enabled if not set but defined
-	proofProgramEnabled := !(c.ProofProgram == nil || (c.ProofProgram.Enabled != nil && !(*c.ProofProgram.Enabled)))
+	proofProgramEnabled := c.ProofProgram != nil && (c.ProofProgram.Enabled == nil || (*c.ProofProgram.Enabled))
 	var proofProgram *ProofProgramOptions
 	if proofProgramEnabled {
 		proofProgram = &ProofProgramOptions{
