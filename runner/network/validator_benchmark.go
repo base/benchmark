@@ -11,7 +11,6 @@ import (
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/consensus"
-	"github.com/base/base-bench/runner/network/proofprogram"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
@@ -54,9 +53,9 @@ func (vb *validatorBenchmark) benchmarkFaultProofProgram(ctx context.Context, pa
 		return fmt.Errorf("proof program binary does not exist at %s", binaryPath)
 	}
 
-	opProgram := proofprogram.NewOPProgram(&vb.config.Genesis, vb.log, binaryPath, vb.validatorClient.ClientURL(), l1Chain, batcherKey)
+	opProgramBenchmark := NewOPProgramBenchmark(&vb.config.Genesis, vb.log, binaryPath, vb.validatorClient.ClientURL(), l1Chain, batcherKey)
 
-	return opProgram.Run(ctx, payloads, firstTestBlock)
+	return opProgramBenchmark.Run(ctx, payloads, firstTestBlock)
 }
 
 func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, metricsCollector metrics.MetricsCollector) error {

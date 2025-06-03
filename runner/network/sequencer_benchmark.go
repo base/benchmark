@@ -142,7 +142,8 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		mempool, worker, err = payload.NewTransferPayloadWorker(
 			ctx, nb.log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis)
 	case strings.HasPrefix(string(payloadType), "contract"):
-		payloadConfig, err := payload.ValidateContractPayload(payloadType, config.ConfigPath())
+		var payloadConfig payload.ContractPayloadWorkerConfig
+		payloadConfig, err = payload.ValidateContractPayload(payloadType, config.ConfigPath())
 		if err != nil {
 			return nil, 0, err
 		}

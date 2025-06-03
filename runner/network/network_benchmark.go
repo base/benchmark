@@ -14,8 +14,6 @@ import (
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
-	"github.com/base/base-bench/runner/network/proofprogram"
-	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -86,28 +84,6 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("failed to run validator: %w", err)
 	}
 	return nil
-}
-
-func (nb *NetworkBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l2RPCURL string, l1Chain *fakel1.FakeL1Chain, batcherKey *ecdsa.PrivateKey) error {
-	if nb.proofConfig == nil {
-		nb.log.Info("Skipping fault proof program benchmark as it is not enabled")
-		return nil
-	}
-
-	version := nb.proofConfig.Version
-	if version == "" {
-		return fmt.Errorf("proof_program.version is not set")
-	}
-
-	// ensure binary exists
-	binaryPath := path.Join("op-program", "versions", version, "op-program")
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
-		return fmt.Errorf("proof program binary does not exist at %s", binaryPath)
-	}
-
-	opProgram := proofprogram.NewOPProgram(&nb.testConfig.Genesis, nb.log, binaryPath, l2RPCURL, l1Chain, batcherKey)
-
-	return opProgram.Run(ctx, payloads, firstTestBlock)
 }
 
 func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, error) {
