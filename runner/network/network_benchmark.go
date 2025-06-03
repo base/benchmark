@@ -70,15 +70,22 @@ func NewNetworkBenchmark(config *TestConfig, log log.Logger, sequencerOptions *c
 }
 
 func (nb *NetworkBenchmark) Run(ctx context.Context) (err error) {
-	l1Chain, err := newL1Chain(nb.testConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create L1 chain: %w", err)
+	// create an L1 chain in case we want to run a fault proof benchmark
+	var l1Chain *l1Chain
+	if nb.proofConfig != nil {
+		l1Chain, err = newL1Chain(nb.testConfig)
+		if err != nil {
+			return fmt.Errorf("failed to create L1 chain: %w", err)
+		}
 	}
 
+	// benchmark the sequencer first to build payloads
 	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer: %w", err)
 	}
+
+	// then benchmark the validator to sync the payloads (also handles fpp benchmark)
 	err = nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, &nb.testConfig.BatcherKey)
 	if err != nil {
 		return fmt.Errorf("failed to run validator: %w", err)
