@@ -2,32 +2,24 @@ package network
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"fmt"
-	"math/big"
-	"math/rand"
 	"os"
 	"path"
-	"strings"
-	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
-	"github.com/ethereum-optimism/optimism/op-service/retry"
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
-	"github.com/base/base-bench/runner/network/consensus"
-	"github.com/base/base-bench/runner/network/mempool"
-	"github.com/base/base-bench/runner/payload"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
 )
 
@@ -35,10 +27,28 @@ const (
 	ExecutionLayerLogFileName = "el.log"
 )
 
-// NetworkBenchmark handles the lifecycle for a single benchmark run.
+// TestConfig holds all configuration needed for a benchmark test
+type TestConfig struct {
+	Params     benchmark.Params
+	Config     config.Config
+	Genesis    core.Genesis
+	BatcherKey ecdsa.PrivateKey
+	// BatcherAddr is lazily initialized to avoid unnecessary computation
+	batcherAddr *common.Address
+}
+
+// BatcherAddr returns the batcher address, computing it if necessary
+func (c *TestConfig) BatcherAddr() common.Address {
+	if c.batcherAddr == nil {
+		batcherAddr := crypto.PubkeyToAddress(c.BatcherKey.PublicKey)
+		c.batcherAddr = &batcherAddr
+	}
+	return *c.batcherAddr
+}
+
+// NetworkBenchmark handles the lifecycle for a single benchmark run
 type NetworkBenchmark struct {
-	log    log.Logger
-	params benchmark.Params
+	log log.Logger
 
 	sequencerOptions *config.InternalClientOptions
 	validatorOptions *config.InternalClientOptions
@@ -46,352 +56,101 @@ type NetworkBenchmark struct {
 	collectedSequencerMetrics *benchmark.SequencerKeyMetrics
 	collectedValidatorMetrics *benchmark.ValidatorKeyMetrics
 
-	genesis *core.Genesis
-	config  config.Config
+	testConfig  *TestConfig
+	proofConfig *benchmark.ProofProgramOptions
 }
 
-// NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client.
-func NewNetworkBenchmark(log log.Logger, benchParams benchmark.Params, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, genesis *core.Genesis, config config.Config) (*NetworkBenchmark, error) {
+// NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
+func NewNetworkBenchmark(config *TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:              log,
 		sequencerOptions: sequencerOptions,
 		validatorOptions: validatorOptions,
-		genesis:          genesis,
-		params:           benchParams,
-		config:           config,
+		testConfig:       config,
+		proofConfig:      proofConfig,
 	}, nil
 }
 
-func (nb *NetworkBenchmark) setupNode(ctx context.Context, l log.Logger, params benchmark.Params, options *config.InternalClientOptions) (types.ExecutionClient, error) {
-	// TODO: serialize these nicer so we can pass them directly
-	nodeType := clients.Geth
-	switch params.NodeType {
-	case "geth":
-		nodeType = clients.Geth
-	case "reth":
-		nodeType = clients.Reth
-	}
-	clientLogger := l.With("nodeType", params.NodeType)
-
-	client := clients.NewClient(nodeType, clientLogger, options)
-
-	fileWriter, err := os.OpenFile(path.Join(options.TestDirPath, ExecutionLayerLogFileName), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open log file")
-	}
-
-	// wrap loggers with a file writer to output/el-log.log
-	stdoutLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
-	stderrLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
-
-	runtimeConfig := &types.RuntimeConfig{
-		Stdout: stdoutLogger,
-		Stderr: stderrLogger,
-	}
-
-	err = client.Run(ctx, runtimeConfig)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to run EL client")
-	}
-
-	return client, nil
-}
-
+// Run executes the benchmark test
 func (nb *NetworkBenchmark) Run(ctx context.Context) error {
-	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx)
-	if err != nil {
-		return err
-	}
-	return nb.benchmarkValidator(ctx, payloads, firstTestBlock)
-}
-
-func (nb *NetworkBenchmark) fundTestAccount(ctx context.Context, mempool mempool.FakeMempool, client types.ExecutionClient, amount *big.Int) error {
-	nb.log.Info("Funding test account")
-
-	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-	addr := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
-
-	// fund the test account if needed (check if the account has a balance)
-	balance, err := client.Client().BalanceAt(ctx, addr, nil)
-	if err != nil {
-		nb.log.Warn("failed to get balance", "err", err)
-		return err
-	}
-
-	blockNumber := uint64(0)
-	blockHeader, err := client.Client().HeaderByNumber(ctx, nil)
-	if err != nil {
-		nb.log.Warn("failed to get block header", "err", err)
-		return err
-	}
-	blockNumber = blockHeader.Number.Uint64()
-
-	random := rand.New(rand.NewSource(int64(blockNumber)))
-	randomHash := common.BigToHash(big.NewInt(random.Int63()))
-
-	// if balance is already good, return
-	if balance.Cmp(amount) >= 0 {
-		return nil
-	}
-
-	depositTx := ethTypes.NewTx(
-		&ethTypes.DepositTx{
-			From:                common.Address{1},
-			To:                  &addr,
-			SourceHash:          randomHash,
-			IsSystemTransaction: false,
-			Mint:                amount,
-			Value:               amount,
-			Gas:                 210000,
-			Data:                []byte{},
-		},
-	)
-
-	txHash := depositTx.Hash()
-
-	mempool.AddTransactions([]*ethTypes.Transaction{depositTx})
-
-	// wait for the transaction to be mined
-	receipt, err := retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*ethTypes.Receipt, error) {
-		receipt, err := client.Client().TransactionReceipt(ctx, txHash)
+	// Create an L1 chain if needed for fault proof benchmark
+	var l1Chain *l1Chain
+	if nb.proofConfig != nil {
+		var err error
+		l1Chain, err = newL1Chain(nb.testConfig)
 		if err != nil {
-			return nil, err
+			return fmt.Errorf("failed to create L1 chain: %w", err)
 		}
-		return receipt, nil
-	})
-	nb.log.Info("Included deposit tx in block", "block", receipt.BlockNumber)
-	if err != nil {
-		return fmt.Errorf("failed to get transaction receipt: %w", err)
-	}
-	if receipt.Status != 1 {
-		return fmt.Errorf("transaction failed with status: %d", receipt.Status)
 	}
 
-	// ensure balance
-	balance, err = client.Client().BalanceAt(ctx, addr, nil)
+	// Benchmark the sequencer first to build payloads
+	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
-		return fmt.Errorf("failed to get balance: %w", err)
+		return fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
-	if balance.Cmp(amount) < 0 {
-		nb.log.Warn("balance is not equal to amount", "balance", balance, "amount", amount)
-		return errors.New("balance is not equal to amount")
+
+	// Benchmark the validator to sync the payloads
+	if err := nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain); err != nil {
+		return fmt.Errorf("failed to run validator benchmark: %w", err)
 	}
-	nb.log.Info("funded test account", "balance", balance, "account", addr.Hex())
 
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context) ([]engine.ExecutableData, uint64, error) {
-	sequencerClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.sequencerOptions)
+func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, error) {
+	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.sequencerOptions)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to setup sequencer node: %w", err)
 	}
 
+	// Ensure client is stopped even if benchmark fails
 	defer sequencerClient.Stop()
 
 	// Create metrics collector and writer
-	metricsCollector := metrics.NewMetricsCollector(nb.log, sequencerClient.Client(), nb.params.NodeType, sequencerClient.MetricsPort())
+	metricsCollector := metrics.NewMetricsCollector(nb.log, sequencerClient.Client(), nb.testConfig.Params.NodeType, sequencerClient.MetricsPort())
 	metricsWriter := metrics.NewFileMetricsWriter(nb.sequencerOptions.MetricsPath)
 
+	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		sequencerMetrics := metricsCollector.GetMetrics()
-
-		nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
-
-		if err := metricsWriter.Write(sequencerMetrics); err != nil {
-			nb.log.Error("Failed to write metrics", "error", err)
+		if sequencerMetrics != nil {
+			nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
+			if err := metricsWriter.Write(sequencerMetrics); err != nil {
+				nb.log.Error("Failed to write sequencer metrics", "error", err)
+			}
 		}
 	}()
 
-	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
-	privateKey := common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
-	var mempool mempool.FakeMempool
-	var worker payload.Worker
-
-	payloadType := nb.params.TransactionPayload
-
-	switch {
-	case payloadType == "tx-fuzz":
-		nb.log.Info("Running tx-fuzz payload")
-		mempool, worker, err = payload.NewTxFuzzPayloadWorker(
-			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.config.TxFuzzBinary())
-	case payloadType == "transfer-only":
-		mempool, worker, err = payload.NewTransferPayloadWorker(
-			ctx, nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, nb.genesis)
-	case strings.HasPrefix(string(payloadType), "contract"):
-		var config payload.ContractPayloadWorkerConfig
-		config, err = payload.ValidateContractPayload(payloadType, nb.config.ConfigPath())
-		if err != nil {
-			return nil, 0, err
-		}
-
-		mempool, worker, err = payload.NewContractPayloadWorker(
-			nb.log, sequencerClient.ClientURL(), nb.params, privateKey, amount, config, nb.genesis)
-	default:
-		return nil, 0, errors.New("invalid payload type")
-	}
-
-	if err != nil {
-		return nil, 0, err
-	}
-
-	defer func() {
-		err := worker.Stop(ctx)
-		if err != nil {
-			nb.log.Warn("failed to stop payload worker", "err", err)
-		}
-	}()
-
-	benchmarkCtx, benchmarkCancel := context.WithCancel(ctx)
-	defer benchmarkCancel()
-
-	errChan := make(chan error)
-	payloadResult := make(chan []engine.ExecutableData)
-
-	setupComplete := make(chan struct{})
-
-	go func() {
-		err := nb.fundTestAccount(benchmarkCtx, mempool, sequencerClient, amount)
-		if err != nil {
-			nb.log.Warn("failed to fund test account", "err", err)
-			errChan <- err
-			return
-		}
-
-		err = worker.Setup(benchmarkCtx)
-		if err != nil {
-			nb.log.Warn("failed to setup payload worker", "err", err)
-			errChan <- err
-			return
-		}
-		close(setupComplete)
-	}()
-
-	var lastSetupBlock uint64
-
-	headBlockHeader, err := sequencerClient.Client().HeaderByNumber(ctx, nil)
-	if err != nil {
-		nb.log.Warn("failed to get head block header", "err", err)
-		return nil, 0, err
-	}
-	headBlockHash := headBlockHeader.Hash()
-	headBlockNumber := headBlockHeader.Number.Uint64()
-
-	go func() {
-
-		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
-			BlockTime: nb.params.BlockTime,
-			GasLimit:  nb.params.GasLimit,
-		}, headBlockHash, headBlockNumber)
-
-		payloads := make([]engine.ExecutableData, 0)
-
-		// setup blocks
-		blockNum := uint64(0)
-
-	setupLoop:
-		for {
-			_blockMetrics := metrics.NewBlockMetrics(blockNum)
-			payload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			payloads = append(payloads, *payload)
-			blockNum = payload.Number
-			select {
-			case <-setupComplete:
-				break setupLoop
-			default:
-			}
-		}
-
-		lastSetupBlock = payloads[len(payloads)-1].Number
-		nb.log.Info("Last setup block", "block", lastSetupBlock)
-
-		// run for a few blocks
-		for i := 0; i < nb.params.NumBlocks; i++ {
-			blockMetrics := metrics.NewBlockMetrics(uint64(i))
-			err := worker.SendTxs(benchmarkCtx)
-			if err != nil {
-				nb.log.Warn("failed to send transactions", "err", err)
-				errChan <- err
-				return
-			}
-
-			payload, err := consensusClient.Propose(benchmarkCtx, blockMetrics)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			if payload == nil {
-				errChan <- errors.New("received nil payload from consensus client")
-				return
-			}
-
-			time.Sleep(1000 * time.Millisecond)
-
-			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
-			if err != nil {
-				nb.log.Error("Failed to collect metrics", "error", err)
-			}
-			payloads = append(payloads, *payload)
-		}
-		payloadResult <- payloads
-	}()
-
-	select {
-	case err := <-errChan:
-		return nil, 0, err
-	case payloads := <-payloadResult:
-		return payloads, lastSetupBlock + 1, nil
-	}
+	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain)
+	return benchmark.Run(ctx, metricsCollector)
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {
-	validatorClient, err := nb.setupNode(ctx, nb.log, nb.params, nb.validatorOptions)
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain) error {
+	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to setup validator node: %w", err)
 	}
 
+	// Ensure client is stopped even if benchmark fails
 	defer validatorClient.Stop()
 
 	// Create metrics collector and writer
-	metricsCollector := metrics.NewMetricsCollector(nb.log, validatorClient.Client(), nb.params.NodeType, validatorClient.MetricsPort())
+	metricsCollector := metrics.NewMetricsCollector(nb.log, validatorClient.Client(), nb.testConfig.Params.NodeType, validatorClient.MetricsPort())
 	metricsWriter := metrics.NewFileMetricsWriter(nb.validatorOptions.MetricsPath)
 
+	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		validatorMetrics := metricsCollector.GetMetrics()
-
-		nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
-
-		if err := metricsWriter.Write(validatorMetrics); err != nil {
-			nb.log.Error("Failed to write metrics", "error", err)
+		if validatorMetrics != nil {
+			nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
+			if err := metricsWriter.Write(validatorMetrics); err != nil {
+				nb.log.Error("Failed to write validator metrics", "error", err)
+			}
 		}
 	}()
 
-	headBlockHeader, err := validatorClient.Client().HeaderByNumber(ctx, nil)
-	if err != nil {
-		nb.log.Warn("failed to get head block header", "err", err)
-	}
-	headBlockHash := headBlockHeader.Hash()
-	headBlockNumber := headBlockHeader.Number.Uint64()
-
-	consensusClient := consensus.NewSyncingConsensusClient(nb.log, validatorClient.Client(), validatorClient.AuthClient(), consensus.ConsensusClientOptions{
-		BlockTime: nb.params.BlockTime,
-	}, headBlockHash, headBlockNumber)
-
-	err = consensusClient.Start(ctx, payloads, metricsCollector, firstTestBlock)
-	if err != nil {
-		if errors.Is(err, context.Canceled) {
-			return err
-		}
-		nb.log.Warn("failed to run consensus client", "err", err)
-		return err
-	}
-	return nil
+	benchmark := newValidatorBenchmark(nb.log, *nb.testConfig, validatorClient, l1Chain, nb.proofConfig)
+	return benchmark.Run(ctx, payloads, firstTestBlock, metricsCollector)
 }
 
 func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
@@ -404,4 +163,43 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
 		ValidatorMetrics: *nb.collectedValidatorMetrics,
 		Success:          true,
 	}, nil
+}
+
+func setupNode(ctx context.Context, l log.Logger, params benchmark.Params, options *config.InternalClientOptions) (types.ExecutionClient, error) {
+	if options == nil {
+		return nil, errors.New("client options cannot be nil")
+	}
+
+	var nodeType clients.Client
+	switch params.NodeType {
+	case "geth":
+		nodeType = clients.Geth
+	case "reth":
+		nodeType = clients.Reth
+	default:
+		return nil, fmt.Errorf("unsupported node type: %s", params.NodeType)
+	}
+
+	clientLogger := l.With("nodeType", params.NodeType)
+	client := clients.NewClient(nodeType, clientLogger, options)
+
+	logPath := path.Join(options.TestDirPath, ExecutionLayerLogFileName)
+	fileWriter, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file at %s: %w", logPath, err)
+	}
+
+	stdoutLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
+	stderrLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
+
+	runtimeConfig := &types.RuntimeConfig{
+		Stdout: stdoutLogger,
+		Stderr: stderrLogger,
+	}
+
+	if err := client.Run(ctx, runtimeConfig); err != nil {
+		return nil, fmt.Errorf("failed to run execution layer client: %w", err)
+	}
+
+	return client, nil
 }

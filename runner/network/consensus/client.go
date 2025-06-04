@@ -8,10 +8,11 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
+
+	"github.com/base/base-bench/runner/network/types"
 )
 
 // ConsensusClientOptions is an object for configuring a ConsensusClient.
@@ -48,21 +49,6 @@ func NewBaseConsensusClient(log log.Logger, client *ethclient.Client, authClient
 	}
 }
 
-// BasicBlockType implements what chain config would usually implement.
-type basicBlockType struct{}
-
-// HasOptimismWithdrawalsRoot implements types.BlockType.
-func (b basicBlockType) HasOptimismWithdrawalsRoot(blkTime uint64) bool {
-	return true
-}
-
-// IsIsthmus implements types.BlockType.
-func (b basicBlockType) IsIsthmus(blkTime uint64) bool {
-	return true
-}
-
-var _ types.BlockType = basicBlockType{}
-
 func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs *eth.PayloadAttributes) (*eth.PayloadID, error) {
 	fcu := engine.ForkchoiceStateV1{
 		HeadBlockHash:      f.headBlockHash,
@@ -98,12 +84,12 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 }
 
 // newPayload calls engine_newPayloadV4 with the given executable data.
-func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData) error {
+func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData, beaconRoot common.Hash) error {
 	newParams := *params
 
 	// newParams.WithdrawalsRoot = &common.Hash{}
 
-	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &common.Hash{}, [][]byte{}, basicBlockType{})
+	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &beaconRoot, [][]byte{}, types.IsthmusBlockType{})
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload to block")
 	}
@@ -113,7 +99,7 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", newParams, []common.Hash{}, common.Hash{}, []common.Hash{})
+	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", newParams, []common.Hash{}, beaconRoot, []common.Hash{})
 
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")

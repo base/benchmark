@@ -12,6 +12,8 @@ import (
 	"path"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
@@ -332,8 +334,21 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 		}
 	}()
 
+	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
+	batcherKey, err := crypto.ToECDSA(batcherKeyBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create batcher key")
+	}
+
+	config := &network.TestConfig{
+		Params:     params,
+		Config:     s.config,
+		Genesis:    *genesis,
+		BatcherKey: *batcherKey,
+	}
+
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(s.log, params, sequencerOptions, validatorOptions, genesis, s.config)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
