@@ -10,6 +10,7 @@ import (
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/payload"
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
@@ -36,16 +37,19 @@ type NetworkBenchmark struct {
 
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
+
+	transactionPayload payload.Definition
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
-func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
-		log:              log,
-		sequencerOptions: sequencerOptions,
-		validatorOptions: validatorOptions,
-		testConfig:       config,
-		proofConfig:      proofConfig,
+		log:                log,
+		sequencerOptions:   sequencerOptions,
+		validatorOptions:   validatorOptions,
+		testConfig:         config,
+		proofConfig:        proofConfig,
+		transactionPayload: transactionPayload,
 	}, nil
 }
 
@@ -99,7 +103,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 		}
 	}()
 
-	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain)
+	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain, nb.transactionPayload)
 	return benchmark.Run(ctx, metricsCollector)
 }
 
@@ -143,7 +147,7 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
 	}, nil
 }
 
-func setupNode(ctx context.Context, l log.Logger, params benchmark.Params, options *config.InternalClientOptions) (types.ExecutionClient, error) {
+func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, options *config.InternalClientOptions) (types.ExecutionClient, error) {
 	if options == nil {
 		return nil, errors.New("client options cannot be nil")
 	}

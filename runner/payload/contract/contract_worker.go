@@ -4,103 +4,56 @@ import (
 	"context"
 	"crypto/ecdsa"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
-	"path/filepath"
-	"strconv"
-	"strings"
+	"path"
 	"time"
 
-	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/network/mempool"
+	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/pkg/errors"
 )
 
-type contractPayloadWorkerConfig struct {
-	Bytecode          []byte
-	FunctionSignature string
-	Input1            string
-	Calldata          []byte
-	CallsPerBlock     int
-}
-
-func validateContractPayload(payloadType benchmark.TransactionPayload, configDir string) (contractPayloadWorkerConfig, error) {
-	selectors := strings.Split(string(payloadType), ":")
-
-	if len(selectors) != 6 {
-		return contractPayloadWorkerConfig{}, errors.New("invalid contract payload type")
-	}
-
-	var callsPerBlock int
-	callsPerBlock, err := strconv.Atoi(selectors[1])
-	if err != nil {
-		return contractPayloadWorkerConfig{}, errors.New("invalid calls per block")
-	}
-
-	functionSignature := selectors[2]
-	input1 := selectors[3]
-
-	calldata := common.FromHex(selectors[4])
-
-	bytecodeFile := selectors[5]
-
-	dir := filepath.Dir(configDir)
-
-	bytecodePath := filepath.Join(dir, bytecodeFile)
-	log.Info("loading bytecode from", "path", bytecodePath)
-
-	bytecodeHex, err := os.ReadFile(bytecodePath)
-	if err != nil {
-		return contractPayloadWorkerConfig{}, errors.New("failed to read bytecode file")
-	}
-	bytecode := common.FromHex(string(bytecodeHex))
-
-	config := contractPayloadWorkerConfig{
-		Bytecode:          bytecode,
-		FunctionSignature: functionSignature,
-		Input1:            input1,
-		Calldata:          calldata,
-		CallsPerBlock:     callsPerBlock,
-	}
-	return config, nil
+type ContractPayloadDefinition struct {
+	ContractBytecode  string `yaml:"contract_bytecode"`
+	FunctionSignature string `yaml:"function_signature"`
+	GasPerTx          string `yaml:"gas_per_tx"`
+	Calldata          string `yaml:"calldata"`
+	CallsPerBlock     int    `yaml:"calls_per_block"`
 }
 
 type contractPayloadWorker struct {
-	contractPayloadWorkerConfig
-
 	log log.Logger
 
 	contractAddress common.Address
 
-	params  benchmark.Params
-	chainID *big.Int
-	client  *ethclient.Client
+	runParams benchtypes.RunParams
+	params    ContractPayloadDefinition
+	chainID   *big.Int
+	client    *ethclient.Client
 
 	prefundedAccount *ecdsa.PrivateKey
 	prefundAmount    *big.Int
 
 	mempool *mempool.StaticWorkloadMempool
 	nonce   uint64
+
+	config config.Config
 }
 
-func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, payloadType benchmark.TransactionPayload, config config.Config) (worker.Worker, error) {
-
-	payloadConfig, err := validateContractPayload(payloadType, config.ConfigPath())
-	if err != nil {
-		return nil, err
-	}
-
+func NewContractPayloadWorker(log log.Logger, elRPCURL string, runParams benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, config config.Config, params interface{}) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)
@@ -110,15 +63,25 @@ func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.
 
 	chainID := genesis.Config.ChainID
 
+	if params == nil {
+		return nil, fmt.Errorf("transaction payload params are missing, but required for contract payload worker")
+	}
+
+	payloadConfig, ok := (params).(*ContractPayloadDefinition)
+	if !ok {
+		return nil, fmt.Errorf("invalid contract transaction payload: %#v", params)
+	}
+
 	t := &contractPayloadWorker{
-		log:                         log,
-		client:                      client,
-		mempool:                     mempool,
-		params:                      params,
-		chainID:                     chainID,
-		prefundedAccount:            &prefundedPrivateKey,
-		prefundAmount:               prefundAmount,
-		contractPayloadWorkerConfig: payloadConfig,
+		log:              log,
+		client:           client,
+		mempool:          mempool,
+		runParams:        runParams,
+		chainID:          chainID,
+		prefundedAccount: &prefundedPrivateKey,
+		prefundAmount:    prefundAmount,
+		params:           *payloadConfig,
+		config:           config,
 	}
 
 	return t, nil
@@ -151,7 +114,25 @@ func (t *contractPayloadWorker) deployContract(ctx context.Context) error {
 
 	amount := big.NewInt(0)
 
-	tx_unsigned := types.NewContractCreation(nonce, amount, gasLimit, gasPrice, t.Bytecode)
+	configDir := path.Dir(t.config.ConfigPath())
+	bytecodePath := path.Join(configDir, t.params.ContractBytecode)
+	bytecodeFile, err := os.Open(bytecodePath)
+	if err != nil {
+		return fmt.Errorf("failed to open contract bytecode file: %w", err)
+	}
+	defer func() { _ = bytecodeFile.Close() }()
+
+	bytecodeHex, err := io.ReadAll(bytecodeFile)
+	if err != nil {
+		return fmt.Errorf("failed to read contract bytecode: %w", err)
+	}
+
+	bytecode, err := hexutil.Decode(string(bytecodeHex))
+	if err != nil {
+		return fmt.Errorf("failed to decode contract bytecode: %w", err)
+	}
+
+	tx_unsigned := types.NewContractCreation(nonce, amount, gasLimit, gasPrice, bytecode)
 
 	signer := types.LatestSignerForChainID(t.chainID)
 
@@ -237,20 +218,24 @@ func (t *contractPayloadWorker) sendContractTx(ctx context.Context) error {
 		return fmt.Errorf("failed to get nonce: %w", err)
 	}
 
-	gasLimit := new(big.Int).Mul(big.NewInt(int64(t.params.GasLimit)), big.NewInt(95))
-	gasLimit = gasLimit.Div(gasLimit, big.NewInt(int64(t.CallsPerBlock)))
+	gasLimit := new(big.Int).Mul(big.NewInt(int64(t.runParams.GasLimit)), big.NewInt(95))
+	gasLimit = gasLimit.Div(gasLimit, big.NewInt(int64(t.params.CallsPerBlock)))
 	gasLimit = gasLimit.Div(gasLimit, big.NewInt(100))
 
-	funcSelector := crypto.Keccak256([]byte(t.FunctionSignature))[:4]
+	funcSelector := crypto.Keccak256([]byte(t.params.FunctionSignature))[:4]
 
 	value := new(big.Int)
-	value, success := value.SetString(t.Input1, 10)
+	value, success := value.SetString(t.params.GasPerTx, 10)
 
 	if !success {
-		return fmt.Errorf("failed to parse input1 as big.Int: %s", t.Input1)
+		return fmt.Errorf("failed to parse gas per tx as big.Int: %s", t.params.GasPerTx)
 	}
 
-	bytesData := t.Calldata
+	bytesHex := t.params.Calldata
+	bytesData, err := hexutil.Decode(bytesHex)
+	if err != nil {
+		return fmt.Errorf("failed to decode calldata: %w", err)
+	}
 
 	uint256Type, _ := abi.NewType("uint256", "", nil)
 	bytesType, _ := abi.NewType("bytes", "", nil)
@@ -289,7 +274,7 @@ func (t *contractPayloadWorker) sendContractTx(ctx context.Context) error {
 }
 
 func (t *contractPayloadWorker) SendTxs(ctx context.Context) error {
-	for i := 0; i < t.CallsPerBlock; i++ {
+	for i := 0; i < t.params.CallsPerBlock; i++ {
 		err := t.sendContractTx(ctx)
 
 		if err != nil {

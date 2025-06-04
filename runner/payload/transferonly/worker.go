@@ -9,8 +9,8 @@ import (
 
 	"math/rand"
 
-	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
+	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
@@ -25,6 +25,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+type TransferOnlyPayloadDefinition struct {
+}
+
 type transferOnlyPayloadWorker struct {
 	log log.Logger
 
@@ -33,7 +36,7 @@ type transferOnlyPayloadWorker struct {
 	nextNonce   map[common.Address]uint64
 	balance     map[common.Address]*big.Int
 
-	params  benchmark.Params
+	params  benchtypes.RunParams
 	chainID *big.Int
 	client  *ethclient.Client
 
@@ -45,7 +48,7 @@ type transferOnlyPayloadWorker struct {
 
 const numAccounts = 1000
 
-func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis) (worker.Worker, error) {
+func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)

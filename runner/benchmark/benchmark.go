@@ -9,41 +9,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/core"
 )
-
-type TransactionPayload string
-
-// Params is the parameters for a single benchmark run.
-type Params struct {
-	NodeType           string
-	GasLimit           uint64
-	TransactionPayload TransactionPayload
-	BlockTime          time.Duration
-	Env                map[string]string
-	NumBlocks          int
-	Tags               map[string]string
-}
-
-func (p Params) ToConfig() map[string]interface{} {
-	params := map[string]interface{}{
-		"NodeType":           p.NodeType,
-		"GasLimit":           p.GasLimit,
-		"TransactionPayload": p.TransactionPayload,
-	}
-
-	for k, v := range p.Tags {
-		params[k] = v
-	}
-
-	return params
-}
 
 // TestRun is a single run of a benchmark. Each config should result in multiple test runs.
 type TestRun struct {
 	ID          string
-	Params      Params
+	Params      types.RunParams
 	TestFile    string
 	Name        string
 	Description string
@@ -55,25 +28,25 @@ const (
 	MaxTotalParams = 24
 )
 
-var DefaultParams = &Params{
+var DefaultParams = &types.RunParams{
 	NodeType:  "geth",
 	GasLimit:  50e9,
 	BlockTime: 1 * time.Second,
 }
 
 // NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
-func NewParamsFromValues(assignments map[string]interface{}) (*Params, error) {
+func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, error) {
 	params := *DefaultParams
 
 	for k, v := range assignments {
 		switch k {
-		case "transaction_workload":
+		case "payload":
 			if vPtrStr, ok := v.(*string); ok {
-				params.TransactionPayload = TransactionPayload(*vPtrStr)
+				params.PayloadID = string(*vPtrStr)
 			} else if vStr, ok := v.(string); ok {
-				params.TransactionPayload = TransactionPayload(vStr)
+				params.PayloadID = string(vStr)
 			} else {
-				return nil, fmt.Errorf("invalid transaction workload %s", v)
+				return nil, fmt.Errorf("invalid payload %s", v)
 			}
 		case "node_type":
 			if vStr, ok := v.(string); ok {
@@ -113,11 +86,6 @@ func NewParamsFromValues(assignments map[string]interface{}) (*Params, error) {
 	return &params, nil
 }
 
-// ClientOptions applies any client customization options to the given client options.
-func (p Params) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
-	return prevClientOptions
-}
-
 const MAX_GAS_LIMIT = math.MaxUint64
 
 var cachedGenesis atomic.Pointer[core.Genesis]
@@ -146,12 +114,4 @@ func DefaultDevnetGenesis() *core.Genesis {
 	cachedGenesis.CompareAndSwap(nil, &genesis)
 
 	return &genesis
-}
-
-type Benchmark struct {
-	Params Params
-}
-
-func NewBenchmark() *Benchmark {
-	return &Benchmark{}
 }

@@ -1,41 +1,45 @@
-- name: Sepolia Alpha snapshot test
-  description: Sepolia Alpha snapshot test
-  snapshot:
+payloads:
+  - name: Transfer-only
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  - name: Sepolia Alpha snapshot test
+    description: Sepolia Alpha snapshot test
+    snapshot:
     # skip non-empty for testing so we don't copy every time we run this
     # just delete the snapshot directory to force a full copy
     command: ./scripts/setup-snapshot.sh --skip-if-nonempty
     genesis_file: ../../sepolia-alpha/sepolia-alpha-genesis.json
     # force_clean is true by default to ensure consistency, but we can skip it for testing
     force_clean: false
-  variables:
-    - type: transaction_workload
-      values:
-        - transfer-only
-    - type: node_type
-      values:
-        - reth
-    - type: num_blocks
-      value: 10
-    - type: gas_limit
-      values:
-        - 15000000
-        - 30000000
-        - 60000000
-        - 90000000
-- name: Devnet snapshot test
-  description: Devnet snapshot test
-  variables:
-    - type: transaction_workload
-      values:
-        - transfer-only
-    - type: node_type
-      values:
-        - reth
-    - type: num_blocks
-      value: 10
-    - type: gas_limit
-      values:
-        - 15000000
-        - 30000000
-        - 60000000
-        - 90000000
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - reth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 15000000
+          - 30000000
+          - 60000000
+          - 90000000
+  - name: Devnet snapshot test
+    description: Devnet snapshot test
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - reth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 15000000
+          - 30000000
+          - 60000000
+          - 90000000

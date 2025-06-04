@@ -3,8 +3,8 @@ package types
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"time"
 
-	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/config"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -29,7 +29,7 @@ var _ ethTypes.BlockType = IsthmusBlockType{}
 
 // TestConfig holds all configuration needed for a benchmark test
 type TestConfig struct {
-	Params     benchmark.Params
+	Params     RunParams
 	Config     config.Config
 	Genesis    core.Genesis
 	BatcherKey ecdsa.PrivateKey
@@ -47,4 +47,34 @@ func (c *TestConfig) BatcherAddr() common.Address {
 		c.batcherAddr = &batcherAddr
 	}
 	return *c.batcherAddr
+}
+
+// Params is the parameters for a single benchmark run.
+type RunParams struct {
+	NodeType  string
+	GasLimit  uint64
+	PayloadID string
+	BlockTime time.Duration
+	Env       map[string]string
+	NumBlocks int
+	Tags      map[string]string
+}
+
+func (p RunParams) ToConfig() map[string]interface{} {
+	params := map[string]interface{}{
+		"NodeType":           p.NodeType,
+		"GasLimit":           p.GasLimit,
+		"TransactionPayload": p.PayloadID,
+	}
+
+	for k, v := range p.Tags {
+		params[k] = v
+	}
+
+	return params
+}
+
+// ClientOptions applies any client customization options to the given client options.
+func (p RunParams) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
+	return prevClientOptions
 }

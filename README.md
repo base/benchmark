@@ -44,21 +44,26 @@ npm run dev
 Each benchmark consists of configurable tests with various input parameters:
 
 ```yaml
-- name: Test Performance
-  description: Execution Speed
-  variables:
-    - type: transaction_workload
-      values:
-        - transfer-only
-    - type: node_type
-      values:
-        - reth
-        - geth
-    - type: num_blocks
-      value: 20
+payloads:
+  - name: Transfer only
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  - name: Test Performance
+    description: Execution Speed
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - reth
+          - geth
+      - type: num_blocks
+        value: 20
 ```
 
-This configuration runs a `transfer-only` transaction workload against both Geth and Reth clients for 20 blocks.
+This configuration runs a `transfer-only` transaction payload against both Geth and Reth clients for 20 blocks.
 
 ### Test Methodology
 

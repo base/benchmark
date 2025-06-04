@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/network/types"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,18 +20,18 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: "transaction_workload",
+						ParamType: "payload",
 						Value:     stringPtr("simple"),
 					},
 				},
 			},
 			want: []benchmark.TestRun{
 				{
-					Params: benchmark.Params{
-						NodeType:           "geth",
-						TransactionPayload: benchmark.TransactionPayload("simple"),
-						GasLimit:           benchmark.DefaultParams.GasLimit,
-						BlockTime:          benchmark.DefaultParams.BlockTime,
+					Params: types.RunParams{
+						NodeType:  "geth",
+						PayloadID: "simple",
+						GasLimit:  benchmark.DefaultParams.GasLimit,
+						BlockTime: benchmark.DefaultParams.BlockTime,
 					},
 				},
 			},
@@ -41,7 +42,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: "transaction_workload",
+						ParamType: "payload",
 						Values:    []interface{}{"simple", "complex"},
 					},
 					{
@@ -52,35 +53,35 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			},
 			want: []benchmark.TestRun{
 				{
-					Params: benchmark.Params{
-						NodeType:           "geth",
-						GasLimit:           benchmark.DefaultParams.GasLimit,
-						TransactionPayload: benchmark.TransactionPayload("simple"),
-						BlockTime:          benchmark.DefaultParams.BlockTime,
+					Params: types.RunParams{
+						NodeType:  "geth",
+						GasLimit:  benchmark.DefaultParams.GasLimit,
+						PayloadID: "simple",
+						BlockTime: benchmark.DefaultParams.BlockTime,
 					},
 				},
 				{
-					Params: benchmark.Params{
-						NodeType:           "erigon",
-						GasLimit:           benchmark.DefaultParams.GasLimit,
-						TransactionPayload: benchmark.TransactionPayload("simple"),
-						BlockTime:          benchmark.DefaultParams.BlockTime,
+					Params: types.RunParams{
+						NodeType:  "erigon",
+						GasLimit:  benchmark.DefaultParams.GasLimit,
+						PayloadID: "simple",
+						BlockTime: benchmark.DefaultParams.BlockTime,
 					},
 				},
 				{
-					Params: benchmark.Params{
-						NodeType:           "geth",
-						GasLimit:           benchmark.DefaultParams.GasLimit,
-						TransactionPayload: benchmark.TransactionPayload("complex"),
-						BlockTime:          benchmark.DefaultParams.BlockTime,
+					Params: types.RunParams{
+						NodeType:  "geth",
+						GasLimit:  benchmark.DefaultParams.GasLimit,
+						PayloadID: "complex",
+						BlockTime: benchmark.DefaultParams.BlockTime,
 					},
 				},
 				{
-					Params: benchmark.Params{
-						NodeType:           "erigon",
-						GasLimit:           benchmark.DefaultParams.GasLimit,
-						TransactionPayload: benchmark.TransactionPayload("complex"),
-						BlockTime:          benchmark.DefaultParams.BlockTime,
+					Params: types.RunParams{
+						NodeType:  "erigon",
+						GasLimit:  benchmark.DefaultParams.GasLimit,
+						PayloadID: "complex",
+						BlockTime: benchmark.DefaultParams.BlockTime,
 					},
 				},
 			},
@@ -91,11 +92,11 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: "transaction_workload",
+						ParamType: "payload",
 						Value:     stringPtr("simple"),
 					},
 					{
-						ParamType: "transaction_workload",
+						ParamType: "payload",
 						Value:     stringPtr("complex"),
 					},
 				},

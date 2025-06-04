@@ -21,6 +21,8 @@ type FakeMempool interface {
 	NextBlock() (sendTxs [][]byte, sequencerTxs [][]byte)
 }
 
+// StaticWorkloadMempool is a fake mempool that simulates a workload of transactions with no gas
+// or dependency tracking.
 type StaticWorkloadMempool struct {
 	// needs to be thread safe to share between workers (could be converted to channel)
 	lock sync.Mutex

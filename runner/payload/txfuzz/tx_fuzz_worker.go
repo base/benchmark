@@ -8,9 +8,9 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients/proxy"
 	"github.com/base/base-bench/runner/network/mempool"
+	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
@@ -25,10 +25,13 @@ type txFuzzPayloadWorker struct {
 	proxyServer *proxy.ProxyServer
 }
 
+type TxFuzzPayloadDefinition struct {
+}
+
 func NewTxFuzzPayloadWorker(
 	log log.Logger,
 	elRPCURL string,
-	params benchmark.Params,
+	params types.RunParams,
 	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
 	txFuzzBin string,

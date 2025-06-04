@@ -16,14 +16,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/go-yaml/yaml"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v3"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
-	benchtypes "github.com/base/base-bench/runner/network/types"
+	"github.com/base/base-bench/runner/network/types"
+	"github.com/base/base-bench/runner/payload"
 	"github.com/ethereum/go-ethereum/core"
 	ethparams "github.com/ethereum/go-ethereum/params"
 )
@@ -53,18 +54,18 @@ func NewService(version string, cfg config.Config, log log.Logger) Service {
 	}
 }
 
-func readBenchmarkConfig(path string) ([]benchmark.TestDefinition, error) {
+func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to open file")
 	}
 
-	var config []benchmark.TestDefinition
+	var config *benchmark.BenchmarkConfig
 	err = yaml.NewDecoder(file).Decode(&config)
 	return config, err
 }
 
-func (s *service) setupInternalDirectories(testDir string, params benchmark.Params, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string) (*config.InternalClientOptions, error) {
+func (s *service) setupInternalDirectories(testDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string) (*config.InternalClientOptions, error) {
 	err := os.MkdirAll(testDir, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create test directory")
@@ -268,7 +269,7 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 	return genesis, nil
 }
 
-func (s *service) setupDataDirs(workingDir string, params benchmark.Params, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
+func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
 	// create temp directory for this test
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
@@ -297,7 +298,8 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions) (*benchmark.BenchmarkRunResult, error) {
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.BenchmarkRunResult, error) {
+
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
 	// get genesis block
@@ -350,8 +352,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 	}
 
 	prefundAmount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(ethparams.Ether))
-
-	config := &benchtypes.TestConfig{
+	config := &types.TestConfig{
 		Params:            params,
 		Config:            s.config,
 		Genesis:           *genesis,
@@ -361,7 +362,7 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 	}
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
@@ -418,7 +419,7 @@ func (s *service) Run(ctx context.Context) error {
 
 	var testPlans []benchmark.TestPlan
 
-	for _, c := range config {
+	for _, c := range config.Benchmarks {
 		testPlan, err := benchmark.NewTestPlanFromConfig(c, s.config.ConfigPath())
 		if err != nil {
 			return errors.Wrap(err, "failed to create params matrix")
@@ -437,6 +438,16 @@ func (s *service) Run(ctx context.Context) error {
 	metadata := benchmark.BenchmarkMetadataFromTestPlans(testPlans)
 	runIdx := 0
 
+	// create map of transaction payloads
+	transactionPayloads := make(map[string]payload.Definition)
+	for _, w := range config.TransactionPayloads {
+		if _, ok := transactionPayloads[w.ID]; ok {
+			return fmt.Errorf("duplicate transaction payloads %s exist", w.ID)
+		}
+
+		transactionPayloads[w.ID] = w
+	}
+
 	for _, testPlan := range testPlans {
 		err = s.writeTestMetadata(metadata)
 		if err != nil {
@@ -452,7 +463,7 @@ func (s *service) Run(ctx context.Context) error {
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram)
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID])
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return err

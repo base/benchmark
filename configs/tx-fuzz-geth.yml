@@ -1,12 +1,16 @@
-- name: TX-Fuzz Geth Performance
-  description: TX-Fuzz Geth Performance
-  variables:
-    - type: transaction_workload
-      values:
-        - tx-fuzz
-    - type: node_type
-      values:
-        - geth
-    - type: num_blocks
-      value: 20
-  
+payloads:
+  - name: TX-Fuzz Geth Performance
+    id: tx-fuzz
+    type: tx-fuzz
+
+benchmarks:
+  - name: TX-Fuzz Geth Performance
+    description: TX-Fuzz Geth Performance
+    variables:
+      - type: payload
+        value: tx-fuzz
+      - type: node_type
+        values:
+          - geth
+      - type: num_blocks
+        value: 20

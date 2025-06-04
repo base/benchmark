@@ -2,10 +2,7 @@ package worker
 
 import (
 	"context"
-	"log"
-	"math/big"
 
-	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
 )
 
@@ -16,5 +13,3 @@ type Worker interface {
 	Stop(ctx context.Context) error
 	Mempool() mempool.FakeMempool
 }
-
-type NewWorkerFn func(logger log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error)

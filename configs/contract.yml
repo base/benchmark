@@ -1,15 +1,25 @@
-- name: Basic EC Pairing Precompile
-  description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
-  benchmark:
-    - sequencer
-  variables:
-    - type: transaction_workload
-      values:
-        - contract:1:ecpairing(uint256,bytes):10000000:0x:./contracts/ecpairing.hex
-    - type: node_type
-      values:
-        - geth
-    - type: num_blocks
-      value: 10
-    - type: gas_limit
-      value: 1000000000
+payloads:
+  - name: Basic EC Pairing Precompile
+    id: basic-ec-pairing-precompile
+    type: contract
+    calls_per_block: 1
+    function_signature: ecpairing(uint256,bytes)
+    gas_per_tx: 10000000
+    calldata: 0x
+    contract_bytecode: ./contracts/ecpairing.hex
+
+benchmarks:
+  - name: Basic EC Pairing Precompile
+    description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+    benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        value: basic-ec-pairing-precompile
+      - type: node_type
+        values:
+          - geth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 1000000000

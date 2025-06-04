@@ -23,18 +23,20 @@ import (
 )
 
 type sequencerBenchmark struct {
-	log             log.Logger
-	sequencerClient types.ExecutionClient
-	config          benchtypes.TestConfig
-	l1Chain         *l1Chain
+	log                log.Logger
+	sequencerClient    types.ExecutionClient
+	config             benchtypes.TestConfig
+	l1Chain            *l1Chain
+	transactionPayload payload.Definition
 }
 
-func newSequencerBenchmark(log log.Logger, config benchtypes.TestConfig, sequencerClient types.ExecutionClient, l1Chain *l1Chain) *sequencerBenchmark {
+func newSequencerBenchmark(log log.Logger, config benchtypes.TestConfig, sequencerClient types.ExecutionClient, l1Chain *l1Chain, transactionPayload payload.Definition) *sequencerBenchmark {
 	return &sequencerBenchmark{
-		log:             log,
-		config:          config,
-		sequencerClient: sequencerClient,
-		l1Chain:         l1Chain,
+		log:                log,
+		config:             config,
+		sequencerClient:    sequencerClient,
+		l1Chain:            l1Chain,
+		transactionPayload: transactionPayload,
 	}
 }
 
@@ -121,16 +123,11 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 }
 
 func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.MetricsCollector) ([]engine.ExecutableData, uint64, error) {
-	payloadType := nb.config.Params.TransactionPayload
-
-	transactionWorker, err := payload.NewPayloadWorker(ctx, nb.log, &nb.config, nb.sequencerClient, payloadType)
+	transactionWorker, err := payload.NewPayloadWorker(ctx, nb.log, &nb.config, nb.sequencerClient, nb.transactionPayload)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	if err != nil {
-		return nil, 0, err
-	}
 	mempool := transactionWorker.Mempool()
 
 	params := nb.config.Params

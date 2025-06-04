@@ -1,16 +1,24 @@
-- name: EC Mul Precompile
-  description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
-  benchmark:
-    - sequencer
-  variables:
-    - type: transaction_workload
-      values:
-        - contract:1:ecmul(uint256,bytes):1000000000:0x:./contracts/precompiles.hex
-    - type: node_type
-      values:
-        - geth
-        - reth
-    - type: num_blocks
-      value: 5
-    - type: gas_limit
-      value: 1000000000
+payloads:
+  - name: EC Mul Precompile
+    id: ecmul
+    type: contract
+    calls_per_block: 1
+    function_signature: ecmul(uint256,bytes)
+    gas_per_tx: 10000000
+
+benchmarks:
+  - name: EC Mul Precompile
+    description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+    benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        value: ecmul
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 5
+      - type: gas_limit
+        value: 1000000000

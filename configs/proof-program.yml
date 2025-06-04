@@ -1,22 +1,27 @@
-- name: Fault proof program execution speed
-  description: Benchmarks the speed that the fault proof program can execute.
-  proof_program:
+payloads:
+  - name: Transfer-only execution speed
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  - name: Fault proof program execution speed
+    description: Benchmarks the speed that the fault proof program can execute.
+    proof_program:
     enabled: true
     type: op-program
     version: v1.6.1-rc.1
-  variables:
-    - type: transaction_workload
-      values:
-        - transfer-only
-    - type: node_type
-      values:
-        - geth
-        # - reth
-    - type: num_blocks
-      value: 2
-    - type: gas_limit
-      values:
-        - 15000000
-        # - 30000000
-        # - 60000000
-        # - 90000000
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - geth
+          # - reth
+      - type: num_blocks
+        value: 2
+      - type: gas_limit
+        values:
+          - 15000000
+          # - 30000000
+          # - 60000000
+          # - 90000000
