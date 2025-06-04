@@ -40,49 +40,11 @@ func (b *BenchmarkType) UnmarshalText(text []byte) error {
 	return nil
 }
 
-// ParamType is an enum that specifies what variables can be specified in
-// a benchmark configuration.
-type ParamType uint
-
-const (
-	ParamTypeEnv ParamType = iota
-	ParamTypeTxWorkload
-	ParamTypeNode
-	ParamTypeGasLimit
-	ParamTypeNumBlocks
-)
-
-func (b ParamType) String() string {
-	return [...]string{"env", "transaction_workload", "node_type"}[b]
-}
-
-func (b ParamType) MarshalText() ([]byte, error) {
-	return []byte(b.String()), nil
-}
-
-func (b *ParamType) UnmarshalText(text []byte) error {
-	switch string(text) {
-	case "env":
-		*b = ParamTypeEnv
-	case "transaction_workload":
-		*b = ParamTypeTxWorkload
-	case "node_type":
-		*b = ParamTypeNode
-	case "gas_limit":
-		*b = ParamTypeGasLimit
-	case "num_blocks":
-		*b = ParamTypeNumBlocks
-	default:
-		return fmt.Errorf("invalid benchmark param type: %s", string(text))
-	}
-	return nil
-}
-
 // Param is a single dimension of a benchmark matrix. It can be a
 // single value or a list of values.
 type Param struct {
 	Name      *string       `yaml:"name"`
-	ParamType ParamType     `yaml:"type"`
+	ParamType string        `yaml:"type"`
 	Value     interface{}   `yaml:"value"`
 	Values    []interface{} `yaml:"values"`
 }
@@ -95,6 +57,12 @@ func (bp *Param) Check() error {
 		return errors.New("value and values cannot both be specified")
 	}
 	return nil
+}
+
+type ProofProgramOptions struct {
+	Enabled *bool  `yaml:"enabled"`
+	Version string `yaml:"version"`
+	Type    string `yaml:"type"`
 }
 
 // SnapshotDefinition is the user-facing YAML configuration for specifying
@@ -147,11 +115,12 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
-	Name        string              `yaml:"name"`
-	Snapshot    *SnapshotDefinition `yaml:"snapshot"`
-	Description string              `yaml:"description"`
-	Tags        *map[string]string  `yaml:"tags"`
-	Variables   []Param             `yaml:"variables"`
+	Name         string               `yaml:"name"`
+	Snapshot     *SnapshotDefinition  `yaml:"snapshot"`
+	Description  string               `yaml:"description"`
+	Tags         *map[string]string   `yaml:"tags"`
+	Variables    []Param              `yaml:"variables"`
+	ProofProgram *ProofProgramOptions `yaml:"proof_program"`
 }
 
 func (bc *TestDefinition) Check() error {
@@ -172,8 +141,9 @@ func (bc *TestDefinition) Check() error {
 
 // TestPlan represents a list of test runs to be executed.
 type TestPlan struct {
-	Runs     []TestRun
-	Snapshot *SnapshotDefinition
+	Runs         []TestRun
+	Snapshot     *SnapshotDefinition
+	ProofProgram *ProofProgramOptions
 }
 
 func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, error) {
@@ -182,9 +152,21 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, er
 		return nil, err
 	}
 
+	// default to enabled if not set but defined
+	proofProgramEnabled := c.ProofProgram != nil && (c.ProofProgram.Enabled == nil || (*c.ProofProgram.Enabled))
+	var proofProgram *ProofProgramOptions
+	if proofProgramEnabled {
+		proofProgram = &ProofProgramOptions{
+			Enabled: &proofProgramEnabled,
+			Version: c.ProofProgram.Version,
+			Type:    c.ProofProgram.Type,
+		}
+	}
+
 	return &TestPlan{
-		Runs:     testRuns,
-		Snapshot: c.Snapshot,
+		Runs:         testRuns,
+		Snapshot:     c.Snapshot,
+		ProofProgram: proofProgram,
 	}, nil
 }
 
@@ -196,7 +178,7 @@ func nameToSlug(name string) string {
 
 // ResolveTestRunsFromMatrix constructs a new ParamsMatrix from a config.
 func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun, error) {
-	seenParams := make(map[ParamType]bool)
+	seenParams := make(map[string]bool)
 
 	// Multiple payloads can run in a single benchmark.
 	params := make([]Param, 0, len(c.Variables))
@@ -250,7 +232,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 	id := fmt.Sprintf("%s-%s-%d", nameToSlug(fileNameWithoutExt), nameToSlug(c.Name), time.Now().Unix())
 
 	for i := 0; i < totalParams; i++ {
-		valueSelections := make(map[ParamType]interface{})
+		valueSelections := make(map[string]interface{})
 		for j, p := range params {
 			valueSelections[p.ParamType] = valuesByParam[j][currentParams[j]]
 		}

@@ -19,7 +19,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: benchmark.ParamTypeTxWorkload,
+						ParamType: "transaction_workload",
 						Value:     stringPtr("simple"),
 					},
 				},
@@ -41,11 +41,11 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: benchmark.ParamTypeTxWorkload,
+						ParamType: "transaction_workload",
 						Values:    []interface{}{"simple", "complex"},
 					},
 					{
-						ParamType: benchmark.ParamTypeNode,
+						ParamType: "node_type",
 						Values:    []interface{}{"geth", "erigon"},
 					},
 				},
@@ -91,11 +91,11 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: benchmark.ParamTypeTxWorkload,
+						ParamType: "transaction_workload",
 						Value:     stringPtr("simple"),
 					},
 					{
-						ParamType: benchmark.ParamTypeTxWorkload,
+						ParamType: "transaction_workload",
 						Value:     stringPtr("complex"),
 					},
 				},
@@ -108,7 +108,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
 					{
-						ParamType: benchmark.ParamTypeNode,
+						ParamType: "node_type",
 						Value:     stringPtr("geth"),
 					},
 				},

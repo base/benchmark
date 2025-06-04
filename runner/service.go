@@ -257,15 +257,13 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 		}
 	} else {
 		// for devnets, just create a new genesis with the current time
-		genesisTime := time.Now()
-		genesis = benchmark.DefaultDevnetGenesis(genesisTime)
+		genesis = benchmark.DefaultDevnetGenesis()
 	}
 
 	return genesis, nil
 }
 
 func (s *service) setupDataDirs(workingDir string, params benchmark.Params, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
-
 	// create temp directory for this test
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
@@ -284,7 +282,17 @@ func (s *service) setupDataDirs(workingDir string, params benchmark.Params, gene
 	return sequencerOptions, validatorOptions, nil
 }
 
-func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition) (*benchmark.BenchmarkRunResult, error) {
+func (s *service) setupBlobsDir(workingDir string) error {
+	// create temp directory for blobs
+	blobsDir := path.Join(workingDir, "blobs")
+	err := os.MkdirAll(blobsDir, 0755)
+	if err != nil {
+		return errors.Wrap(err, "failed to create blobs directory")
+	}
+	return nil
+}
+
+func (s *service) runTest(ctx context.Context, params benchmark.Params, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions) (*benchmark.BenchmarkRunResult, error) {
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
 	// get genesis block
@@ -302,6 +310,12 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup data dirs")
+	}
+
+	if proofConfig != nil {
+		if err := s.setupBlobsDir(workingDir); err != nil {
+			return nil, errors.Wrap(err, "failed to setup blobs directory")
+		}
 	}
 
 	defer func() {
@@ -410,7 +424,7 @@ func (s *service) Run(ctx context.Context) error {
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot)
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram)
 			if err != nil {
 				if errors.Is(err, context.Canceled) {
 					return err
