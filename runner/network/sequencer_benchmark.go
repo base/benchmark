@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/clients/types"
@@ -13,24 +12,24 @@ import (
 	"github.com/base/base-bench/runner/network/consensus"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
+	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
 	"github.com/pkg/errors"
 )
 
 type sequencerBenchmark struct {
 	log             log.Logger
 	sequencerClient types.ExecutionClient
-	config          TestConfig
+	config          benchtypes.TestConfig
 	l1Chain         *l1Chain
 }
 
-func newSequencerBenchmark(log log.Logger, config TestConfig, sequencerClient types.ExecutionClient, l1Chain *l1Chain) *sequencerBenchmark {
+func newSequencerBenchmark(log log.Logger, config benchtypes.TestConfig, sequencerClient types.ExecutionClient, l1Chain *l1Chain) *sequencerBenchmark {
 	return &sequencerBenchmark{
 		log:             log,
 		config:          config,
@@ -39,9 +38,9 @@ func newSequencerBenchmark(log log.Logger, config TestConfig, sequencerClient ty
 	}
 }
 
-func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempool.FakeMempool, sequencerClient types.ExecutionClient, amount *big.Int) error {
+func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempool.FakeMempool) error {
 	nb.log.Info("Funding test account")
-	client := sequencerClient
+	client := nb.sequencerClient
 
 	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 	addr := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
@@ -64,8 +63,10 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	random := rand.New(rand.NewSource(int64(blockNumber)))
 	randomHash := common.BigToHash(big.NewInt(random.Int63()))
 
+	amount := nb.config.PrefundAmount
+
 	// if balance is already good, return
-	if balance.Cmp(amount) >= 0 {
+	if balance.Cmp(&amount) >= 0 {
 		return nil
 	}
 
@@ -75,8 +76,8 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 			To:                  &addr,
 			SourceHash:          randomHash,
 			IsSystemTransaction: false,
-			Mint:                amount,
-			Value:               amount,
+			Mint:                &amount,
+			Value:               &amount,
 			Gas:                 210000,
 			Data:                []byte{},
 		},
@@ -110,7 +111,7 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	if err != nil {
 		return fmt.Errorf("failed to get balance: %w", err)
 	}
-	if balance.Cmp(amount) < 0 {
+	if balance.Cmp(&amount) < 0 {
 		nb.log.Warn("balance is not equal to amount", "balance", balance, "amount", amount)
 		return errors.New("balance is not equal to amount")
 	}
@@ -120,47 +121,22 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 }
 
 func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.MetricsCollector) ([]engine.ExecutableData, uint64, error) {
-	amount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether))
-	privateKey := common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	payloadType := nb.config.Params.TransactionPayload
 
-	var mempool mempool.FakeMempool
-	var worker payload.Worker
-	var err error
-
-	params := nb.config.Params
-	config := nb.config.Config
-	genesis := nb.config.Genesis
-
-	payloadType := params.TransactionPayload
-	sequencerClient := nb.sequencerClient
-
-	switch {
-	case payloadType == "tx-fuzz":
-		nb.log.Info("Running tx-fuzz payload")
-		mempool, worker, err = payload.NewTxFuzzPayloadWorker(
-			nb.log, sequencerClient.ClientURL(), params, privateKey, amount, config.TxFuzzBinary())
-	case payloadType == "transfer-only":
-		mempool, worker, err = payload.NewTransferPayloadWorker(
-			ctx, nb.log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis)
-	case strings.HasPrefix(string(payloadType), "contract"):
-		var payloadConfig payload.ContractPayloadWorkerConfig
-		payloadConfig, err = payload.ValidateContractPayload(payloadType, config.ConfigPath())
-		if err != nil {
-			return nil, 0, err
-		}
-
-		mempool, worker, err = payload.NewContractPayloadWorker(
-			nb.log, sequencerClient.ClientURL(), params, privateKey, amount, payloadConfig, &genesis)
-	default:
-		return nil, 0, errors.New("invalid payload type")
+	transactionWorker, err := payload.NewPayloadWorker(ctx, nb.log, &nb.config, nb.sequencerClient, payloadType)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	if err != nil {
 		return nil, 0, err
 	}
+	mempool := transactionWorker.Mempool()
 
+	params := nb.config.Params
+	sequencerClient := nb.sequencerClient
 	defer func() {
-		err := worker.Stop(ctx)
+		err := transactionWorker.Stop(ctx)
 		if err != nil {
 			nb.log.Warn("failed to stop payload worker", "err", err)
 		}
@@ -175,14 +151,14 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	setupComplete := make(chan struct{})
 
 	go func() {
-		err := nb.fundTestAccount(benchmarkCtx, mempool, sequencerClient, amount)
+		err := nb.fundTestAccount(benchmarkCtx, mempool)
 		if err != nil {
 			nb.log.Warn("failed to fund test account", "err", err)
 			errChan <- err
 			return
 		}
 
-		err = worker.Setup(benchmarkCtx)
+		err = transactionWorker.Setup(benchmarkCtx)
 		if err != nil {
 			nb.log.Warn("failed to setup payload worker", "err", err)
 			errChan <- err
@@ -241,7 +217,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		// run for a few blocks
 		for i := 0; i < params.NumBlocks; i++ {
 			blockMetrics := metrics.NewBlockMetrics(uint64(i))
-			err := worker.SendTxs(benchmarkCtx)
+			err := transactionWorker.SendTxs(benchmarkCtx)
 			if err != nil {
 				nb.log.Warn("failed to send transactions", "err", err)
 				errChan <- err

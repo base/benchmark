@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"os"
 	"path"
 	"time"
@@ -22,7 +23,9 @@ import (
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
+	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/core"
+	ethparams "github.com/ethereum/go-ethereum/params"
 )
 
 var ErrAlreadyStopped = errors.New("already stopped")
@@ -340,11 +343,21 @@ func (s *service) runTest(ctx context.Context, params benchmark.Params, workingD
 		return nil, errors.Wrap(err, "failed to create batcher key")
 	}
 
-	config := &network.TestConfig{
-		Params:     params,
-		Config:     s.config,
-		Genesis:    *genesis,
-		BatcherKey: *batcherKey,
+	prefundKeyBytes := common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	prefundKey, err := crypto.ToECDSA(prefundKeyBytes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create prefund key")
+	}
+
+	prefundAmount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(ethparams.Ether))
+
+	config := &benchtypes.TestConfig{
+		Params:            params,
+		Config:            s.config,
+		Genesis:           *genesis,
+		BatcherKey:        *batcherKey,
+		PrefundPrivateKey: *prefundKey,
+		PrefundAmount:     *prefundAmount,
 	}
 
 	// Run benchmark

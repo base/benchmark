@@ -1,7 +1,15 @@
 package types
 
 import (
+	"crypto/ecdsa"
+	"math/big"
+
+	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/config"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 // BasicBlockType implements what chain config would usually implement.
@@ -18,3 +26,25 @@ func (b IsthmusBlockType) IsIsthmus(blkTime uint64) bool {
 }
 
 var _ ethTypes.BlockType = IsthmusBlockType{}
+
+// TestConfig holds all configuration needed for a benchmark test
+type TestConfig struct {
+	Params     benchmark.Params
+	Config     config.Config
+	Genesis    core.Genesis
+	BatcherKey ecdsa.PrivateKey
+	// BatcherAddr is lazily initialized to avoid unnecessary computation
+	batcherAddr *common.Address
+
+	PrefundPrivateKey ecdsa.PrivateKey
+	PrefundAmount     big.Int
+}
+
+// BatcherAddr returns the batcher address, computing it if necessary
+func (c *TestConfig) BatcherAddr() common.Address {
+	if c.batcherAddr == nil {
+		batcherAddr := crypto.PubkeyToAddress(c.BatcherKey.PublicKey)
+		c.batcherAddr = &batcherAddr
+	}
+	return *c.batcherAddr
+}

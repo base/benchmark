@@ -1,4 +1,4 @@
-package payload
+package transferonly
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/mempool"
+	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -24,16 +25,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Note: Payload workers are responsible keeping track of gas in a block and sending transactions to the mempool.
-type Worker interface {
-	Setup(ctx context.Context) error
-	SendTxs(ctx context.Context) error
-	Stop(ctx context.Context) error
-}
-
-type NewWorkerFn func(logger log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int) (Worker, error)
-
-type TransferOnlyPayloadWorker struct {
+type transferOnlyPayloadWorker struct {
 	log log.Logger
 
 	privateKeys []*ecdsa.PrivateKey
@@ -53,38 +45,38 @@ type TransferOnlyPayloadWorker struct {
 
 const numAccounts = 1000
 
-func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int, genesis *core.Genesis) (mempool.FakeMempool, Worker, error) {
+func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	chainID := genesis.Config.ChainID
-	priv, err := crypto.ToECDSA(prefundedPrivateKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to convert private key: %w", err)
-	}
 
-	t := &TransferOnlyPayloadWorker{
+	t := &transferOnlyPayloadWorker{
 		log:              log,
 		client:           client,
 		mempool:          mempool,
 		params:           params,
 		chainID:          chainID,
-		prefundedAccount: priv,
+		prefundedAccount: &prefundedPrivateKey,
 		prefundAmount:    prefundAmount,
 	}
 
 	if err := t.generateAccounts(ctx); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return mempool, t, nil
+	return t, nil
 }
 
-func (t *TransferOnlyPayloadWorker) generateAccounts(ctx context.Context) error {
+func (t *transferOnlyPayloadWorker) Mempool() mempool.FakeMempool {
+	return t.mempool
+}
+
+func (t *transferOnlyPayloadWorker) generateAccounts(ctx context.Context) error {
 	t.privateKeys = make([]*ecdsa.PrivateKey, 0, numAccounts)
 	t.addresses = make([]common.Address, 0, numAccounts)
 	t.nextNonce = make(map[common.Address]uint64)
@@ -133,12 +125,12 @@ func (t *TransferOnlyPayloadWorker) generateAccounts(ctx context.Context) error 
 	return nil
 }
 
-func (t *TransferOnlyPayloadWorker) Stop(ctx context.Context) error {
+func (t *transferOnlyPayloadWorker) Stop(ctx context.Context) error {
 	// TODO: Implement
 	return nil
 }
 
-func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
+func (t *transferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	// check balance > prefundAmount
 	balance, err := t.client.BalanceAt(ctx, crypto.PubkeyToAddress(t.prefundedAccount.PublicKey), nil)
 	log.Info("Prefunded account balance", "balance", balance.String())
@@ -216,7 +208,7 @@ func (t *TransferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+func (t *transferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	return retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
@@ -226,7 +218,7 @@ func (t *TransferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 	})
 }
 
-func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
+func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	gasUsed := uint64(0)
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
@@ -251,7 +243,7 @@ func (t *TransferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	return nil
 }
 
-func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
+func (t *transferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
 	txdata := &types.DynamicFeeTx{
 		ChainID:   t.chainID,
 		Nonce:     nonce,
@@ -267,7 +259,7 @@ func (t *TransferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 	return tx, nil
 }
 
-func (t *TransferOnlyPayloadWorker) SendTxs(ctx context.Context) error {
+func (t *transferOnlyPayloadWorker) SendTxs(ctx context.Context) error {
 	if err := t.sendTxs(ctx); err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
 		return err

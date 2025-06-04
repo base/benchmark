@@ -1,4 +1,4 @@
-package payload
+package contract
 
 import (
 	"context"
@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/network/mempool"
+	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -25,7 +27,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type ContractPayloadWorkerConfig struct {
+type contractPayloadWorkerConfig struct {
 	Bytecode          []byte
 	FunctionSignature string
 	Input1            string
@@ -33,17 +35,17 @@ type ContractPayloadWorkerConfig struct {
 	CallsPerBlock     int
 }
 
-func ValidateContractPayload(payloadType benchmark.TransactionPayload, configDir string) (ContractPayloadWorkerConfig, error) {
+func validateContractPayload(payloadType benchmark.TransactionPayload, configDir string) (contractPayloadWorkerConfig, error) {
 	selectors := strings.Split(string(payloadType), ":")
 
 	if len(selectors) != 6 {
-		return ContractPayloadWorkerConfig{}, errors.New("invalid contract payload type")
+		return contractPayloadWorkerConfig{}, errors.New("invalid contract payload type")
 	}
 
 	var callsPerBlock int
 	callsPerBlock, err := strconv.Atoi(selectors[1])
 	if err != nil {
-		return ContractPayloadWorkerConfig{}, errors.New("invalid calls per block")
+		return contractPayloadWorkerConfig{}, errors.New("invalid calls per block")
 	}
 
 	functionSignature := selectors[2]
@@ -60,11 +62,11 @@ func ValidateContractPayload(payloadType benchmark.TransactionPayload, configDir
 
 	bytecodeHex, err := os.ReadFile(bytecodePath)
 	if err != nil {
-		return ContractPayloadWorkerConfig{}, errors.New("failed to read bytecode file")
+		return contractPayloadWorkerConfig{}, errors.New("failed to read bytecode file")
 	}
 	bytecode := common.FromHex(string(bytecodeHex))
 
-	config := ContractPayloadWorkerConfig{
+	config := contractPayloadWorkerConfig{
 		Bytecode:          bytecode,
 		FunctionSignature: functionSignature,
 		Input1:            input1,
@@ -74,8 +76,8 @@ func ValidateContractPayload(payloadType benchmark.TransactionPayload, configDir
 	return config, nil
 }
 
-type ContractPayloadWorker struct {
-	ContractPayloadWorkerConfig
+type contractPayloadWorker struct {
+	contractPayloadWorkerConfig
 
 	log log.Logger
 
@@ -92,40 +94,46 @@ type ContractPayloadWorker struct {
 	nonce   uint64
 }
 
-func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey []byte, prefundAmount *big.Int, config ContractPayloadWorkerConfig, genesis *core.Genesis) (mempool.FakeMempool, Worker, error) {
+func NewContractPayloadWorker(log log.Logger, elRPCURL string, params benchmark.Params, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, payloadType benchmark.TransactionPayload, config config.Config) (worker.Worker, error) {
+
+	payloadConfig, err := validateContractPayload(payloadType, config.ConfigPath())
+	if err != nil {
+		return nil, err
+	}
+
 	mempool := mempool.NewStaticWorkloadMempool(log)
 
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	chainID := genesis.Config.ChainID
-	priv, err := crypto.ToECDSA(prefundedPrivateKey)
-	if err != nil {
-		return nil, nil, err
-	}
 
-	t := &ContractPayloadWorker{
+	t := &contractPayloadWorker{
 		log:                         log,
 		client:                      client,
 		mempool:                     mempool,
 		params:                      params,
 		chainID:                     chainID,
-		prefundedAccount:            priv,
+		prefundedAccount:            &prefundedPrivateKey,
 		prefundAmount:               prefundAmount,
-		ContractPayloadWorkerConfig: config,
+		contractPayloadWorkerConfig: payloadConfig,
 	}
 
-	return mempool, t, nil
+	return t, nil
 }
 
-func (t *ContractPayloadWorker) Stop(ctx context.Context) error {
+func (t *contractPayloadWorker) Mempool() mempool.FakeMempool {
+	return t.mempool
+}
+
+func (t *contractPayloadWorker) Stop(ctx context.Context) error {
 	// TODO: Implement
 	return nil
 }
 
-func (t *ContractPayloadWorker) deployContract(ctx context.Context) error {
+func (t *contractPayloadWorker) deployContract(ctx context.Context) error {
 	address := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
 	nonce := t.mempool.GetTransactionCount(address)
 	t.nonce = nonce
@@ -175,11 +183,11 @@ func (t *ContractPayloadWorker) deployContract(ctx context.Context) error {
 	return nil
 }
 
-func (t *ContractPayloadWorker) Setup(ctx context.Context) error {
+func (t *contractPayloadWorker) Setup(ctx context.Context) error {
 	return t.deployContract(ctx)
 }
 
-func (t *ContractPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+func (t *contractPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	return retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
@@ -189,7 +197,7 @@ func (t *ContractPayloadWorker) waitForReceipt(ctx context.Context, txHash commo
 	})
 }
 
-func (t *ContractPayloadWorker) debugContract() (*big.Int, error) {
+func (t *contractPayloadWorker) debugContract() (*big.Int, error) {
 	contractAddress := t.contractAddress
 
 	fromAddress := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
@@ -213,7 +221,7 @@ func (t *ContractPayloadWorker) debugContract() (*big.Int, error) {
 	return result, nil
 }
 
-func (t *ContractPayloadWorker) sendContractTx(ctx context.Context) error {
+func (t *contractPayloadWorker) sendContractTx(ctx context.Context) error {
 	contractAddress := t.contractAddress
 
 	privateKey := t.prefundedAccount
@@ -280,7 +288,7 @@ func (t *ContractPayloadWorker) sendContractTx(ctx context.Context) error {
 	return nil
 }
 
-func (t *ContractPayloadWorker) SendTxs(ctx context.Context) error {
+func (t *contractPayloadWorker) SendTxs(ctx context.Context) error {
 	for i := 0; i < t.CallsPerBlock; i++ {
 		err := t.sendContractTx(ctx)
 

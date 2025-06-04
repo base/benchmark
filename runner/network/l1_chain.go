@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
+	"github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
@@ -18,7 +19,7 @@ type l1Chain struct {
 	chain fakel1.L1Chain
 }
 
-func newL1Chain(config *TestConfig) (*l1Chain, error) {
+func newL1Chain(config *types.TestConfig) (*l1Chain, error) {
 	chain, err := setupChain(config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup L1 chain: %w", err)
@@ -79,7 +80,7 @@ func makeL1Genesis(prefundAddr []common.Address) core.Genesis {
 	return l1Genesis
 }
 
-func setupChain(config *TestConfig) (fakel1.L1Chain, error) {
+func setupChain(config *types.TestConfig) (fakel1.L1Chain, error) {
 	blobsFolder := path.Join(config.Config.DataDir(), "blobs")
 	if err := os.MkdirAll(blobsFolder, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create blobs folder: %w", err)

@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"crypto/ecdsa"
 	"fmt"
 	"os"
 	"path"
@@ -15,10 +14,8 @@ import (
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
 
+	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
@@ -26,25 +23,6 @@ import (
 const (
 	ExecutionLayerLogFileName = "el.log"
 )
-
-// TestConfig holds all configuration needed for a benchmark test
-type TestConfig struct {
-	Params     benchmark.Params
-	Config     config.Config
-	Genesis    core.Genesis
-	BatcherKey ecdsa.PrivateKey
-	// BatcherAddr is lazily initialized to avoid unnecessary computation
-	batcherAddr *common.Address
-}
-
-// BatcherAddr returns the batcher address, computing it if necessary
-func (c *TestConfig) BatcherAddr() common.Address {
-	if c.batcherAddr == nil {
-		batcherAddr := crypto.PubkeyToAddress(c.BatcherKey.PublicKey)
-		c.batcherAddr = &batcherAddr
-	}
-	return *c.batcherAddr
-}
 
 // NetworkBenchmark handles the lifecycle for a single benchmark run
 type NetworkBenchmark struct {
@@ -56,12 +34,12 @@ type NetworkBenchmark struct {
 	collectedSequencerMetrics *benchmark.SequencerKeyMetrics
 	collectedValidatorMetrics *benchmark.ValidatorKeyMetrics
 
-	testConfig  *TestConfig
+	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
-func NewNetworkBenchmark(config *TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:              log,
 		sequencerOptions: sequencerOptions,

@@ -1,7 +1,8 @@
-package payload
+package txfuzz
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"math/big"
 	"os"
@@ -10,11 +11,12 @@ import (
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients/proxy"
 	"github.com/base/base-bench/runner/network/mempool"
+	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
 
-type TxFuzzPayloadWorker struct {
+type txFuzzPayloadWorker struct {
 	log         log.Logger
 	prefundSK   string
 	txFuzzBin   string
@@ -27,27 +29,31 @@ func NewTxFuzzPayloadWorker(
 	log log.Logger,
 	elRPCURL string,
 	params benchmark.Params,
-	prefundedPrivateKey []byte,
+	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
 	txFuzzBin string,
-) (mempool.FakeMempool, Worker, error) {
+) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log)
 	proxyServer := proxy.NewProxyServer(elRPCURL, log, 8545, mempool)
 
-	t := &TxFuzzPayloadWorker{
+	t := &txFuzzPayloadWorker{
 		log:         log,
-		prefundSK:   hex.EncodeToString(prefundedPrivateKey),
+		prefundSK:   hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
 		txFuzzBin:   txFuzzBin,
 		elRPCURL:    elRPCURL,
 		mempool:     mempool,
 		proxyServer: proxyServer,
 	}
 
-	return mempool, t, nil
+	return t, nil
+}
+
+func (t *txFuzzPayloadWorker) Mempool() mempool.FakeMempool {
+	return t.mempool
 }
 
 // Setup is a no-op for the tx fuzzer
-func (t *TxFuzzPayloadWorker) Setup(ctx context.Context) error {
+func (t *txFuzzPayloadWorker) Setup(ctx context.Context) error {
 	err := t.proxyServer.Run(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to run proxy server")
@@ -66,12 +72,12 @@ func (t *TxFuzzPayloadWorker) Setup(ctx context.Context) error {
 	return nil
 }
 
-func (t *TxFuzzPayloadWorker) Stop(ctx context.Context) error {
+func (t *txFuzzPayloadWorker) Stop(ctx context.Context) error {
 	t.proxyServer.Stop()
 	return nil
 }
 
-func (t *TxFuzzPayloadWorker) SendTxs(ctx context.Context) error {
+func (t *txFuzzPayloadWorker) SendTxs(ctx context.Context) error {
 	t.log.Info("Sending txs in tx-fuzz mode")
 	pendingTxs := t.proxyServer.PendingTxs()
 	t.proxyServer.ClearPendingTxs()

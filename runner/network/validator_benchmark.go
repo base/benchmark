@@ -12,6 +12,7 @@ import (
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/consensus"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
+	benchtypes "github.com/base/base-bench/runner/network/types"
 
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/log"
@@ -21,12 +22,12 @@ import (
 type validatorBenchmark struct {
 	log             log.Logger
 	validatorClient types.ExecutionClient
-	config          TestConfig
+	config          benchtypes.TestConfig
 	proofConfig     *benchmark.ProofProgramOptions
 	l1Chain         *l1Chain
 }
 
-func newValidatorBenchmark(log log.Logger, config TestConfig, validatorClient types.ExecutionClient, l1Chain *l1Chain, proofConfig *benchmark.ProofProgramOptions) *validatorBenchmark {
+func newValidatorBenchmark(log log.Logger, config benchtypes.TestConfig, validatorClient types.ExecutionClient, l1Chain *l1Chain, proofConfig *benchmark.ProofProgramOptions) *validatorBenchmark {
 	return &validatorBenchmark{
 		log:             log,
 		config:          config,
