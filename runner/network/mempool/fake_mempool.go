@@ -37,6 +37,8 @@ type StaticWorkloadMempool struct {
 
 	// sequencer txs included in payload attributes
 	currentBlockSequencerTxs [][]byte
+
+	chainId *big.Int
 }
 
 func NewStaticWorkloadMempool(log log.Logger, chainID *big.Int) *StaticWorkloadMempool {
@@ -44,6 +46,7 @@ func NewStaticWorkloadMempool(log log.Logger, chainID *big.Int) *StaticWorkloadM
 		chainID:      chainID,
 		log:          log,
 		addressNonce: make(map[common.Address]uint64),
+		chainId:      chainId,
 	}
 }
 
