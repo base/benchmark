@@ -25,7 +25,6 @@ type FakeMempool interface {
 // StaticWorkloadMempool is a fake mempool that simulates a workload of transactions with no gas
 // or dependency tracking.
 type StaticWorkloadMempool struct {
-	chainID *big.Int
 	// needs to be thread safe to share between workers (could be converted to channel)
 	lock sync.Mutex
 	log  log.Logger
@@ -37,13 +36,15 @@ type StaticWorkloadMempool struct {
 
 	// sequencer txs included in payload attributes
 	currentBlockSequencerTxs [][]byte
+
+	chainID *big.Int
 }
 
 func NewStaticWorkloadMempool(log log.Logger, chainID *big.Int) *StaticWorkloadMempool {
 	return &StaticWorkloadMempool{
-		chainID:      chainID,
 		log:          log,
 		addressNonce: make(map[common.Address]uint64),
+		chainID:      chainID,
 	}
 }
 
