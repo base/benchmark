@@ -203,6 +203,22 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
 	header.Root = statedb.IntermediateRoot(true)
 
+	accountLoaded := statedb.AccountLoaded
+	accountDeleted := statedb.AccountDeleted
+	accountReads := statedb.AccountReads
+	accountsUpdated := statedb.AccountUpdated
+	storageDeleted := statedb.StorageDeleted.Load()
+	storageReads := statedb.StorageReads
+	storageLoaded := statedb.StorageLoaded
+
+	fmt.Printf("- Accounts Loaded: %d\n", accountLoaded)
+	fmt.Printf("- Accounts Deleted: %d\n", accountDeleted)
+	fmt.Printf("- Accounts Reset: %d\n", accountReads)
+	fmt.Printf("- Accounts Updated: %d\n", accountsUpdated)
+	fmt.Printf("- Storage Deleted: %d\n", storageDeleted)
+	fmt.Printf("- Storage Reads: %d\n", storageReads)
+	fmt.Printf("- Storage Loaded: %d\n", storageLoaded)
+
 	isCancun := genesis.Config.IsCancun(header.Number, header.Time)
 	// Write state changes to db
 	root, err := statedb.Commit(header.Number.Uint64(), genesis.Config.IsEIP158(header.Number), isCancun)
@@ -211,6 +227,11 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	}
 	if header.Root.Cmp(root) != 0 {
 		return fmt.Errorf("l1 state root mismatch: %v != %v", root, header.Root)
+	}
+
+	err = statedb.Database().TrieDB().Commit(root, false)
+	if err != nil {
+		return fmt.Errorf("failed to commit state db: %w", err)
 	}
 
 	fmt.Printf("state root calculated: %s, state root in header: %s\n", root.Hex(), header.Root.Hex())
