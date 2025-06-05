@@ -138,6 +138,35 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 		return fmt.Errorf("failed to init state db around block %s (state %s): %w", parent.Hash().Hex(), parent.Root().Hex(), err)
 	}
 
+	accountLoaded := statedb.AccountLoaded
+	accountDeleted := statedb.AccountDeleted
+	accountsUpdated := statedb.AccountUpdated
+	storageDeleted := statedb.StorageDeleted.Load()
+	storageUpdated := statedb.StorageUpdated.Load()
+	storageLoaded := statedb.StorageLoaded
+
+	updateAndPrintStats := func() {
+		oldAccountLoaded := accountLoaded
+		oldAccountDeleted := accountDeleted
+		oldAccountsUpdated := accountsUpdated
+		oldStorageDeleted := storageDeleted
+		oldStorageLoaded := storageLoaded
+		oldStorageUpdated := storageUpdated
+		accountLoaded = statedb.AccountLoaded
+		accountDeleted = statedb.AccountDeleted
+		accountsUpdated = statedb.AccountUpdated
+		storageDeleted = statedb.StorageDeleted.Load()
+		storageUpdated = statedb.StorageUpdated.Load()
+		storageLoaded = statedb.StorageLoaded
+
+		fmt.Printf("- ∂ Accounts Reads: %d\n", accountLoaded-oldAccountLoaded)
+		fmt.Printf("- ∂ Accounts Deletes: %d\n", accountDeleted-oldAccountDeleted)
+		fmt.Printf("- ∂ Accounts Updates: %d\n", accountsUpdated-oldAccountsUpdated)
+		fmt.Printf("- ∂ Storage Reads: %d\n", storageLoaded-oldStorageLoaded)
+		fmt.Printf("- ∂ Storage Deletes: %d\n", storageDeleted-oldStorageDeleted)
+		fmt.Printf("- ∂ Storage Updates: %d\n", storageUpdated-oldStorageUpdated)
+	}
+
 	receipts := make([]*types.Receipt, 0)
 	transactions := make([]*types.Transaction, 0)
 
@@ -175,6 +204,9 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	gasPool := new(core.GasPool)
 	gasPool.AddGas(header.GasLimit)
 
+	fmt.Println("stats before tx")
+	updateAndPrintStats()
+
 	for _, tx := range executedBlock.Transactions() {
 		from, err := types.Sender(types.NewIsthmusSigner(genesis.Config.ChainID), tx)
 		if err != nil {
@@ -196,6 +228,9 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 			return fmt.Errorf("failed to apply transaction to L1 block (tx %d): %v", len(executedBlock.Transactions()), err)
 		}
 
+		fmt.Println("stats after tx")
+		updateAndPrintStats()
+
 		receipts = append(receipts, receipt)
 		transactions = append(transactions, tx.WithoutBlobTxSidecar())
 	}
@@ -203,21 +238,16 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
 	header.Root = statedb.IntermediateRoot(true)
 
-	accountLoaded := statedb.AccountLoaded
-	accountDeleted := statedb.AccountDeleted
-	accountReads := statedb.AccountReads
-	accountsUpdated := statedb.AccountUpdated
-	storageDeleted := statedb.StorageDeleted.Load()
-	storageReads := statedb.StorageReads
-	storageLoaded := statedb.StorageLoaded
+	fmt.Println("state root")
+	updateAndPrintStats()
 
-	fmt.Printf("- Accounts Loaded: %d\n", accountLoaded)
-	fmt.Printf("- Accounts Deleted: %d\n", accountDeleted)
-	fmt.Printf("- Accounts Reset: %d\n", accountReads)
-	fmt.Printf("- Accounts Updated: %d\n", accountsUpdated)
-	fmt.Printf("- Storage Deleted: %d\n", storageDeleted)
-	fmt.Printf("- Storage Reads: %d\n", storageReads)
-	fmt.Printf("- Storage Loaded: %d\n", storageLoaded)
+	fmt.Println("final stats")
+	fmt.Printf("- Accounts Reads: %d\n", accountLoaded)
+	fmt.Printf("- Accounts Deletes: %d\n", accountDeleted)
+	fmt.Printf("- Accounts Updates: %d\n", accountsUpdated)
+	fmt.Printf("- Storage Reads: %d\n", storageLoaded)
+	fmt.Printf("- Storage Deletes: %d\n", storageDeleted)
+	fmt.Printf("- Storage Updates: %d\n", storageUpdated)
 
 	isCancun := genesis.Config.IsCancun(header.Number, header.Time)
 	// Write state changes to db
