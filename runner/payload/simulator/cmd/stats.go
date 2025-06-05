@@ -84,14 +84,82 @@ func (b *blockCtx) Config() *params.ChainConfig {
 	return b.config
 }
 
-// // Engine retrieves the chain's consensus engine.
-// Engine() consensus.Engine
+type stats struct {
+	accountLoaded   float64
+	accountDeleted  float64
+	accountsUpdated float64
+	storageLoaded   float64
+	storageDeleted  float64
+	storageUpdated  float64
+}
 
-// // GetHeader returns the header corresponding to the hash/number argument pair.
-// GetHeader(common.Hash, uint64) *types.Header
+func newStats() *stats {
+	return &stats{
+		accountLoaded:   0,
+		accountDeleted:  0,
+		accountsUpdated: 0,
+		storageLoaded:   0,
+		storageDeleted:  0,
+		storageUpdated:  0,
+	}
+}
 
-// // Config returns the chain's configuration.
-// Config() *params.ChainConfig
+func (s *stats) update(db *state.StateDB) {
+	s.accountLoaded = float64(db.AccountLoaded)
+	s.accountDeleted = float64(db.AccountDeleted)
+	s.accountsUpdated = float64(db.AccountUpdated)
+	s.storageLoaded = float64(db.StorageLoaded)
+	s.storageDeleted = float64(db.StorageDeleted.Load())
+	s.storageUpdated = float64(db.StorageUpdated.Load())
+}
+
+func (s *stats) sub(other *stats) *stats {
+	return &stats{
+		accountLoaded:   s.accountLoaded - other.accountLoaded,
+		accountDeleted:  s.accountDeleted - other.accountDeleted,
+		accountsUpdated: s.accountsUpdated - other.accountsUpdated,
+		storageLoaded:   s.storageLoaded - other.storageLoaded,
+		storageDeleted:  s.storageDeleted - other.storageDeleted,
+		storageUpdated:  s.storageUpdated - other.storageUpdated,
+	}
+}
+
+func (s *stats) add(other *stats) *stats {
+	return &stats{
+		accountLoaded:   s.accountLoaded + other.accountLoaded,
+		accountDeleted:  s.accountDeleted + other.accountDeleted,
+		accountsUpdated: s.accountsUpdated + other.accountsUpdated,
+		storageLoaded:   s.storageLoaded + other.storageLoaded,
+		storageDeleted:  s.storageDeleted + other.storageDeleted,
+		storageUpdated:  s.storageUpdated + other.storageUpdated,
+	}
+}
+
+func (s *stats) mul(n float64) *stats {
+	return &stats{
+		accountLoaded:   s.accountLoaded * n,
+		accountDeleted:  s.accountDeleted * n,
+		accountsUpdated: s.accountsUpdated * n,
+		storageLoaded:   s.storageLoaded * n,
+		storageDeleted:  s.storageDeleted * n,
+		storageUpdated:  s.storageUpdated * n,
+	}
+}
+
+func (s *stats) copy() *stats {
+	return &stats{
+		accountLoaded:   s.accountLoaded,
+		accountDeleted:  s.accountDeleted,
+		accountsUpdated: s.accountsUpdated,
+		storageLoaded:   s.storageLoaded,
+		storageDeleted:  s.storageDeleted,
+		storageUpdated:  s.storageUpdated,
+	}
+}
+
+func (s *stats) String() string {
+	return fmt.Sprintf("- Accounts Reads: %.0f\n- Accounts Deletes: %.0f\n- Accounts Updates: %.0f\n- Storage Reads: %.0f\n- Storage Deletes: %.0f\n- Storage Updates: %.0f\n", s.accountLoaded, s.accountDeleted, s.accountsUpdated, s.storageLoaded, s.storageDeleted, s.storageUpdated)
+}
 
 func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *types.Block, witness *eth.ExecutionWitness, genesis *core.Genesis) error {
 	header := &types.Header{
@@ -115,8 +183,6 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 		return fmt.Errorf("failed to get chain config: %w", err)
 	}
 
-	fmt.Printf("%#v\n", chainCfg)
-
 	genesis.Config = chainCfg
 
 	chainCtx := newBlockCtx(genesis, client)
@@ -138,37 +204,8 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 		return fmt.Errorf("failed to init state db around block %s (state %s): %w", parent.Hash().Hex(), parent.Root().Hex(), err)
 	}
 
-	accountLoaded := statedb.AccountLoaded
-	accountDeleted := statedb.AccountDeleted
-	accountsUpdated := statedb.AccountUpdated
-	storageDeleted := statedb.StorageDeleted.Load()
-	storageUpdated := statedb.StorageUpdated.Load()
-	storageLoaded := statedb.StorageLoaded
-
-	updateAndPrintStats := func() {
-		oldAccountLoaded := accountLoaded
-		oldAccountDeleted := accountDeleted
-		oldAccountsUpdated := accountsUpdated
-		oldStorageDeleted := storageDeleted
-		oldStorageLoaded := storageLoaded
-		oldStorageUpdated := storageUpdated
-		accountLoaded = statedb.AccountLoaded
-		accountDeleted = statedb.AccountDeleted
-		accountsUpdated = statedb.AccountUpdated
-		storageDeleted = statedb.StorageDeleted.Load()
-		storageUpdated = statedb.StorageUpdated.Load()
-		storageLoaded = statedb.StorageLoaded
-
-		fmt.Printf("- ∂ Accounts Reads: %d\n", accountLoaded-oldAccountLoaded)
-		fmt.Printf("- ∂ Accounts Deletes: %d\n", accountDeleted-oldAccountDeleted)
-		fmt.Printf("- ∂ Accounts Updates: %d\n", accountsUpdated-oldAccountsUpdated)
-		fmt.Printf("- ∂ Storage Reads: %d\n", storageLoaded-oldStorageLoaded)
-		fmt.Printf("- ∂ Storage Deletes: %d\n", storageDeleted-oldStorageDeleted)
-		fmt.Printf("- ∂ Storage Updates: %d\n", storageUpdated-oldStorageUpdated)
-	}
-
-	receipts := make([]*types.Receipt, 0)
-	transactions := make([]*types.Transaction, 0)
+	blockStats := newStats()
+	txStats := make([]*stats, len(executedBlock.Transactions()))
 
 	if genesis.Config.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(genesis.Config, parent.Header(), header.Time)
@@ -204,15 +241,9 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	gasPool := new(core.GasPool)
 	gasPool.AddGas(header.GasLimit)
 
-	fmt.Println("stats before tx")
-	updateAndPrintStats()
+	blockStats.update(statedb)
 
-	for _, tx := range executedBlock.Transactions() {
-		from, err := types.Sender(types.NewIsthmusSigner(genesis.Config.ChainID), tx)
-		if err != nil {
-			return fmt.Errorf("failed to get sender of tx: %v", err)
-		}
-		fmt.Println("including tx", "nonce", tx.Nonce(), "from", from, "to", tx.To())
+	for i, tx := range executedBlock.Transactions() {
 		if tx.Gas() > header.GasLimit {
 			return fmt.Errorf("tx consumes %d gas, more than available in L1 block %d", tx.Gas(), header.GasLimit)
 		}
@@ -222,32 +253,21 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 		statedb.SetTxContext(tx.Hash(), len(executedBlock.Transactions()))
 		blockCtx := core.NewEVMBlockContext(header, chainCtx, nil, genesis.Config, statedb)
 		evm := vm.NewEVM(blockCtx, statedb, genesis.Config, vm.Config{})
-		receipt, err := core.ApplyTransaction(
+		_, err := core.ApplyTransaction(
 			evm, gasPool, statedb, header, tx.WithoutBlobTxSidecar(), &header.GasUsed)
 		if err != nil {
 			return fmt.Errorf("failed to apply transaction to L1 block (tx %d): %v", len(executedBlock.Transactions()), err)
 		}
 
-		fmt.Println("stats after tx")
-		updateAndPrintStats()
-
-		receipts = append(receipts, receipt)
-		transactions = append(transactions, tx.WithoutBlobTxSidecar())
+		prevBlockStats := blockStats.copy()
+		blockStats.update(statedb)
+		txStats[i] = blockStats.sub(prevBlockStats)
 	}
 
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
 	header.Root = statedb.IntermediateRoot(true)
 
-	fmt.Println("state root")
-	updateAndPrintStats()
-
-	fmt.Println("final stats")
-	fmt.Printf("- Accounts Reads: %d\n", accountLoaded)
-	fmt.Printf("- Accounts Deletes: %d\n", accountDeleted)
-	fmt.Printf("- Accounts Updates: %d\n", accountsUpdated)
-	fmt.Printf("- Storage Reads: %d\n", storageLoaded)
-	fmt.Printf("- Storage Deletes: %d\n", storageDeleted)
-	fmt.Printf("- Storage Updates: %d\n", storageUpdated)
+	blockStats.update(statedb)
 
 	isCancun := genesis.Config.IsCancun(header.Number, header.Time)
 	// Write state changes to db
@@ -265,6 +285,14 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	}
 
 	fmt.Printf("state root calculated: %s, state root in header: %s\n", root.Hex(), header.Root.Hex())
+
+	fmt.Println("block stats")
+	fmt.Println(blockStats)
+
+	fmt.Println("tx stats")
+	for i, txStat := range txStats {
+		fmt.Printf("tx %d: %s\n", i, txStat)
+	}
 
 	return nil
 }
