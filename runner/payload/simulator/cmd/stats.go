@@ -136,35 +136,29 @@ func (o opcodeStats) String() string {
 	})
 	opcodes = opcodes[:min(10, len(opcodes))]
 	for _, opcode := range opcodes {
-		result.WriteString(fmt.Sprintf("\n   - %10s: %.2f", opcode, o[opcode]))
+		result.WriteString(fmt.Sprintf("\n   - %20s: %.2f", opcode, o[opcode]))
 	}
 	return result.String()
 }
 
 var allPrecompiles = map[common.Address]string{
-	common.BytesToAddress([]byte{1}):    "ecrecover",
-	common.BytesToAddress([]byte{2}):    "sha256hash",
-	common.BytesToAddress([]byte{3}):    "ripemd160hash",
-	common.BytesToAddress([]byte{4}):    "dataCopy",
-	common.BytesToAddress([]byte{5}):    "bigModExp",
-	common.BytesToAddress([]byte{0xf5}): "bigModExp",
-	common.BytesToAddress([]byte{6}):    "bn256Add",
-	common.BytesToAddress([]byte{7}):    "bn256ScalarMulIstanbul",
-	common.BytesToAddress([]byte{8}):    "bn256PairingGranite",
-	common.BytesToAddress([]byte{9}):    "blake2F",
-	common.BytesToAddress([]byte{0x0a}): "kzgPointEvaluation",
-
-	common.BytesToAddress([]byte{0x0f, 0x0a}): "bls12381G1Add",
-	common.BytesToAddress([]byte{0x0f, 0x0b}): "bls12381G1MultiExpPrague",
-	common.BytesToAddress([]byte{0x1f, 0x0b}): "bls12381G1MultiExpIsthmus",
-	common.BytesToAddress([]byte{0x0f, 0x0c}): "bls12381G2Add",
-	common.BytesToAddress([]byte{0x0f, 0x0d}): "bls12381G2MultiExpPrague",
-	common.BytesToAddress([]byte{0x1f, 0x0d}): "bls12381G2MultiExpIsthmus",
-	common.BytesToAddress([]byte{0x0f, 0x0e}): "bls12381PairingPrague",
-	common.BytesToAddress([]byte{0x1f, 0x0e}): "bls12381PairingIsthmus",
-	common.BytesToAddress([]byte{0x0f, 0x0f}): "bls12381MapG1",
-	common.BytesToAddress([]byte{0x0f, 0x10}): "bls12381MapG2",
-
+	common.BytesToAddress([]byte{1}):          "ecrecover",
+	common.BytesToAddress([]byte{2}):          "sha256hash",
+	common.BytesToAddress([]byte{3}):          "ripemd160hash",
+	common.BytesToAddress([]byte{4}):          "dataCopy",
+	common.BytesToAddress([]byte{5}):          "bigModExp",
+	common.BytesToAddress([]byte{6}):          "bn256Add",
+	common.BytesToAddress([]byte{7}):          "bn256ScalarMul",
+	common.BytesToAddress([]byte{8}):          "bn256Pairing",
+	common.BytesToAddress([]byte{9}):          "blake2F",
+	common.BytesToAddress([]byte{0x0a}):       "kzgPointEvaluation",
+	common.BytesToAddress([]byte{0x0b}):       "bls12381G1Add",
+	common.BytesToAddress([]byte{0x0c}):       "bls12381G1MultiExp",
+	common.BytesToAddress([]byte{0x0d}):       "bls12381G2Add",
+	common.BytesToAddress([]byte{0x0e}):       "bls12381G2MultiExp",
+	common.BytesToAddress([]byte{0x0f}):       "bls12381Pairing",
+	common.BytesToAddress([]byte{0x10}):       "bls12381MapG1",
+	common.BytesToAddress([]byte{0x11}):       "bls12381MapG2",
 	common.BytesToAddress([]byte{0x01, 0x00}): "p256Verify",
 }
 
@@ -224,8 +218,7 @@ func (s *stats) update(db *state.StateDB, codePrestate map[common.Hash][]byte, o
 
 	s.codeSizeLoaded = float64(totalCodeSize)
 	s.numContractsLoaded = float64(len(codePrestate))
-	s.opcodes = opcodeStats
-	s.opcodes.removeAllBut("EXP", "SHA3")
+	s.opcodes = opcodeStats.removeAllBut("EXP", "SHA3")
 	s.precompileStats = precompileStats
 }
 
