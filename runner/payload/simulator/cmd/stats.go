@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"math/big"
 
 	"github.com/ethereum-optimism/optimism/op-program/chainconfig"
@@ -21,44 +22,40 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb/memorydb"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-func fetchBlockStats(client *ethclient.Client, block *types.Block, genesis *core.Genesis) (map[string]interface{}, error) {
+func fetchBlockStats(log log.Logger, client *ethclient.Client, block *types.Block, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*stats, []*stats, error) {
+	log.Info("Fetching execution witness")
+
 	var result *eth.ExecutionWitness
 	err := client.Client().CallContext(context.Background(), &result, "debug_executionWitness", hexutil.EncodeUint64(block.NumberU64()))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	log.Info("Finished fetching execution witness")
 
 	parentBlock, err := client.BlockByHash(context.Background(), block.ParentHash())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	err = executeBlock(client, parentBlock, block, result, genesis)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{
-		"blockNumber": block.Number(),
-		"blockHash":   block.Hash(),
-		"blockTime":   block.Time(),
-		"blockSize":   block.Size(),
-	}, nil
+	return executeBlock(log, client, parentBlock, block, result, genesis, headerCache)
 }
 
 type blockCtx struct {
 	engine                consensus.Engine
 	getHeaderByHashNumber func(hash common.Hash, number uint64) *types.Header
 	config                *params.ChainConfig
+	headers               map[common.Hash]*types.Header
 }
 
-func newBlockCtx(genesis *core.Genesis, ethClient *ethclient.Client) *blockCtx {
+func newBlockCtx(genesis *core.Genesis, ethClient *ethclient.Client, headerCache map[common.Hash]*types.Header) *blockCtx {
 	getHeaderByHashNumber := func(hash common.Hash, number uint64) *types.Header {
-		header, err := ethClient.HeaderByNumber(context.Background(), nil)
+		header, err := ethClient.HeaderByHash(context.Background(), hash)
 		if err != nil {
 			panic(err)
 		}
@@ -69,6 +66,7 @@ func newBlockCtx(genesis *core.Genesis, ethClient *ethclient.Client) *blockCtx {
 		engine:                beacon.New(nil),
 		getHeaderByHashNumber: getHeaderByHashNumber,
 		config:                genesis.Config,
+		headers:               headerCache,
 	}
 }
 
@@ -77,7 +75,12 @@ func (b *blockCtx) Engine() consensus.Engine {
 }
 
 func (b *blockCtx) GetHeader(hash common.Hash, number uint64) *types.Header {
-	return b.getHeaderByHashNumber(hash, number)
+	if header, ok := b.headers[hash]; ok {
+		return header
+	}
+	header := b.getHeaderByHashNumber(hash, number)
+	b.headers[hash] = header
+	return header
 }
 
 func (b *blockCtx) Config() *params.ChainConfig {
@@ -124,6 +127,17 @@ func (s *stats) sub(other *stats) *stats {
 	}
 }
 
+func (s *stats) pow(n float64) *stats {
+	return &stats{
+		accountLoaded:   math.Pow(s.accountLoaded, n),
+		accountDeleted:  math.Pow(s.accountDeleted, n),
+		accountsUpdated: math.Pow(s.accountsUpdated, n),
+		storageLoaded:   math.Pow(s.storageLoaded, n),
+		storageDeleted:  math.Pow(s.storageDeleted, n),
+		storageUpdated:  math.Pow(s.storageUpdated, n),
+	}
+}
+
 func (s *stats) add(other *stats) *stats {
 	return &stats{
 		accountLoaded:   s.accountLoaded + other.accountLoaded,
@@ -158,10 +172,10 @@ func (s *stats) copy() *stats {
 }
 
 func (s *stats) String() string {
-	return fmt.Sprintf("- Accounts Reads: %.0f\n- Accounts Deletes: %.0f\n- Accounts Updates: %.0f\n- Storage Reads: %.0f\n- Storage Deletes: %.0f\n- Storage Updates: %.0f\n", s.accountLoaded, s.accountDeleted, s.accountsUpdated, s.storageLoaded, s.storageDeleted, s.storageUpdated)
+	return fmt.Sprintf("- Accounts Reads: %.2f\n- Accounts Deletes: %.2f\n- Accounts Updates: %.2f\n- Storage Reads: %.2f\n- Storage Deletes: %.2f\n- Storage Updates: %.2f\n", s.accountLoaded, s.accountDeleted, s.accountsUpdated, s.storageLoaded, s.storageDeleted, s.storageUpdated)
 }
 
-func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *types.Block, witness *eth.ExecutionWitness, genesis *core.Genesis) error {
+func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block, executedBlock *types.Block, witness *eth.ExecutionWitness, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*stats, []*stats, error) {
 	header := &types.Header{
 		ParentHash:      parent.Hash(),
 		Coinbase:        executedBlock.Coinbase(),
@@ -180,12 +194,12 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 
 	chainCfg, err := chainconfig.ChainConfigByChainID(eth.ChainIDFromBig(big.NewInt(8453)))
 	if err != nil {
-		return fmt.Errorf("failed to get chain config: %w", err)
+		return nil, nil, fmt.Errorf("failed to get chain config: %w", err)
 	}
 
 	genesis.Config = chainCfg
 
-	chainCtx := newBlockCtx(genesis, client)
+	chainCtx := newBlockCtx(genesis, client, headerCache)
 
 	for _, code := range witness.Codes {
 		codes[crypto.Keccak256Hash(code)] = []byte(code)
@@ -201,7 +215,7 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 
 	statedb, err := state.New(parent.Root(), state.NewDatabase(triedb.NewDatabase(rawdb.NewDatabase(oracleDb), nil), nil))
 	if err != nil {
-		return fmt.Errorf("failed to init state db around block %s (state %s): %w", parent.Hash().Hex(), parent.Root().Hex(), err)
+		return nil, nil, fmt.Errorf("failed to init state db around block %s (state %s): %w", parent.Hash().Hex(), parent.Root().Hex(), err)
 	}
 
 	blockStats := newStats()
@@ -243,12 +257,14 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 
 	blockStats.update(statedb)
 
+	log.Info("Finished initializing state db")
+
 	for i, tx := range executedBlock.Transactions() {
 		if tx.Gas() > header.GasLimit {
-			return fmt.Errorf("tx consumes %d gas, more than available in L1 block %d", tx.Gas(), header.GasLimit)
+			return nil, nil, fmt.Errorf("tx consumes %d gas, more than available in L1 block %d", tx.Gas(), header.GasLimit)
 		}
 		if tx.Gas() > uint64(*gasPool) {
-			return fmt.Errorf("action takes too much gas: %d, only have %d", tx.Gas(), uint64(*gasPool))
+			return nil, nil, fmt.Errorf("action takes too much gas: %d, only have %d", tx.Gas(), uint64(*gasPool))
 		}
 		statedb.SetTxContext(tx.Hash(), len(executedBlock.Transactions()))
 		blockCtx := core.NewEVMBlockContext(header, chainCtx, nil, genesis.Config, statedb)
@@ -256,7 +272,7 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 		_, err := core.ApplyTransaction(
 			evm, gasPool, statedb, header, tx.WithoutBlobTxSidecar(), &header.GasUsed)
 		if err != nil {
-			return fmt.Errorf("failed to apply transaction to L1 block (tx %d): %v", len(executedBlock.Transactions()), err)
+			return nil, nil, fmt.Errorf("failed to apply transaction to L1 block (tx %d): %v", len(executedBlock.Transactions()), err)
 		}
 
 		prevBlockStats := blockStats.copy()
@@ -267,32 +283,28 @@ func executeBlock(client *ethclient.Client, parent *types.Block, executedBlock *
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
 	header.Root = statedb.IntermediateRoot(true)
 
+	log.Info("Finished executing block transactions")
+
 	blockStats.update(statedb)
 
 	isCancun := genesis.Config.IsCancun(header.Number, header.Time)
 	// Write state changes to db
 	root, err := statedb.Commit(header.Number.Uint64(), genesis.Config.IsEIP158(header.Number), isCancun)
 	if err != nil {
-		return fmt.Errorf("l1 state write error: %v", err)
+		return nil, nil, fmt.Errorf("l1 state write error: %v", err)
 	}
 	if header.Root.Cmp(root) != 0 {
-		return fmt.Errorf("l1 state root mismatch: %v != %v", root, header.Root)
+		return nil, nil, fmt.Errorf("l1 state root mismatch: %v != %v", root, header.Root)
 	}
+
+	log.Info("Finished committing state db")
 
 	err = statedb.Database().TrieDB().Commit(root, false)
 	if err != nil {
-		return fmt.Errorf("failed to commit state db: %w", err)
+		return nil, nil, fmt.Errorf("failed to commit state db: %w", err)
 	}
 
-	fmt.Printf("state root calculated: %s, state root in header: %s\n", root.Hex(), header.Root.Hex())
+	log.Info("Finished committing state db to trie db")
 
-	fmt.Println("block stats")
-	fmt.Println(blockStats)
-
-	fmt.Println("tx stats")
-	for i, txStat := range txStats {
-		fmt.Printf("tx %d: %s\n", i, txStat)
-	}
-
-	return nil
+	return blockStats, txStats, nil
 }
