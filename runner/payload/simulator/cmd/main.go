@@ -118,11 +118,11 @@ func main() {
 		}
 
 		blockVariance = blockVariance.mul(1 / float64(sampleSize))
-		blockStdDev := blockVariance.pow(0.5)
+		_ = blockVariance.pow(0.5)
 
 		fmt.Printf("Aggregate block stats:\n%s\n\n", aggregateBlockStats)
 		fmt.Printf("Aggregate tx stats:\n%s\n\n", aggregateTxStats)
-		fmt.Printf("Block std dev:\n%s\n\n", blockStdDev)
+		// fmt.Printf("Block std dev:\n%s\n\n", blockStdDev)
 		return nil
 	}
 
