@@ -218,7 +218,7 @@ func (s *stats) update(db *state.StateDB, codePrestate map[common.Hash][]byte, o
 
 	s.codeSizeLoaded = float64(totalCodeSize)
 	s.numContractsLoaded = float64(len(codePrestate))
-	s.opcodes = opcodeStats.removeAllBut("EXP", "SHA3")
+	s.opcodes = opcodeStats.removeAllBut("EXP", "KECCAK256")
 	s.precompileStats = precompileStats
 }
 

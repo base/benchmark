@@ -62,7 +62,7 @@ func main() {
 		if err != nil {
 			return err
 		}
-		defer genesisFile.Close()
+		defer func() { _ = genesisFile.Close() }()
 		err = json.NewDecoder(genesisFile).Decode(&genesis)
 		if err != nil {
 			return err
