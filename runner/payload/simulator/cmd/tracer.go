@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/base/base-bench/runner/payload/simulator/simulatorstats"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/tracing"
 	"github.com/ethereum/go-ethereum/core/vm"
@@ -8,14 +9,14 @@ import (
 
 // opcodeTracer is a live tracer that tracks the opcode and precompile stats.
 type opcodeTracer struct {
-	opcodeStats     opcodeStats
-	precompileStats opcodeStats
+	opcodeStats     simulatorstats.OpcodeStats
+	precompileStats simulatorstats.OpcodeStats
 }
 
 func newOpcodeTracer() *opcodeTracer {
 	return &opcodeTracer{
-		opcodeStats:     make(opcodeStats),
-		precompileStats: make(opcodeStats),
+		opcodeStats:     make(simulatorstats.OpcodeStats),
+		precompileStats: make(simulatorstats.OpcodeStats),
 	}
 }
 
@@ -33,7 +34,7 @@ func (t *opcodeTracer) OnOpcode(pc uint64, op byte, gas, cost uint64, scope trac
 		addr := common.BigToAddress(addressBig.ToBig())
 		precompiles := vm.PrecompiledContractsIsthmus
 		if precompiles[addr] != nil {
-			t.precompileStats[allPrecompiles[addr]]++
+			t.precompileStats[simulatorstats.PrecompileAddressToName[addr]]++
 		}
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/base/base-bench/runner/payload/simulator/simulatorstats"
 	"github.com/ethereum-optimism/optimism/op-service/log"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -89,12 +90,12 @@ func main() {
 
 		logger := log.NewLogger(os.Stdout, log.ReadCLIConfig(c))
 
-		aggregateBlockStats := newStats()
+		aggregateBlockStats := simulatorstats.NewStats()
 		totalTxs := 0
 
 		headerCache := make(map[common.Hash]*types.Header)
 
-		allBlockStats := make([]*stats, sampleSize)
+		allBlockStats := make([]*simulatorstats.Stats, sampleSize)
 
 		for i := 0; i < sampleSize; i++ {
 			logger.Info("Fetching block stats", "block", latestBlock.Number().String())
@@ -109,24 +110,24 @@ func main() {
 				return err
 			}
 
-			aggregateBlockStats = aggregateBlockStats.add(blockStats)
+			aggregateBlockStats = aggregateBlockStats.Add(blockStats)
 			allBlockStats[i] = blockStats
 			totalTxs += len(txStats)
 		}
 
-		aggregateTxStats := aggregateBlockStats.copy().mul(1 / float64(totalTxs))
-		aggregateBlockStats = aggregateBlockStats.mul(1 / float64(sampleSize))
+		aggregateTxStats := aggregateBlockStats.Copy().Mul(1 / float64(totalTxs))
+		aggregateBlockStats = aggregateBlockStats.Mul(1 / float64(sampleSize))
 
-		blockVariance := newStats()
+		blockVariance := simulatorstats.NewStats()
 		// calculate std dev for each stat
 		for i := 0; i < sampleSize; i++ {
-			allBlockStats[i] = allBlockStats[i].sub(aggregateBlockStats)
-			allBlockStats[i] = allBlockStats[i].pow(2)
-			blockVariance = blockVariance.add(allBlockStats[i])
+			allBlockStats[i] = allBlockStats[i].Sub(aggregateBlockStats)
+			allBlockStats[i] = allBlockStats[i].Pow(2)
+			blockVariance = blockVariance.Add(allBlockStats[i])
 		}
 
-		blockVariance = blockVariance.mul(1 / float64(sampleSize))
-		_ = blockVariance.pow(0.5)
+		blockVariance = blockVariance.Mul(1 / float64(sampleSize))
+		_ = blockVariance.Pow(0.5)
 
 		fmt.Printf("Aggregate block stats:\n%s\n\n", aggregateBlockStats)
 		fmt.Printf("Aggregate tx stats:\n%s\n\n", aggregateTxStats)
