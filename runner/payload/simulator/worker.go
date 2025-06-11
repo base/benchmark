@@ -3,11 +3,9 @@ package simulator
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
-	"os"
 	"time"
 
 	"github.com/base/base-bench/runner/network/mempool"
@@ -18,7 +16,6 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -26,12 +23,6 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
-
-// maxGasPerCall is the maximum gas per call for the payload contract.
-const maxGasPerCall = 10000000
-
-// maxStorageSlots is the number of unaccessed storage slots read
-const maxStorageSlots = 1e7
 
 const maxAccounts = 2
 
@@ -150,31 +141,13 @@ func (t *simulatorPayloadWorker) Setup(ctx context.Context) error {
 
 	var lastTxHash common.Hash
 
-	// create contract
-	contractFile, err := os.Open("contracts/out/Simulator.sol/Simulator.json")
-	if err != nil {
-		return errors.Wrap(err, "failed to open contract file")
-	}
-	defer contractFile.Close()
-
-	var contract Contract
-	err = json.NewDecoder(contractFile).Decode(&contract)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode contract file")
-	}
-
-	bytecode, err := hexutil.Decode(contract.Bytecode.Object)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode contract bytecode")
-	}
-
 	numStorageSlotsRequired := uint64((t.payloadParams.StorageLoaded + t.payloadParams.StorageUpdated) * float64(t.params.NumBlocks+2))
 	numAccountsRequired := uint64((t.payloadParams.AccountLoaded + t.payloadParams.AccountsUpdated) * float64(t.params.NumBlocks+2))
 
 	storageChunks := uint64(math.Ceil(float64(numStorageSlotsRequired) / 100000))
 	accountChunks := uint64(math.Ceil(float64(numAccountsRequired) / 100000))
 
-	contractAddr, contractDeploymentTx, err := t.createDeployTx(t.prefundedAccount, bytecode, numStorageSlotsRequired, numAccountsRequired)
+	contractAddr, contractDeploymentTx, err := t.createDeployTx(t.prefundedAccount, numStorageSlotsRequired, numAccountsRequired)
 	if err != nil {
 		return errors.Wrap(err, "failed to create contract deployment transaction")
 	}
@@ -317,7 +290,7 @@ func (t *simulatorPayloadWorker) createCallTx(transactor *bind.TransactOpts, fro
 	})
 }
 
-func (t *simulatorPayloadWorker) createDeployTx(fromPriv *ecdsa.PrivateKey, contract []byte, numStorageSlotsRequired uint64, numAccountsRequired uint64) (*common.Address, *types.Transaction, error) {
+func (t *simulatorPayloadWorker) createDeployTx(fromPriv *ecdsa.PrivateKey, numStorageSlotsRequired uint64, numAccountsRequired uint64) (*common.Address, *types.Transaction, error) {
 
 	transactor, err := bind.NewKeyedTransactorWithChainID(fromPriv, t.chainID)
 	if err != nil {
