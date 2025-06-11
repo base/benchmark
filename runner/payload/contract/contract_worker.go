@@ -242,6 +242,9 @@ func (t *contractPayloadWorker) sendContractTx(ctx context.Context) error {
 	}
 
 	bytesHex := t.params.Calldata
+	if bytesHex == "" {
+		bytesHex = "0x"
+	}
 	bytesData, err := hexutil.Decode(bytesHex)
 	if err != nil {
 		return fmt.Errorf("failed to decode calldata: %w", err)
