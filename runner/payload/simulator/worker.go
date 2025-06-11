@@ -3,28 +3,27 @@ package simulator
 import (
 	"context"
 	"crypto/ecdsa"
-	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
+	"os"
 	"time"
-
-	"math/rand"
 
 	"github.com/base/base-bench/runner/network/mempool"
 	benchtypes "github.com/base/base-bench/runner/network/types"
+	"github.com/base/base-bench/runner/payload/simulator/abi"
 	"github.com/base/base-bench/runner/payload/simulator/simulatorstats"
 	"github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/params"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 )
 
@@ -36,123 +35,22 @@ const maxStorageSlots = 1e7
 
 const maxAccounts = 2
 
-type SimulatorPayloadDefinition = simulatorstats.Stats
-
-func generatePayloadContract(target simulatorstats.Stats) []byte {
-	// calculate number of calls to make
-	// round(expectedCalls - actualCalls)
-	// round((target * (numBlocks + 1)) - (totalPerBlock * numBlocks))
-	// numCalls := (target.Copy().Mul(float64(numBlocks + 1))).Sub(totalPerBlock.Copy().Mul(float64(numBlocks)))
-	numCalls := target.Round()
-
-	// first read some random account balances and storage slots
-
-	b := []byte{}
-
-	// load call data 0 (storage slot offset)
-	b = append(b, byte(vm.PUSH1))
-	b = append(b, byte(0))
-	b = append(b, byte(vm.CALLDATALOAD))
-
-	for i := 0; i < int(numCalls.StorageLoaded); i++ {
-		b = append(b, byte(vm.PUSH1))
-		b = append(b, byte(1))
-		b = append(b, byte(vm.ADD))
-		b = append(b, byte(vm.DUP1))
-		b = append(b, byte(vm.SLOAD))
-		b = append(b, byte(vm.POP))
-	}
-
-	b = append(b, byte(vm.PUSH1))
-	b = append(b, byte(1))
-	b = append(b, byte(vm.CALLDATALOAD))
-
-	for i := 0; i < int(numCalls.AccountLoaded)-1; i++ {
-		b = append(b, byte(vm.PUSH1))
-		b = append(b, byte(1))
-		b = append(b, byte(vm.ADD))
-		b = append(b, byte(vm.DUP1))
-		b = append(b, byte(vm.BALANCE))
-		b = append(b, byte(vm.POP))
-	}
-
-	// pop the account offset
-	b = append(b, byte(vm.POP))
-
-	// copy the latest storage offset to use as a counter
-	b = append(b, byte(vm.DUP1))
-
-	// store from the latest storage offset backwards
-	for i := 0; i < int(numCalls.StorageUpdated); i++ {
-		// sub 1 from counter
-		b = append(b, byte(vm.PUSH1))
-		b = append(b, byte(1))
-		b = append(b, byte(vm.SUB))
-
-		// push the key, value to store
-		b = append(b, byte(vm.DUP1))
-		b = append(b, byte(vm.DUP1))
-
-		// store the value
-		b = append(b, byte(vm.SSTORE))
-	}
-
-	// pop the counter
-	b = append(b, byte(vm.POP))
-
-	for i := 0; i < int(numCalls.StorageCreated); i++ {
-		b = append(b, byte(vm.PUSH1))
-		b = append(b, byte(1))
-		b = append(b, byte(vm.ADD))
-
-		b = append(b, byte(vm.DUP1))
-		b = append(b, byte(vm.DUP1))
-		b = append(b, byte(vm.SSTORE))
-	}
-
-	b = append(b, byte(vm.RETURN))
-
-	deployPrefixSize := byte(16)
-	deployPrefix := []byte{
-		// Copy input data after this prefix into memory starting at address 0x00
-		// CODECOPY arg size
-		byte(vm.PUSH1), deployPrefixSize,
-		byte(vm.CODESIZE),
-		byte(vm.SUB),
-		// CODECOPY arg offset
-		byte(vm.PUSH1), deployPrefixSize,
-		// CODECOPY arg destOffset
-		byte(vm.PUSH1), 0x00,
-		byte(vm.CODECOPY),
-
-		// Return code from memory
-		// RETURN arg size
-		byte(vm.PUSH1), deployPrefixSize,
-		byte(vm.CODESIZE),
-		byte(vm.SUB),
-		// RETURN arg offset
-		byte(vm.PUSH1), 0x00,
-		byte(vm.RETURN),
-	}
-
-	b = append(deployPrefix, b...)
-
-	return b
+type Bytecode struct {
+	Object string `json:"object"`
 }
+
+type Contract struct {
+	Bytecode Bytecode `json:"bytecode"`
+}
+
+type SimulatorPayloadDefinition = simulatorstats.Stats
 
 type simulatorPayloadWorker struct {
 	log log.Logger
 
-	privateKeys  []*ecdsa.PrivateKey
-	addresses    []common.Address
-	nextNonce    map[common.Address]uint64
-	balance      map[common.Address]*big.Int
-	prefundNonce uint64
-
-	params        benchtypes.RunParams
-	payloadParams SimulatorPayloadDefinition
-	chainID       *big.Int
-	client        *ethclient.Client
+	params  benchtypes.RunParams
+	chainID *big.Int
+	client  *ethclient.Client
 
 	prefundedAccount *ecdsa.PrivateKey
 	prefundAmount    *big.Int
@@ -160,7 +58,40 @@ type simulatorPayloadWorker struct {
 	mempool *mempool.StaticWorkloadMempool
 
 	contractAddr common.Address
+
+	payloadParams   SimulatorPayloadDefinition
+	actualNumConfig SimulatorPayloadDefinition
+	numBlocks       uint64
+	transactor      *transactorWithTrackedNonce
 }
+
+type transactorWithTrackedNonce struct {
+	bind.ContractBackend
+	trackedAddr common.Address
+	nonce       uint64
+}
+
+func newTransactorWithTrackedNonce(transactor bind.ContractBackend, trackedAddr common.Address) *transactorWithTrackedNonce {
+	return &transactorWithTrackedNonce{
+		ContractBackend: transactor,
+		trackedAddr:     trackedAddr,
+		nonce:           0,
+	}
+}
+
+func (t *transactorWithTrackedNonce) incrementNonce() {
+	t.nonce++
+}
+
+func (t *transactorWithTrackedNonce) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
+	if account != t.trackedAddr {
+		return t.ContractBackend.PendingNonceAt(ctx, account)
+	}
+
+	return t.nonce, nil
+}
+
+var _ bind.ContractBackend = &transactorWithTrackedNonce{}
 
 func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, payloadParams interface{}) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log, genesis.Config.ChainID)
@@ -190,10 +121,7 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 		prefundedAccount: &prefundedPrivateKey,
 		prefundAmount:    prefundAmount,
 		payloadParams:    *simulatorParams,
-	}
-
-	if err := t.generateAccounts(ctx); err != nil {
-		return nil, err
+		transactor:       newTransactorWithTrackedNonce(client, crypto.PubkeyToAddress(prefundedPrivateKey.PublicKey)),
 	}
 
 	return t, nil
@@ -201,55 +129,6 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 
 func (t *simulatorPayloadWorker) Mempool() mempool.FakeMempool {
 	return t.mempool
-}
-
-func (t *simulatorPayloadWorker) generateAccounts(ctx context.Context) error {
-	t.privateKeys = make([]*ecdsa.PrivateKey, 0, maxAccounts)
-	t.addresses = make([]common.Address, 0, maxAccounts)
-	t.nextNonce = make(map[common.Address]uint64)
-	t.balance = make(map[common.Address]*big.Int)
-
-	src := rand.New(rand.NewSource(100))
-	for i := 0; i < maxAccounts; i++ {
-		key, err := ecdsa.GenerateKey(crypto.S256(), src)
-		if err != nil {
-			return err
-		}
-
-		t.privateKeys = append(t.privateKeys, key)
-		t.addresses = append(t.addresses, crypto.PubkeyToAddress(key.PublicKey))
-		t.nextNonce[crypto.PubkeyToAddress(key.PublicKey)] = 0
-		t.balance[crypto.PubkeyToAddress(key.PublicKey)] = big.NewInt(0)
-	}
-
-	// fetch nonce and balance for all accounts
-	batchElems := make([]rpc.BatchElem, 0, maxAccounts)
-	for _, addr := range t.addresses {
-		batchElems = append(batchElems, rpc.BatchElem{
-			Method: "eth_getTransactionCount",
-			Args:   []interface{}{addr, "latest"},
-			Result: new(string),
-		})
-	}
-
-	err := t.client.Client().BatchCallContext(ctx, batchElems)
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch account nonces")
-	}
-
-	for i, elem := range batchElems {
-		if elem.Error != nil {
-			return errors.Wrapf(elem.Error, "failed to fetch account nonce for %s", t.addresses[i].Hex())
-		}
-		nonce, err := hexutil.DecodeUint64((*elem.Result.(*string)))
-		if err != nil {
-			return errors.Wrapf(err, "failed to decode nonce for %s", t.addresses[i].Hex())
-		}
-		// next nonce
-		t.nextNonce[t.addresses[i]] = nonce
-	}
-
-	return nil
 }
 
 func (t *simulatorPayloadWorker) Stop(ctx context.Context) error {
@@ -269,72 +148,89 @@ func (t *simulatorPayloadWorker) Setup(ctx context.Context) error {
 		return fmt.Errorf("prefunded account balance %s is less than prefund amount %s", balance.String(), t.prefundAmount.String())
 	}
 
-	// 21000 * numAccounts
-	gasCost := new(big.Int).Mul(big.NewInt(21000*params.GWei), big.NewInt(maxAccounts))
-
-	// Aim to distribute roughly half of the balance to leave a buffer
-	halfBalance := new(big.Int).Div(balance, big.NewInt(2))
-	valueToDistribute := new(big.Int).Sub(halfBalance, gasCost)
-
-	// Ensure valueToDistribute is not negative if gasCost is very high or balance is very low
-	if valueToDistribute.Sign() < 0 {
-		valueToDistribute.SetInt64(0)
-	}
-
-	perAccount := new(big.Int).Div(valueToDistribute, big.NewInt(maxAccounts))
-
-	// Ensure perAccount is at least 1 wei if we are distributing anything, otherwise it will be 0
-	if valueToDistribute.Sign() > 0 && perAccount.Sign() == 0 {
-		perAccount.SetInt64(1)
-	}
-
-	sendCalls := make([]*types.Transaction, 0, maxAccounts)
-
-	var nonceHex string
-	// fetch nonce for prefunded account
-	prefundAddress := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
-	err = t.client.Client().CallContext(ctx, &nonceHex, "eth_getTransactionCount", prefundAddress.Hex(), "latest")
-	if err != nil {
-		return errors.Wrap(err, "failed to fetch prefunded account nonce")
-	}
-
-	nonce, err := hexutil.DecodeUint64(nonceHex)
-	if err != nil {
-		return errors.Wrap(err, "failed to decode prefunded account nonce")
-	}
-
-	t.prefundNonce = nonce
-
 	var lastTxHash common.Hash
 
-	// prefund accounts
-	// for i := 0; i < maxAccounts; i++ {
-	// 	transferTx, err := t.createTransferTx(t.prefundedAccount, nonce, t.addresses[i], perAccount)
-	// 	if err != nil {
-	// 		return errors.Wrap(err, "failed to create transfer transaction")
-	// 	}
-	// 	nonce++
-	// 	sendCalls = append(sendCalls, transferTx)
-	// }
-
 	// create contract
-	contract := generatePayloadContract(t.payloadParams)
-	contractAddr := crypto.CreateAddress(prefundAddress, t.prefundNonce)
+	contractFile, err := os.Open("contracts/out/Simulator.sol/Simulator.json")
+	if err != nil {
+		return errors.Wrap(err, "failed to open contract file")
+	}
+	defer contractFile.Close()
 
-	t.log.Debug("Contract address", "address", contractAddr.Hex())
-	t.contractAddr = contractAddr
+	var contract Contract
+	err = json.NewDecoder(contractFile).Decode(&contract)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode contract file")
+	}
 
-	contractDeploymentTx, err := t.createDeployTx(t.prefundedAccount, t.prefundNonce, contract)
+	bytecode, err := hexutil.Decode(contract.Bytecode.Object)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode contract bytecode")
+	}
+
+	numStorageSlotsRequired := uint64((t.payloadParams.StorageLoaded + t.payloadParams.StorageUpdated) * float64(t.params.NumBlocks+2))
+	numAccountsRequired := uint64((t.payloadParams.AccountLoaded + t.payloadParams.AccountsUpdated) * float64(t.params.NumBlocks+2))
+
+	storageChunks := uint64(math.Ceil(float64(numStorageSlotsRequired) / 100000))
+	accountChunks := uint64(math.Ceil(float64(numAccountsRequired) / 100000))
+
+	contractAddr, contractDeploymentTx, err := t.createDeployTx(t.prefundedAccount, bytecode, numStorageSlotsRequired, numAccountsRequired)
 	if err != nil {
 		return errors.Wrap(err, "failed to create contract deployment transaction")
 	}
-	t.prefundNonce++
-	sendCalls = append(sendCalls, contractDeploymentTx)
-	lastTxHash = contractDeploymentTx.Hash()
+	t.transactor.incrementNonce()
+
+	t.log.Debug("Contract address", "address", contractAddr.Hex())
+	t.contractAddr = *contractAddr
+
+	t.mempool.AddTransactions([]*types.Transaction{contractDeploymentTx})
+
+	receipt, err := t.waitForReceipt(ctx, contractDeploymentTx.Hash())
+	if err != nil {
+		return errors.Wrap(err, "failed to wait for receipt")
+	}
+
+	if receipt.Status != types.ReceiptStatusSuccessful {
+		return fmt.Errorf("contract deployment failed")
+	}
+
+	sendCalls := make([]*types.Transaction, 0)
+
+	transactor, err := bind.NewKeyedTransactorWithChainID(t.prefundedAccount, t.chainID)
+	if err != nil {
+		return errors.Wrap(err, "failed to create transactor")
+	}
+	transactor.NoSend = true
+	transactor.GasLimit = t.params.GasLimit / 2
+
+	simulator, err := abi.NewSimulator(t.contractAddr, t.transactor)
+	if err != nil {
+		return errors.Wrap(err, "failed to create simulator transactor")
+	}
+
+	for i := uint64(0); i < storageChunks; i++ {
+		storageChunkTx, err := simulator.InitializeStorageChunk(transactor, big.NewInt(int64(i)))
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize storage chunk")
+		}
+		t.transactor.incrementNonce()
+		sendCalls = append(sendCalls, storageChunkTx)
+	}
+
+	for i := uint64(0); i < accountChunks; i++ {
+		addressChunkTx, err := simulator.InitializeAddressChunk(transactor, big.NewInt(int64(i)))
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize address chunk")
+		}
+		t.transactor.incrementNonce()
+		sendCalls = append(sendCalls, addressChunkTx)
+	}
+
+	lastTxHash = sendCalls[len(sendCalls)-1].Hash()
 
 	t.mempool.AddTransactions(sendCalls)
 
-	receipt, err := t.waitForReceipt(ctx, lastTxHash)
+	receipt, err = t.waitForReceipt(ctx, lastTxHash)
 	if err != nil {
 		return errors.Wrap(err, "failed to wait for receipt")
 	}
@@ -342,13 +238,6 @@ func (t *simulatorPayloadWorker) Setup(ctx context.Context) error {
 	t.log.Debug("Contract deployment receipt", "status", receipt.Status)
 
 	t.log.Debug("Last receipt", "status", receipt.Status)
-
-	t.log.Debug("Prefunded accounts", "numAccounts", len(t.addresses), "perAccount", perAccount)
-
-	// update account amounts
-	for i := 0; i < maxAccounts; i++ {
-		t.balance[t.addresses[i]] = perAccount
-	}
 
 	return nil
 }
@@ -364,87 +253,86 @@ func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash comm
 }
 
 func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
-	gasUsed := uint64(0)
 	txs := make([]*types.Transaction, 0, maxAccounts)
 
-	storageOffset := uint64(0)
-	accountOffset := uint64(0)
+	actual := t.actualNumConfig
+	expected := t.payloadParams.Mul(float64(t.numBlocks + 1))
 
-	for gasUsed < (t.params.GasLimit - 100_000) {
-		transferTx, err := t.createCallTx(t.prefundedAccount, t.prefundNonce, t.contractAddr, storageOffset, accountOffset)
-		if err != nil {
-			t.log.Error("Failed to create transfer transaction", "err", err)
-			return err
-		}
+	blockCounts := expected.Sub(&actual).Round()
 
-		calls := t.payloadParams.Copy().Round()
-
-		storageOffset += uint64(calls.StorageLoaded) + uint64(calls.StorageCreated)
-		accountOffset += uint64(calls.AccountsUpdated) + uint64(calls.AccountsCreated)
-
-		txs = append(txs, transferTx)
-
-		gasUsed += transferTx.Gas()
-
-		t.prefundNonce++
+	transactor, err := bind.NewKeyedTransactorWithChainID(t.prefundedAccount, t.chainID)
+	if err != nil {
+		return errors.Wrap(err, "failed to create transactor")
 	}
+	transactor.NoSend = true
+	transactor.GasLimit = t.params.GasLimit / 2
+
+	transferTx, err := t.createCallTx(transactor, t.prefundedAccount, *blockCounts)
+	if err != nil {
+		t.log.Error("Failed to create transfer transaction", "err", err)
+		return err
+	}
+	t.transactor.incrementNonce()
+
+	txs = append(txs, transferTx)
+
+	t.actualNumConfig = *t.actualNumConfig.Add(blockCounts)
+	t.numBlocks++
 
 	t.mempool.AddTransactions(txs)
 	return nil
 }
 
-func (t *simulatorPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
-	txdata := &types.DynamicFeeTx{
-		ChainID:   t.chainID,
-		Nonce:     nonce,
-		To:        &toAddr,
-		Gas:       21000,
-		GasFeeCap: new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(1)),
-		GasTipCap: big.NewInt(2),
-		Value:     amount,
+func (t *simulatorPayloadWorker) createCallTx(transactor *bind.TransactOpts, fromPriv *ecdsa.PrivateKey, config SimulatorPayloadDefinition) (*types.Transaction, error) {
+	simulator, err := abi.NewSimulator(t.contractAddr, t.transactor)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to create simulator transactor")
 	}
-	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
-	tx := types.MustSignNewTx(fromPriv, signer, txdata)
 
-	return tx, nil
+	precompiles := make([]abi.PrecompileConfig, 0, len(config.Precompiles))
+	for precompileName, numCalls := range config.Precompiles {
+		addr, ok := simulatorstats.PrecompileNameToAddress[precompileName]
+		if !ok {
+			return nil, fmt.Errorf("unknown precompile name: %s", precompileName)
+		}
+
+		precompiles = append(precompiles, abi.PrecompileConfig{
+			PrecompileAddress: addr,
+			NumCalls:          big.NewInt(int64(numCalls)),
+		})
+	}
+
+	fmt.Printf("config: %+v\n", config)
+
+	return simulator.Run(transactor, abi.SimulatorConfig{
+		LoadStorage:    big.NewInt(int64(config.StorageLoaded)),
+		UpdateStorage:  big.NewInt(int64(config.StorageUpdated)),
+		DeleteStorage:  big.NewInt(int64(config.StorageDeleted)),
+		CreateStorage:  big.NewInt(int64(config.StorageCreated)),
+		LoadAccounts:   big.NewInt(int64(config.AccountLoaded)),
+		UpdateAccounts: big.NewInt(int64(config.AccountsUpdated)),
+		DeleteAccounts: big.NewInt(int64(config.AccountDeleted)),
+		CreateAccounts: big.NewInt(int64(config.AccountsCreated)),
+		Precompiles:    precompiles,
+	})
 }
 
-func (t *simulatorPayloadWorker) createCallTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, currStorageOffset uint64, currAccountOffset uint64) (*types.Transaction, error) {
-	currStorageOffsetBytes := make([]byte, 32)
-	binary.BigEndian.PutUint64(currStorageOffsetBytes, currStorageOffset)
-	currAccountOffsetBytes := make([]byte, 32)
-	binary.BigEndian.PutUint64(currAccountOffsetBytes, currAccountOffset)
+func (t *simulatorPayloadWorker) createDeployTx(fromPriv *ecdsa.PrivateKey, contract []byte, numStorageSlotsRequired uint64, numAccountsRequired uint64) (*common.Address, *types.Transaction, error) {
 
-	txdata := &types.DynamicFeeTx{
-		ChainID:   t.chainID,
-		Nonce:     nonce,
-		To:        &toAddr,
-		Gas:       1e6,
-		GasFeeCap: new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(1)),
-		GasTipCap: big.NewInt(2),
-		Data:      append(currStorageOffsetBytes, currAccountOffsetBytes...),
+	transactor, err := bind.NewKeyedTransactorWithChainID(fromPriv, t.chainID)
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to create transactor")
+	}
+	transactor.NoSend = true
+	transactor.GasLimit = t.params.GasLimit / 2
+	transactor.Value = new(big.Int).Div(t.prefundAmount, big.NewInt(2))
+
+	deployAddr, deployTx, _, err := abi.DeploySimulator(transactor, t.transactor, big.NewInt(int64(numStorageSlotsRequired)), big.NewInt(int64(numAccountsRequired)), big.NewInt(100000), big.NewInt(100000))
+	if err != nil {
+		return nil, nil, errors.Wrap(err, "failed to deploy simulator")
 	}
 
-	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
-	tx := types.MustSignNewTx(fromPriv, signer, txdata)
-
-	return tx, nil
-}
-
-func (t *simulatorPayloadWorker) createDeployTx(fromPriv *ecdsa.PrivateKey, nonce uint64, contract []byte) (*types.Transaction, error) {
-	txdata := &types.DynamicFeeTx{
-		ChainID:   t.chainID,
-		Nonce:     nonce,
-		To:        nil,
-		Gas:       1e6,
-		GasFeeCap: new(big.Int).Mul(big.NewInt(params.GWei), big.NewInt(1)),
-		GasTipCap: big.NewInt(2),
-		Data:      contract,
-	}
-	signer := types.NewPragueSigner(new(big.Int).SetUint64(t.chainID.Uint64()))
-	tx := types.MustSignNewTx(fromPriv, signer, txdata)
-
-	return tx, nil
+	return &deployAddr, deployTx, nil
 }
 
 func (t *simulatorPayloadWorker) SendTxs(ctx context.Context) error {

@@ -89,6 +89,14 @@ var PrecompileAddressToName = map[common.Address]string{
 	common.BytesToAddress([]byte{0x01, 0x00}): "p256Verify",
 }
 
+var PrecompileNameToAddress = map[string]common.Address{}
+
+func init() {
+	for address, name := range PrecompileAddressToName {
+		PrecompileNameToAddress[name] = address
+	}
+}
+
 func (o OpcodeStats) RemoveAllBut(opcodes ...string) OpcodeStats {
 	result := make(OpcodeStats)
 	for _, opcode := range opcodes {

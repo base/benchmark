@@ -94,6 +94,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--txpool.accountqueue", "1000000")
 	args = append(args, "--maxpeers", "0")
 	args = append(args, "--nodiscover")
+	args = append(args, "--rpc.txfeecap", "20")
 	args = append(args, "--syncmode", "full")
 	args = append(args, "--http.api", "eth,net,web3,miner,debug")
 	args = append(args, "--gcmode", "archive")
