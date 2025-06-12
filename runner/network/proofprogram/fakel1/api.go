@@ -127,42 +127,6 @@ func (api *EthereumAPI) BlobBaseFee(ctx context.Context) *hexutil.Big {
 	return (*hexutil.Big)(api.b.BlobBaseFee(ctx))
 }
 
-// Syncing returns false in case the node is currently not syncing with the network. It can be up-to-date or has not
-// yet received the latest block headers from its peers. In case it is synchronizing:
-// - startingBlock: block number this node started to synchronize from
-// - currentBlock:  block number this node is currently importing
-// - highestBlock:  block number of the highest block header this node has received from peers
-// - pulledStates:  number of state entries processed until now
-// - knownStates:   number of known state entries that still need to be pulled
-func (api *EthereumAPI) Syncing() (interface{}, error) {
-	progress := api.b.SyncProgress()
-
-	// Return not syncing if the synchronisation already completed
-	if progress.Done() {
-		return false, nil
-	}
-	// Otherwise gather the block sync stats
-	return map[string]interface{}{
-		"startingBlock":          hexutil.Uint64(progress.StartingBlock),
-		"currentBlock":           hexutil.Uint64(progress.CurrentBlock),
-		"highestBlock":           hexutil.Uint64(progress.HighestBlock),
-		"syncedAccounts":         hexutil.Uint64(progress.SyncedAccounts),
-		"syncedAccountBytes":     hexutil.Uint64(progress.SyncedAccountBytes),
-		"syncedBytecodes":        hexutil.Uint64(progress.SyncedBytecodes),
-		"syncedBytecodeBytes":    hexutil.Uint64(progress.SyncedBytecodeBytes),
-		"syncedStorage":          hexutil.Uint64(progress.SyncedStorage),
-		"syncedStorageBytes":     hexutil.Uint64(progress.SyncedStorageBytes),
-		"healedTrienodes":        hexutil.Uint64(progress.HealedTrienodes),
-		"healedTrienodeBytes":    hexutil.Uint64(progress.HealedTrienodeBytes),
-		"healedBytecodes":        hexutil.Uint64(progress.HealedBytecodes),
-		"healedBytecodeBytes":    hexutil.Uint64(progress.HealedBytecodeBytes),
-		"healingTrienodes":       hexutil.Uint64(progress.HealingTrienodes),
-		"healingBytecode":        hexutil.Uint64(progress.HealingBytecode),
-		"txIndexFinishedBlocks":  hexutil.Uint64(progress.TxIndexFinishedBlocks),
-		"txIndexRemainingBlocks": hexutil.Uint64(progress.TxIndexRemainingBlocks),
-	}, nil
-}
-
 // TxPoolAPI offers and API for the transaction pool. It only operates on data that is non-confidential.
 type TxPoolAPI struct {
 	b Backend
