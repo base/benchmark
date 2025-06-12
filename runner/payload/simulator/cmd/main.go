@@ -20,16 +20,6 @@ var flags = []cli.Flag{
 		Usage:    "RPC URL of the chain to fetch payloads from",
 		Required: true,
 	},
-	&cli.StringFlag{
-		Name:     "block-range",
-		Usage:    "Block range to fetch payloads from",
-		Required: false,
-	},
-	&cli.StringFlag{
-		Name:  "output",
-		Usage: "Path to the output JSON file",
-		Value: "stats.json",
-	},
 	&cli.IntFlag{
 		Name:  "sample-size",
 		Usage: "Number of payloads to sample",
@@ -60,8 +50,6 @@ func main() {
 		rpcURL := c.String("rpc-url")
 		chainID := c.String("chain-id")
 		genesisFilePath := c.String("genesis")
-		// blockRange := c.String("block-range")
-		// output := c.String("output")
 		sampleSize := c.Int("sample-size")
 
 		var genesis *core.Genesis

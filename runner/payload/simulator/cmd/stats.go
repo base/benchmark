@@ -349,6 +349,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 	oracleKv := newPreimageOracle(db, codes, nodes)
 	oracleDb := NewOracleBackedDB(db, oracleKv, eth.ChainIDFromBig(genesis.Config.ChainID))
 
+	// copied from geth:
 	statedb, err := state.New(parent.Root(), state.NewDatabase(triedb.NewDatabase(rawdb.NewDatabase(oracleDb), nil), nil))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to init state db around block %s (state %s): %w", parent.Hash().Hex(), parent.Root().Hex(), err)
@@ -373,12 +374,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 		root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), header.Number.Bytes())
 		header.ParentBeaconRoot = &root
 
-		// Copied from op-program/client/l2/engineapi/block_processor.go
-		// TODO(client-pod#826)
-		// Unfortunately this is not part of any Geth environment setup,
-		// we just have to apply it, like how the Geth block-builder worker does.
 		context := core.NewEVMBlockContext(header, chainCtx, nil, genesis.Config, statedb)
-		// NOTE: Unlikely to be needed for the beacon block root, but we setup any precompile overrides anyways for forwards-compatibility
 		var precompileOverrides vm.PrecompileOverrides
 
 		vmenv := vm.NewEVM(context, statedb, genesis.Config, vm.Config{PrecompileOverrides: precompileOverrides, Tracer: blockTracer.Tracer()})
