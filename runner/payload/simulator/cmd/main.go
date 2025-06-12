@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"os"
 
 	"github.com/ethereum-optimism/optimism/op-service/log"
@@ -39,6 +40,11 @@ var flags = []cli.Flag{
 		Usage: "Genesis JSON file",
 		Value: "genesis.json",
 	},
+	&cli.StringFlag{
+		Name:  "chain-id",
+		Usage: "Chain ID to load genesis from",
+		Value: "",
+	},
 }
 
 func init() {
@@ -52,20 +58,34 @@ func main() {
 	app.Flags = flags
 	app.Action = func(c *cli.Context) error {
 		rpcURL := c.String("rpc-url")
+		chainID := c.String("chain-id")
 		genesisFilePath := c.String("genesis")
 		// blockRange := c.String("block-range")
 		// output := c.String("output")
 		sampleSize := c.Int("sample-size")
 
 		var genesis *core.Genesis
-		genesisFile, err := os.Open(genesisFilePath)
-		if err != nil {
-			return err
-		}
-		defer func() { _ = genesisFile.Close() }()
-		err = json.NewDecoder(genesisFile).Decode(&genesis)
-		if err != nil {
-			return err
+		var err error
+		if chainID != "" {
+			genesisFile, err := os.Open(genesisFilePath)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = genesisFile.Close() }()
+			err = json.NewDecoder(genesisFile).Decode(&genesis)
+			if err != nil {
+				return err
+			}
+		} else {
+			chainIDBig, ok := new(big.Int).SetString(chainID, 10)
+			if !ok {
+				return fmt.Errorf("invalid chain ID: %s", chainID)
+			}
+
+			genesis, err = core.LoadOPStackGenesis(chainIDBig.Uint64())
+			if err != nil {
+				return err
+			}
 		}
 
 		client, err := ethclient.DialContext(c.Context, rpcURL)
