@@ -6,6 +6,7 @@ payloads:
     id: ecpairing
     type: contract
     calls_per_block: 1
+    contract_bytecode: ./contracts/precompiles.hex
     function_signature: ecpairing(uint256,bytes)
     gas_per_tx: 10000000
     contract_bytecode: Precompile
@@ -13,6 +14,7 @@ payloads:
     id: ecmul
     type: contract
     calls_per_block: 1
+    contract_bytecode: ./contracts/precompiles.hex
     function_signature: ecmul(uint256,bytes)
     gas_per_tx: 10000000
     contract_bytecode: Precompile
@@ -20,6 +22,7 @@ payloads:
     id: sstore
     type: contract
     calls_per_block: 1
+    contract_bytecode: ./contracts/precompiles.hex
     function_signature: sstore(uint256,bytes)
     gas_per_tx: 10000000
     contract_bytecode: Precompile
