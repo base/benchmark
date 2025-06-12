@@ -35,8 +35,9 @@ func NewTxFuzzPayloadWorker(
 	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
 	txFuzzBin string,
+	chainID *big.Int,
 ) (worker.Worker, error) {
-	mempool := mempool.NewStaticWorkloadMempool(log)
+	mempool := mempool.NewStaticWorkloadMempool(log, chainID)
 	proxyServer := proxy.NewProxyServer(elRPCURL, log, 8545, mempool)
 
 	t := &txFuzzPayloadWorker{

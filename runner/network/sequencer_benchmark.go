@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
@@ -44,8 +45,7 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	nb.log.Info("Funding test account")
 	client := nb.sequencerClient
 
-	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-	addr := common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")
+	addr := crypto.PubkeyToAddress(nb.config.PrefundPrivateKey.PublicKey)
 
 	// fund the test account if needed (check if the account has a balance)
 	balance, err := client.Client().BalanceAt(ctx, addr, nil)
@@ -114,7 +114,7 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 		return fmt.Errorf("failed to get balance: %w", err)
 	}
 	if balance.Cmp(&amount) < 0 {
-		nb.log.Warn("balance is not equal to amount", "balance", balance, "amount", amount)
+		nb.log.Warn("balance is not equal to amount", "balance", balance.String(), "amount", amount.String())
 		return errors.New("balance is not equal to amount")
 	}
 	nb.log.Info("funded test account", "balance", balance, "account", addr.Hex())
@@ -189,6 +189,9 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		// setup blocks
 		blockNum := uint64(0)
+
+		// sleep to allow the worker setup time to submit tx before the first block
+		time.Sleep(2 * time.Second)
 
 	setupLoop:
 		for {

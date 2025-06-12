@@ -39,9 +39,10 @@ type ProofProgramOptions struct {
 // SnapshotDefinition is the user-facing YAML configuration for specifying
 // a snapshot to be restored before running a benchmark.
 type SnapshotDefinition struct {
-	Command     string `yaml:"command"`
-	GenesisFile string `yaml:"genesis_file"`
-	ForceClean  *bool  `yaml:"force_clean"`
+	Command           string  `yaml:"command"`
+	GenesisFile       *string `yaml:"genesis_file"`
+	SuperchainChainID *uint64 `yaml:"superchain_chain_id"`
+	ForceClean        *bool   `yaml:"force_clean"`
 }
 
 // CreateSnapshot copies the snapshot to the output directory for the given

@@ -29,7 +29,7 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 	switch definition.Type {
 	case "tx-fuzz":
 		worker, err = txfuzz.NewTxFuzzPayloadWorker(
-			log, sequencerClient.ClientURL(), params, privateKey, amount, config.TxFuzzBinary())
+			log, sequencerClient.ClientURL(), params, privateKey, amount, config.TxFuzzBinary(), genesis.Config.ChainID)
 	case "transfer-only":
 		worker, err = transferonly.NewTransferPayloadWorker(
 			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis)

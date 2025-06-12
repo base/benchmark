@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"encoding/hex"
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -24,6 +25,7 @@ type FakeMempool interface {
 // StaticWorkloadMempool is a fake mempool that simulates a workload of transactions with no gas
 // or dependency tracking.
 type StaticWorkloadMempool struct {
+	chainID *big.Int
 	// needs to be thread safe to share between workers (could be converted to channel)
 	lock sync.Mutex
 	log  log.Logger
@@ -37,9 +39,9 @@ type StaticWorkloadMempool struct {
 	currentBlockSequencerTxs [][]byte
 }
 
-func NewStaticWorkloadMempool(log log.Logger) *StaticWorkloadMempool {
-
+func NewStaticWorkloadMempool(log log.Logger, chainID *big.Int) *StaticWorkloadMempool {
 	return &StaticWorkloadMempool{
+		chainID:      chainID,
 		log:          log,
 		addressNonce: make(map[common.Address]uint64),
 	}
@@ -50,7 +52,7 @@ func (m *StaticWorkloadMempool) AddTransactions(transactions []*types.Transactio
 	defer m.lock.Unlock()
 
 	for _, transaction := range transactions {
-		from, err := types.Sender(types.NewIsthmusSigner(transaction.ChainId()), transaction)
+		from, err := types.Sender(types.NewIsthmusSigner(m.chainID), transaction)
 
 		if err != nil {
 			panic(err)

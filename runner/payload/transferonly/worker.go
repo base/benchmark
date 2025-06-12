@@ -49,7 +49,7 @@ type transferOnlyPayloadWorker struct {
 const numAccounts = 1000
 
 func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis) (worker.Worker, error) {
-	mempool := mempool.NewStaticWorkloadMempool(log)
+	mempool := mempool.NewStaticWorkloadMempool(log, genesis.Config.ChainID)
 
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {

@@ -244,22 +244,33 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 	var genesis *core.Genesis
 
 	if usingSnapshot {
-		s.log.Info("Using snapshot", "command", snapshotConfig.Command, "genesis_file", snapshotConfig.GenesisFile)
+		if snapshotConfig.GenesisFile != nil {
+			s.log.Info("Using genesis file from snapshot config", "command", snapshotConfig.Command, "genesis_file", *snapshotConfig.GenesisFile)
 
-		// read genesis file
-		genesisFile, err := os.Open(snapshotConfig.GenesisFile)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to open genesis file")
-		}
+			// read genesis file
+			genesisFile, err := os.Open(*snapshotConfig.GenesisFile)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to open genesis file")
+			}
 
-		defer func() {
-			_ = genesisFile.Close()
-		}()
+			defer func() {
+				_ = genesisFile.Close()
+			}()
 
-		genesis = new(core.Genesis)
-		err = json.NewDecoder(genesisFile).Decode(genesis)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to decode genesis file")
+			genesis = new(core.Genesis)
+			err = json.NewDecoder(genesisFile).Decode(genesis)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to decode genesis file")
+			}
+		} else {
+			s.log.Info("Using genesis file from superchain", "command", snapshotConfig.Command, "superchain_chain_id", *snapshotConfig.SuperchainChainID)
+
+			genesis, err := core.LoadOPStackGenesis(*snapshotConfig.SuperchainChainID)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to load genesis file")
+			}
+
+			return genesis, nil
 		}
 	} else {
 		// for devnets, just create a new genesis with the current time
@@ -345,7 +356,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		return nil, errors.Wrap(err, "failed to create batcher key")
 	}
 
-	prefundKeyBytes := common.FromHex("0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	prefundKeyBytes := common.FromHex("0xad0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	prefundKey, err := crypto.ToECDSA(prefundKeyBytes)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create prefund key")

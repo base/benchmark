@@ -64,7 +64,7 @@ type contractPayloadWorker struct {
 }
 
 func NewContractPayloadWorker(log log.Logger, elRPCURL string, runParams benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, config config.Config, params interface{}) (worker.Worker, error) {
-	mempool := mempool.NewStaticWorkloadMempool(log)
+	mempool := mempool.NewStaticWorkloadMempool(log, genesis.Config.ChainID)
 
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {
