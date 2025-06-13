@@ -7,6 +7,7 @@ import (
 	clienttypes "github.com/base/base-bench/runner/clients/types"
 	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/contract"
+	"github.com/base/base-bench/runner/payload/simulator"
 	"github.com/base/base-bench/runner/payload/transferonly"
 	"github.com/base/base-bench/runner/payload/txfuzz"
 	"github.com/base/base-bench/runner/payload/worker"
@@ -36,6 +37,9 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 	case "contract":
 		worker, err = contract.NewContractPayloadWorker(
 			log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, config, definition.Params)
+	case "simulator":
+		worker, err = simulator.NewSimulatorPayloadWorker(
+			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, definition.Params)
 	default:
 		return nil, errors.New("invalid payload type")
 	}
@@ -75,6 +79,8 @@ func (t *Definition) UnmarshalYAML(node *yaml.Node) error {
 		params = &txfuzz.TxFuzzPayloadDefinition{}
 	case "contract":
 		params = &contract.ContractPayloadDefinition{}
+	case "simulator":
+		params = &simulator.SimulatorPayloadDefinition{}
 	}
 
 	err = node.Decode(params)

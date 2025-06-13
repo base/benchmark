@@ -95,8 +95,11 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 	return w.Bytes(), nil
 }
 
-func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte) (*eth.PayloadAttributes, *common.Hash, error) {
+func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte, isSetupPayload bool) (*eth.PayloadAttributes, *common.Hash, error) {
 	gasLimit := eth.Uint64Quantity(f.options.GasLimit)
+	if isSetupPayload {
+		gasLimit = eth.Uint64Quantity(f.options.GasLimitSetup)
+	}
 
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 1))
@@ -184,7 +187,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 }
 
 // Propose starts block generation, waits BlockTime, and generates a block.
-func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics) (*engine.ExecutableData, error) {
+func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics, isSetupPayload bool) (*engine.ExecutableData, error) {
 	startTime := time.Now()
 
 	sendTxs, sequencerTxs := f.mempool.NextBlock()
@@ -238,7 +241,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	f.log.Info("Starting block building")
 
-	payloadAttrs, beaconRoot, err := f.generatePayloadAttributes(sequencerTxs)
+	payloadAttrs, beaconRoot, err := f.generatePayloadAttributes(sequencerTxs, isSetupPayload)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate payload attributes")
 	}

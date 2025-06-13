@@ -21,6 +21,8 @@ type ConsensusClientOptions struct {
 	BlockTime time.Duration
 	// GasLimit is the gas limit for the payload
 	GasLimit uint64
+	// GasLimitSetup is the gas limit for the setup payload
+	GasLimitSetup uint64
 }
 
 // BaseConsensusClient contains common functionality shared between different consensus client implementations.
@@ -70,7 +72,7 @@ func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs
 
 // getBuiltPayload retrieves the built payload for the given payload ID.
 func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID engine.PayloadID) (*engine.ExecutableData, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
 	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", payloadID)

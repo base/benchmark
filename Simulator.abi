@@ -1,0 +1,165 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_storage_slots_to_initialize",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_addresses_to_initialize",
+        "type": "uint160",
+        "internalType": "uint160"
+      },
+      {
+        "name": "_storage_chunk_size",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "_addresses_chunk_size",
+        "type": "uint160",
+        "internalType": "uint160"
+      }
+    ],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "function",
+    "name": "fully_initialized",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize_address_chunk",
+    "inputs": [
+      {
+        "name": "chunk_index",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initialize_storage_chunk",
+    "inputs": [
+      {
+        "name": "chunk_index",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "num_address_chunks",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "num_storage_chunks",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "run",
+    "inputs": [
+      {
+        "name": "config",
+        "type": "tuple",
+        "internalType": "struct SimulatorConfig",
+        "components": [
+          {
+            "name": "load_accounts",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "update_accounts",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "delete_accounts",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "create_accounts",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "load_storage",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "update_storage",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "delete_storage",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "create_storage",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "precompiles",
+            "type": "tuple[]",
+            "internalType": "struct PrecompileConfig[]",
+            "components": [
+              {
+                "name": "precompile_address",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "num_calls",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]
