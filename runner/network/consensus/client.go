@@ -21,6 +21,8 @@ type ConsensusClientOptions struct {
 	BlockTime time.Duration
 	// GasLimit is the gas limit for the payload
 	GasLimit uint64
+	// GasLimitSetup is the gas limit for the setup payload
+	GasLimitSetup uint64
 }
 
 // BaseConsensusClient contains common functionality shared between different consensus client implementations.

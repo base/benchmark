@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
 struct PrecompileConfig {
@@ -18,48 +19,23 @@ struct SimulatorConfig {
 }
 
 contract Simulator {
-    uint256 storage_slots_to_initialize;
-    uint160 addresses_to_initialize;
-    uint256 storage_chunk_size;
-    uint160 address_chunk_size;
+    uint256 constant storage_chunk_size = 100;
+    uint160 constant address_chunk_size = 100;
+    uint256 constant safe_offset = 10000;
 
     mapping(uint256 => uint256) storage_slots;
-    uint256 num_storage_initialized = 0;
-    uint256 num_address_initialized = 0;
-    uint256 num_storage_deleted = 0;
+    uint256 public num_storage_initialized = safe_offset;
+    uint160 public num_address_initialized = 0;
+    uint256 public num_storage_deleted = safe_offset;
 
     // first storage slot with a value
-    uint256 current_storage_slot_index = 0;
+    uint256 current_storage_slot_index = safe_offset;
 
-    constructor(
-        uint256 _storage_slots_to_initialize,
-        uint160 _addresses_to_initialize,
-        uint256 _storage_chunk_size,
-        uint160 _addresses_chunk_size
-    ) public payable {
-        storage_slots_to_initialize = _storage_slots_to_initialize;
-        addresses_to_initialize = _addresses_to_initialize;
-        storage_chunk_size = _storage_chunk_size;
-        address_chunk_size = _addresses_chunk_size;
-    }
+    constructor() payable {}
 
-    function num_storage_chunks() public view returns (uint256) {
-        return storage_slots_to_initialize / storage_chunk_size;
-    }
-
-    function num_address_chunks() public view returns (uint256) {
-        return addresses_to_initialize / address_chunk_size;
-    }
-
-    function fully_initialized() public view returns (bool) {
-        return
-            num_storage_initialized == storage_slots_to_initialize &&
-            num_address_initialized == addresses_to_initialize;
-    }
-
-    function initialize_storage_chunk(uint256 chunk_index) public {
-        uint256 start_index = chunk_index * storage_chunk_size;
-        uint256 end_index = start_index + storage_chunk_size;
+    function initialize_storage_chunk() public {
+        uint256 start_index = num_storage_initialized;
+        uint256 end_index = num_storage_initialized + storage_chunk_size;
 
         for (uint256 i = start_index; i < end_index; i++) {
             storage_slots[i] = i;
@@ -67,14 +43,22 @@ contract Simulator {
         num_storage_initialized += storage_chunk_size;
     }
 
-    function initialize_address_chunk(uint256 chunk_index) public {
-        uint160 start_index = uint160(chunk_index) * address_chunk_size;
-        uint160 end_index = start_index + address_chunk_size;
+    function initialize_address_chunk() public {
+        uint160 start_index = num_address_initialized;
+        uint160 end_index = num_address_initialized + address_chunk_size;
 
+        // ignore return value
+        bool success;
         for (uint160 i = start_index; i < end_index; i++) {
-            payable(address(i)).transfer(1);
+            success = payable(address(i)).send(1);
         }
         num_address_initialized += address_chunk_size;
+    }
+
+    function num_storage_slots_needed(SimulatorConfig calldata config) public view returns (uint256) {
+        return current_storage_slot_index +
+                config.load_storage +
+                config.update_storage;
     }
 
     function run(SimulatorConfig calldata config) public {

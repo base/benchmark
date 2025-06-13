@@ -50,8 +50,8 @@ type SimulatorConfig struct {
 
 // SimulatorMetaData contains all meta data concerning the Simulator contract.
 var SimulatorMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"_storage_slots_to_initialize\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"_addresses_to_initialize\",\"type\":\"uint160\",\"internalType\":\"uint160\"},{\"name\":\"_storage_chunk_size\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"_addresses_chunk_size\",\"type\":\"uint160\",\"internalType\":\"uint160\"}],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"fully_initialized\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"initialize_address_chunk\",\"inputs\":[{\"name\":\"chunk_index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"initialize_storage_chunk\",\"inputs\":[{\"name\":\"chunk_index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"num_address_chunks\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"num_storage_chunks\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"run\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structSimulatorConfig\",\"components\":[{\"name\":\"load_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"update_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"delete_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"create_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"load_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"update_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"delete_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"create_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"precompiles\",\"type\":\"tuple[]\",\"internalType\":\"structPrecompileConfig[]\",\"components\":[{\"name\":\"precompile_address\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"num_calls\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"}]",
-	Bin: "0x60806040525f6005555f6006555f6007555f600855604051610c70380380610c708339818101604052810190610035919061014b565b835f819055508260015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550816002819055508060035f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550505050506101af565b5f80fd5b5f819050919050565b6100e1816100cf565b81146100eb575f80fd5b50565b5f815190506100fc816100d8565b92915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b61012a81610102565b8114610134575f80fd5b50565b5f8151905061014581610121565b92915050565b5f805f8060808587031215610163576101626100cb565b5b5f610170878288016100ee565b945050602061018187828801610137565b9350506040610192878288016100ee565b92505060606101a387828801610137565b91505092959194509250565b610ab4806101bc5f395ff3fe608060405234801561000f575f80fd5b5060043610610060575f3560e01c8063359e53e3146100645780634e125b0c1461008257806363b1845f146100a0578063746d124a146100bc578063c1d61ec4146100d8578063d845ebb1146100f4575b5f80fd5b61006c610112565b60405161007991906105f7565b60405180910390f35b61008a610127565b604051610097919061062a565b60405180910390f35b6100ba60048036038101906100b59190610675565b610177565b005b6100d660048036038101906100d19190610675565b6101e9565b005b6100f260048036038101906100ed91906106c3565b610329565b005b6100fc610571565b60405161010991906105f7565b60405180910390f35b5f6002545f546101229190610764565b905090565b5f8054600554148015610172575060015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16600654145b905090565b5f600254826101869190610794565b90505f6002548261019791906107d5565b90505f8290505b818110156101c9578060045f8381526020019081526020015f2081905550808060010191505061019e565b5060025460055f8282546101dd91906107d5565b92505081905550505050565b5f60035f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16826102179190610827565b90505f60035f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16826102479190610868565b90505f8290505b8173ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1610156102d4578073ffffffffffffffffffffffffffffffffffffffff166108fc600190811502906040515f60405180830381858888f193505050501580156102c6573d5f803e3d5ffd5b50808060010191505061024e565b5060035f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1660065f82825461031d91906107d5565b92505081905550505050565b6005548160a00135826080013560085461034391906107d5565b61034d91906107d5565b111561038e576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016103859061092f565b60405180910390fd5b5f60085490505b81608001356008546103a791906107d5565b8110156103c2575f6008549050508080600101915050610395565b50806080013560085f8282546103d891906107d5565b925050819055505f60085490505b8160a001356008546103f891906107d5565b811015610416575f60085490508081555080806001019150506103e6565b508060a0013560085f82825461042c91906107d5565b925050819055505f60055490505b8160e0013560055461044c91906107d5565b811015610468575f81905080815550808060010191505061043a565b508060e0013560055f82825461047e91906107d5565b925050819055505f60075490505b8160c0013560075461049e91906107d5565b8110156104ba575f8190505f815550808060010191505061048c565b508060c0013560075f8282546104d091906107d5565b925050819055505f5b818061010001906104ea9190610959565b905081101561056d57610560828061010001906105079190610959565b83818110610518576105176109bb565b5b9050604002015f01602081019061052f9190610a23565b838061010001906105409190610959565b84818110610551576105506109bb565b5b905060400201602001356105db565b80806001019150506104d9565b5050565b5f60035f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1660015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff166105c09190610a4e565b73ffffffffffffffffffffffffffffffffffffffff16905090565b5050565b5f819050919050565b6105f1816105df565b82525050565b5f60208201905061060a5f8301846105e8565b92915050565b5f8115159050919050565b61062481610610565b82525050565b5f60208201905061063d5f83018461061b565b92915050565b5f80fd5b5f80fd5b610654816105df565b811461065e575f80fd5b50565b5f8135905061066f8161064b565b92915050565b5f6020828403121561068a57610689610643565b5b5f61069784828501610661565b91505092915050565b5f80fd5b5f61012082840312156106ba576106b96106a0565b5b81905092915050565b5f602082840312156106d8576106d7610643565b5b5f82013567ffffffffffffffff8111156106f5576106f4610647565b5b610701848285016106a4565b91505092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601260045260245ffd5b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f61076e826105df565b9150610779836105df565b9250826107895761078861070a565b5b828204905092915050565b5f61079e826105df565b91506107a9836105df565b92508282026107b7816105df565b915082820484148315176107ce576107cd610737565b5b5092915050565b5f6107df826105df565b91506107ea836105df565b925082820190508082111561080257610801610737565b5b92915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f61083182610808565b915061083c83610808565b925082820261084a81610808565b9150828204841483151761086157610860610737565b5b5092915050565b5f61087282610808565b915061087d83610808565b9250828201905073ffffffffffffffffffffffffffffffffffffffff8111156108a9576108a8610737565b5b92915050565b5f82825260208201905092915050565b7f4e6f7420656e6f7567682073746f7261676520736c6f747320746f206c6f61645f8201527f2f75706461746500000000000000000000000000000000000000000000000000602082015250565b5f6109196027836108af565b9150610924826108bf565b604082019050919050565b5f6020820190508181035f8301526109468161090d565b9050919050565b5f80fd5b5f80fd5b5f80fd5b5f80833560016020038436030381126109755761097461094d565b5b80840192508235915067ffffffffffffffff82111561099757610996610951565b5b6020830192506040820236038313156109b3576109b2610955565b5b509250929050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52603260045260245ffd5b5f6109f282610808565b9050919050565b610a02816109e8565b8114610a0c575f80fd5b50565b5f81359050610a1d816109f9565b92915050565b5f60208284031215610a3857610a37610643565b5b5f610a4584828501610a0f565b91505092915050565b5f610a5882610808565b9150610a6383610808565b925082610a7357610a7261070a565b5b82820490509291505056fea26469706673582212202d69a4afdb0f60cb6529cab140ab23b9df8f170e5a59ea2c805826fcc5960a8c64736f6c63430008190033",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[],\"stateMutability\":\"payable\"},{\"type\":\"function\",\"name\":\"initialize_address_chunk\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"initialize_storage_chunk\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"num_address_initialized\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint160\",\"internalType\":\"uint160\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"num_storage_deleted\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"num_storage_initialized\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"num_storage_slots_needed\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structSimulatorConfig\",\"components\":[{\"name\":\"load_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"update_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"delete_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"create_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"load_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"update_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"delete_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"create_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"precompiles\",\"type\":\"tuple[]\",\"internalType\":\"structPrecompileConfig[]\",\"components\":[{\"name\":\"precompile_address\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"num_calls\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"run\",\"inputs\":[{\"name\":\"config\",\"type\":\"tuple\",\"internalType\":\"structSimulatorConfig\",\"components\":[{\"name\":\"load_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"update_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"delete_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"create_accounts\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"load_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"update_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"delete_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"create_storage\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"precompiles\",\"type\":\"tuple[]\",\"internalType\":\"structPrecompileConfig[]\",\"components\":[{\"name\":\"precompile_address\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"num_calls\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"}]",
+	Bin: "0x60806040526127106001555f60025f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506127106003556127106004556108de806100635f395ff3fe608060405234801561000f575f5ffd5b506004361061007b575f3560e01c8063c1d61ec411610059578063c1d61ec4146100b1578063e2b5a25c146100cd578063e41c3c69146100eb578063ee2bb32b1461011b5761007b565b80633594dea61461007f57806339aa1ab9146100895780634e83a9d5146100a7575b5f5ffd5b610087610139565b005b610091610282565b60405161009e9190610590565b60405180910390f35b6100af610288565b005b6100cb60048036038101906100c691906105d4565b6102ed565b005b6100d5610520565b6040516100e29190610649565b60405180910390f35b610105600480360381019061010091906105d4565b610545565b6040516101129190610590565b60405180910390f35b61012361056e565b6040516101309190610590565b60405180910390f35b5f60025f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690505f606460025f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1661018d919061068f565b90505f5f8390505b8273ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff16101561020d578073ffffffffffffffffffffffffffffffffffffffff166108fc600190811502906040515f60405180830381858888f1935050505091508080600101915050610195565b50606460025f8282829054906101000a900473ffffffffffffffffffffffffffffffffffffffff1661023f919061068f565b92506101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550505050565b60035481565b5f60015490505f606460015461029e91906106d6565b90505f8290505b818110156102cf57805f5f8381526020019081526020015f208190555080806001019150506102a5565b50606460015f8282546102e291906106d6565b925050819055505050565b6001548160a00135826080013560045461030791906106d6565b61031191906106d6565b1115610352576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161034990610789565b60405180910390fd5b5f60045490505b816080013560045461036b91906106d6565b81101561037f578080600101915050610359565b50806080013560045f82825461039591906106d6565b925050819055505f60045490505b8160a001356004546103b591906106d6565b8110156103cc5780815580806001019150506103a3565b508060a0013560045f8282546103e291906106d6565b925050819055505f60015490505b8160e0013560015461040291906106d6565b8110156104195780815580806001019150506103f0565b508060e0013560015f82825461042f91906106d6565b925050819055505f60035490505b8160c0013560035461044f91906106d6565b811015610466575f8155808060010191505061043d565b508060c0013560035f82825461047c91906106d6565b925050819055505f5f90505b8180610100019061049991906107b3565b905081101561051c5761050f828061010001906104b691906107b3565b838181106104c7576104c6610815565b5b9050604002015f0160208101906104de919061087d565b838061010001906104ef91906107b3565b84818110610500576104ff610815565b5b90506040020160200135610574565b8080600101915050610488565b5050565b60025f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1681565b5f8160a00135826080013560045461055d91906106d6565b61056791906106d6565b9050919050565b60015481565b5050565b5f819050919050565b61058a81610578565b82525050565b5f6020820190506105a35f830184610581565b92915050565b5f5ffd5b5f5ffd5b5f5ffd5b5f61012082840312156105cb576105ca6105b1565b5b81905092915050565b5f602082840312156105e9576105e86105a9565b5b5f82013567ffffffffffffffff811115610606576106056105ad565b5b610612848285016105b5565b91505092915050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b6106438161061b565b82525050565b5f60208201905061065c5f83018461063a565b92915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f6106998261061b565b91506106a48361061b565b9250828201905073ffffffffffffffffffffffffffffffffffffffff8111156106d0576106cf610662565b5b92915050565b5f6106e082610578565b91506106eb83610578565b925082820190508082111561070357610702610662565b5b92915050565b5f82825260208201905092915050565b7f4e6f7420656e6f7567682073746f7261676520736c6f747320746f206c6f61645f8201527f2f75706461746500000000000000000000000000000000000000000000000000602082015250565b5f610773602783610709565b915061077e82610719565b604082019050919050565b5f6020820190508181035f8301526107a081610767565b9050919050565b5f5ffd5b5f5ffd5b5f5ffd5b5f5f833560016020038436030381126107cf576107ce6107a7565b5b80840192508235915067ffffffffffffffff8211156107f1576107f06107ab565b5b60208301925060408202360383131561080d5761080c6107af565b5b509250929050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52603260045260245ffd5b5f61084c8261061b565b9050919050565b61085c81610842565b8114610866575f5ffd5b50565b5f8135905061087781610853565b92915050565b5f60208284031215610892576108916105a9565b5b5f61089f84828501610869565b9150509291505056fea264697066735822122069a9552f9ef31be597a5876feb077aa89467acfb11ed0609d58a31087123a1f264736f6c634300081e0033",
 }
 
 // SimulatorABI is the input ABI used to generate the binding from.
@@ -63,7 +63,7 @@ var SimulatorABI = SimulatorMetaData.ABI
 var SimulatorBin = SimulatorMetaData.Bin
 
 // DeploySimulator deploys a new Ethereum contract, binding an instance of Simulator to it.
-func DeploySimulator(auth *bind.TransactOpts, backend bind.ContractBackend, _storage_slots_to_initialize *big.Int, _addresses_to_initialize *big.Int, _storage_chunk_size *big.Int, _addresses_chunk_size *big.Int) (common.Address, *types.Transaction, *Simulator, error) {
+func DeploySimulator(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Simulator, error) {
 	parsed, err := SimulatorMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
@@ -72,7 +72,7 @@ func DeploySimulator(auth *bind.TransactOpts, backend bind.ContractBackend, _sto
 		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
 	}
 
-	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(SimulatorBin), backend, _storage_slots_to_initialize, _addresses_to_initialize, _storage_chunk_size, _addresses_chunk_size)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(SimulatorBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -221,43 +221,12 @@ func (_Simulator *SimulatorTransactorRaw) Transact(opts *bind.TransactOpts, meth
 	return _Simulator.Contract.contract.Transact(opts, method, params...)
 }
 
-// FullyInitialized is a free data retrieval call binding the contract method 0x4e125b0c.
+// NumAddressInitialized is a free data retrieval call binding the contract method 0xe2b5a25c.
 //
-// Solidity: function fully_initialized() view returns(bool)
-func (_Simulator *SimulatorCaller) FullyInitialized(opts *bind.CallOpts) (bool, error) {
+// Solidity: function num_address_initialized() view returns(uint160)
+func (_Simulator *SimulatorCaller) NumAddressInitialized(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Simulator.contract.Call(opts, &out, "fully_initialized")
-
-	if err != nil {
-		return *new(bool), err
-	}
-
-	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
-
-	return out0, err
-
-}
-
-// FullyInitialized is a free data retrieval call binding the contract method 0x4e125b0c.
-//
-// Solidity: function fully_initialized() view returns(bool)
-func (_Simulator *SimulatorSession) FullyInitialized() (bool, error) {
-	return _Simulator.Contract.FullyInitialized(&_Simulator.CallOpts)
-}
-
-// FullyInitialized is a free data retrieval call binding the contract method 0x4e125b0c.
-//
-// Solidity: function fully_initialized() view returns(bool)
-func (_Simulator *SimulatorCallerSession) FullyInitialized() (bool, error) {
-	return _Simulator.Contract.FullyInitialized(&_Simulator.CallOpts)
-}
-
-// NumAddressChunks is a free data retrieval call binding the contract method 0xd845ebb1.
-//
-// Solidity: function num_address_chunks() view returns(uint256)
-func (_Simulator *SimulatorCaller) NumAddressChunks(opts *bind.CallOpts) (*big.Int, error) {
-	var out []interface{}
-	err := _Simulator.contract.Call(opts, &out, "num_address_chunks")
+	err := _Simulator.contract.Call(opts, &out, "num_address_initialized")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -269,26 +238,26 @@ func (_Simulator *SimulatorCaller) NumAddressChunks(opts *bind.CallOpts) (*big.I
 
 }
 
-// NumAddressChunks is a free data retrieval call binding the contract method 0xd845ebb1.
+// NumAddressInitialized is a free data retrieval call binding the contract method 0xe2b5a25c.
 //
-// Solidity: function num_address_chunks() view returns(uint256)
-func (_Simulator *SimulatorSession) NumAddressChunks() (*big.Int, error) {
-	return _Simulator.Contract.NumAddressChunks(&_Simulator.CallOpts)
+// Solidity: function num_address_initialized() view returns(uint160)
+func (_Simulator *SimulatorSession) NumAddressInitialized() (*big.Int, error) {
+	return _Simulator.Contract.NumAddressInitialized(&_Simulator.CallOpts)
 }
 
-// NumAddressChunks is a free data retrieval call binding the contract method 0xd845ebb1.
+// NumAddressInitialized is a free data retrieval call binding the contract method 0xe2b5a25c.
 //
-// Solidity: function num_address_chunks() view returns(uint256)
-func (_Simulator *SimulatorCallerSession) NumAddressChunks() (*big.Int, error) {
-	return _Simulator.Contract.NumAddressChunks(&_Simulator.CallOpts)
+// Solidity: function num_address_initialized() view returns(uint160)
+func (_Simulator *SimulatorCallerSession) NumAddressInitialized() (*big.Int, error) {
+	return _Simulator.Contract.NumAddressInitialized(&_Simulator.CallOpts)
 }
 
-// NumStorageChunks is a free data retrieval call binding the contract method 0x359e53e3.
+// NumStorageDeleted is a free data retrieval call binding the contract method 0x39aa1ab9.
 //
-// Solidity: function num_storage_chunks() view returns(uint256)
-func (_Simulator *SimulatorCaller) NumStorageChunks(opts *bind.CallOpts) (*big.Int, error) {
+// Solidity: function num_storage_deleted() view returns(uint256)
+func (_Simulator *SimulatorCaller) NumStorageDeleted(opts *bind.CallOpts) (*big.Int, error) {
 	var out []interface{}
-	err := _Simulator.contract.Call(opts, &out, "num_storage_chunks")
+	err := _Simulator.contract.Call(opts, &out, "num_storage_deleted")
 
 	if err != nil {
 		return *new(*big.Int), err
@@ -300,60 +269,122 @@ func (_Simulator *SimulatorCaller) NumStorageChunks(opts *bind.CallOpts) (*big.I
 
 }
 
-// NumStorageChunks is a free data retrieval call binding the contract method 0x359e53e3.
+// NumStorageDeleted is a free data retrieval call binding the contract method 0x39aa1ab9.
 //
-// Solidity: function num_storage_chunks() view returns(uint256)
-func (_Simulator *SimulatorSession) NumStorageChunks() (*big.Int, error) {
-	return _Simulator.Contract.NumStorageChunks(&_Simulator.CallOpts)
+// Solidity: function num_storage_deleted() view returns(uint256)
+func (_Simulator *SimulatorSession) NumStorageDeleted() (*big.Int, error) {
+	return _Simulator.Contract.NumStorageDeleted(&_Simulator.CallOpts)
 }
 
-// NumStorageChunks is a free data retrieval call binding the contract method 0x359e53e3.
+// NumStorageDeleted is a free data retrieval call binding the contract method 0x39aa1ab9.
 //
-// Solidity: function num_storage_chunks() view returns(uint256)
-func (_Simulator *SimulatorCallerSession) NumStorageChunks() (*big.Int, error) {
-	return _Simulator.Contract.NumStorageChunks(&_Simulator.CallOpts)
+// Solidity: function num_storage_deleted() view returns(uint256)
+func (_Simulator *SimulatorCallerSession) NumStorageDeleted() (*big.Int, error) {
+	return _Simulator.Contract.NumStorageDeleted(&_Simulator.CallOpts)
 }
 
-// InitializeAddressChunk is a paid mutator transaction binding the contract method 0x746d124a.
+// NumStorageInitialized is a free data retrieval call binding the contract method 0xee2bb32b.
 //
-// Solidity: function initialize_address_chunk(uint256 chunk_index) returns()
-func (_Simulator *SimulatorTransactor) InitializeAddressChunk(opts *bind.TransactOpts, chunk_index *big.Int) (*types.Transaction, error) {
-	return _Simulator.contract.Transact(opts, "initialize_address_chunk", chunk_index)
+// Solidity: function num_storage_initialized() view returns(uint256)
+func (_Simulator *SimulatorCaller) NumStorageInitialized(opts *bind.CallOpts) (*big.Int, error) {
+	var out []interface{}
+	err := _Simulator.contract.Call(opts, &out, "num_storage_initialized")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
-// InitializeAddressChunk is a paid mutator transaction binding the contract method 0x746d124a.
+// NumStorageInitialized is a free data retrieval call binding the contract method 0xee2bb32b.
 //
-// Solidity: function initialize_address_chunk(uint256 chunk_index) returns()
-func (_Simulator *SimulatorSession) InitializeAddressChunk(chunk_index *big.Int) (*types.Transaction, error) {
-	return _Simulator.Contract.InitializeAddressChunk(&_Simulator.TransactOpts, chunk_index)
+// Solidity: function num_storage_initialized() view returns(uint256)
+func (_Simulator *SimulatorSession) NumStorageInitialized() (*big.Int, error) {
+	return _Simulator.Contract.NumStorageInitialized(&_Simulator.CallOpts)
 }
 
-// InitializeAddressChunk is a paid mutator transaction binding the contract method 0x746d124a.
+// NumStorageInitialized is a free data retrieval call binding the contract method 0xee2bb32b.
 //
-// Solidity: function initialize_address_chunk(uint256 chunk_index) returns()
-func (_Simulator *SimulatorTransactorSession) InitializeAddressChunk(chunk_index *big.Int) (*types.Transaction, error) {
-	return _Simulator.Contract.InitializeAddressChunk(&_Simulator.TransactOpts, chunk_index)
+// Solidity: function num_storage_initialized() view returns(uint256)
+func (_Simulator *SimulatorCallerSession) NumStorageInitialized() (*big.Int, error) {
+	return _Simulator.Contract.NumStorageInitialized(&_Simulator.CallOpts)
 }
 
-// InitializeStorageChunk is a paid mutator transaction binding the contract method 0x63b1845f.
+// NumStorageSlotsNeeded is a free data retrieval call binding the contract method 0xe41c3c69.
 //
-// Solidity: function initialize_storage_chunk(uint256 chunk_index) returns()
-func (_Simulator *SimulatorTransactor) InitializeStorageChunk(opts *bind.TransactOpts, chunk_index *big.Int) (*types.Transaction, error) {
-	return _Simulator.contract.Transact(opts, "initialize_storage_chunk", chunk_index)
+// Solidity: function num_storage_slots_needed((uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(address,uint256)[]) config) view returns(uint256)
+func (_Simulator *SimulatorCaller) NumStorageSlotsNeeded(opts *bind.CallOpts, config SimulatorConfig) (*big.Int, error) {
+	var out []interface{}
+	err := _Simulator.contract.Call(opts, &out, "num_storage_slots_needed", config)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
-// InitializeStorageChunk is a paid mutator transaction binding the contract method 0x63b1845f.
+// NumStorageSlotsNeeded is a free data retrieval call binding the contract method 0xe41c3c69.
 //
-// Solidity: function initialize_storage_chunk(uint256 chunk_index) returns()
-func (_Simulator *SimulatorSession) InitializeStorageChunk(chunk_index *big.Int) (*types.Transaction, error) {
-	return _Simulator.Contract.InitializeStorageChunk(&_Simulator.TransactOpts, chunk_index)
+// Solidity: function num_storage_slots_needed((uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(address,uint256)[]) config) view returns(uint256)
+func (_Simulator *SimulatorSession) NumStorageSlotsNeeded(config SimulatorConfig) (*big.Int, error) {
+	return _Simulator.Contract.NumStorageSlotsNeeded(&_Simulator.CallOpts, config)
 }
 
-// InitializeStorageChunk is a paid mutator transaction binding the contract method 0x63b1845f.
+// NumStorageSlotsNeeded is a free data retrieval call binding the contract method 0xe41c3c69.
 //
-// Solidity: function initialize_storage_chunk(uint256 chunk_index) returns()
-func (_Simulator *SimulatorTransactorSession) InitializeStorageChunk(chunk_index *big.Int) (*types.Transaction, error) {
-	return _Simulator.Contract.InitializeStorageChunk(&_Simulator.TransactOpts, chunk_index)
+// Solidity: function num_storage_slots_needed((uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,(address,uint256)[]) config) view returns(uint256)
+func (_Simulator *SimulatorCallerSession) NumStorageSlotsNeeded(config SimulatorConfig) (*big.Int, error) {
+	return _Simulator.Contract.NumStorageSlotsNeeded(&_Simulator.CallOpts, config)
+}
+
+// InitializeAddressChunk is a paid mutator transaction binding the contract method 0x3594dea6.
+//
+// Solidity: function initialize_address_chunk() returns()
+func (_Simulator *SimulatorTransactor) InitializeAddressChunk(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _Simulator.contract.Transact(opts, "initialize_address_chunk")
+}
+
+// InitializeAddressChunk is a paid mutator transaction binding the contract method 0x3594dea6.
+//
+// Solidity: function initialize_address_chunk() returns()
+func (_Simulator *SimulatorSession) InitializeAddressChunk() (*types.Transaction, error) {
+	return _Simulator.Contract.InitializeAddressChunk(&_Simulator.TransactOpts)
+}
+
+// InitializeAddressChunk is a paid mutator transaction binding the contract method 0x3594dea6.
+//
+// Solidity: function initialize_address_chunk() returns()
+func (_Simulator *SimulatorTransactorSession) InitializeAddressChunk() (*types.Transaction, error) {
+	return _Simulator.Contract.InitializeAddressChunk(&_Simulator.TransactOpts)
+}
+
+// InitializeStorageChunk is a paid mutator transaction binding the contract method 0x4e83a9d5.
+//
+// Solidity: function initialize_storage_chunk() returns()
+func (_Simulator *SimulatorTransactor) InitializeStorageChunk(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _Simulator.contract.Transact(opts, "initialize_storage_chunk")
+}
+
+// InitializeStorageChunk is a paid mutator transaction binding the contract method 0x4e83a9d5.
+//
+// Solidity: function initialize_storage_chunk() returns()
+func (_Simulator *SimulatorSession) InitializeStorageChunk() (*types.Transaction, error) {
+	return _Simulator.Contract.InitializeStorageChunk(&_Simulator.TransactOpts)
+}
+
+// InitializeStorageChunk is a paid mutator transaction binding the contract method 0x4e83a9d5.
+//
+// Solidity: function initialize_storage_chunk() returns()
+func (_Simulator *SimulatorTransactorSession) InitializeStorageChunk() (*types.Transaction, error) {
+	return _Simulator.Contract.InitializeStorageChunk(&_Simulator.TransactOpts)
 }
 
 // Run is a paid mutator transaction binding the contract method 0xc1d61ec4.

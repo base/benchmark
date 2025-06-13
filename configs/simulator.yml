@@ -2,16 +2,16 @@ payloads:
   - name: Simulator
     id: simulator
     type: simulator
-    account_loaded: 3000
+    account_loaded: 300
     account_deleted: 1.27
-    accounts_updated: 4810.17
-    accounts_created: 4810.17
-    storage_loaded: 3000
-    storage_deleted: 465.1
-    storage_updated: 11439.7
-    storage_created: 11439.7
-    code_size_loaded: 66234731.5
-    num_contracts_loaded: 453.30
+    accounts_updated: 481.17
+    accounts_created: 481.17
+    storage_loaded: 300
+    storage_deleted: 46.1
+    storage_updated: 1149.7
+    storage_created: 1149.7
+    code_size_loaded: 6624731.5
+    num_contracts_loaded: 43.30
     opcodes:
       EXP: 626.30
       KECCAK256: 29.21

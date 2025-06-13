@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"maps"
 	"math"
+	"math/big"
 	"sort"
 	"strings"
 
+	"github.com/base/base-bench/runner/payload/simulator/abi"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -124,6 +126,34 @@ type Stats struct {
 	NumContractsLoaded float64     `yaml:"num_contracts_loaded"`
 	Opcodes            OpcodeStats `yaml:"opcodes"`
 	Precompiles        OpcodeStats `yaml:"precompiles"`
+}
+
+func (s *Stats) ToConfig() (*abi.SimulatorConfig, error) {
+	rounded := s.Copy().Round()
+	precompiles := make([]abi.PrecompileConfig, 0, len(rounded.Precompiles))
+	for precompileName, numCalls := range rounded.Precompiles {
+		addr, ok := PrecompileNameToAddress[precompileName]
+		if !ok {
+			return nil, fmt.Errorf("unknown precompile name: %s", precompileName)
+		}
+
+		precompiles = append(precompiles, abi.PrecompileConfig{
+			PrecompileAddress: addr,
+			NumCalls:          big.NewInt(int64(numCalls)),
+		})
+	}
+
+	return &abi.SimulatorConfig{
+		LoadStorage:    big.NewInt(int64(rounded.StorageLoaded)),
+		UpdateStorage:  big.NewInt(int64(rounded.StorageUpdated)),
+		DeleteStorage:  big.NewInt(int64(rounded.StorageDeleted)),
+		CreateStorage:  big.NewInt(int64(rounded.StorageCreated)),
+		LoadAccounts:   big.NewInt(int64(rounded.AccountLoaded)),
+		UpdateAccounts: big.NewInt(int64(rounded.AccountsUpdated)),
+		DeleteAccounts: big.NewInt(int64(rounded.AccountDeleted)),
+		CreateAccounts: big.NewInt(int64(rounded.AccountsCreated)),
+		Precompiles:    precompiles,
+	}, nil
 }
 
 func NewStats() *Stats {
