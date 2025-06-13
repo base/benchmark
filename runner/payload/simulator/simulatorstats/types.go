@@ -71,16 +71,16 @@ func (o OpcodeStats) String() string {
 }
 
 var PrecompileAddressToName = map[common.Address]string{
-	common.BytesToAddress([]byte{1}):          "ecrecover",
-	common.BytesToAddress([]byte{2}):          "sha256hash",
-	common.BytesToAddress([]byte{3}):          "ripemd160hash",
-	common.BytesToAddress([]byte{4}):          "dataCopy",
-	common.BytesToAddress([]byte{5}):          "bigModExp",
-	common.BytesToAddress([]byte{6}):          "bn256Add",
-	common.BytesToAddress([]byte{7}):          "bn256ScalarMul",
-	common.BytesToAddress([]byte{8}):          "bn256Pairing",
-	common.BytesToAddress([]byte{9}):          "blake2F",
-	common.BytesToAddress([]byte{0x0a}):       "kzgPointEvaluation",
+	common.BytesToAddress([]byte{1}): "ecrecover",
+	common.BytesToAddress([]byte{2}): "sha256hash",
+	common.BytesToAddress([]byte{3}): "ripemd160hash",
+	common.BytesToAddress([]byte{4}): "dataCopy",
+	common.BytesToAddress([]byte{5}): "bigModExp",
+	common.BytesToAddress([]byte{6}): "bn256Add",
+	common.BytesToAddress([]byte{7}): "bn256ScalarMul",
+	common.BytesToAddress([]byte{8}): "bn256Pairing",
+	common.BytesToAddress([]byte{9}): "blake2F",
+	// common.BytesToAddress([]byte{0x0a}):       "kzgPointEvaluation",
 	common.BytesToAddress([]byte{0x0b}):       "bls12381G1Add",
 	common.BytesToAddress([]byte{0x0c}):       "bls12381G1MultiExp",
 	common.BytesToAddress([]byte{0x0d}):       "bls12381G2Add",
@@ -117,6 +117,7 @@ type Stats struct {
 	AccountLoaded      float64     `yaml:"account_loaded"`
 	AccountDeleted     float64     `yaml:"account_deleted"`
 	AccountsUpdated    float64     `yaml:"accounts_updated"`
+	CallsPerBlock      string      `yaml:"calls_per_block"`
 	AccountsCreated    float64     `yaml:"accounts_created"`
 	StorageLoaded      float64     `yaml:"storage_loaded"`
 	StorageDeleted     float64     `yaml:"storage_deleted"`
@@ -150,7 +151,6 @@ func (s *Stats) ToConfig() (*abi.SimulatorConfig, error) {
 		CreateStorage:  big.NewInt(int64(rounded.StorageCreated)),
 		LoadAccounts:   big.NewInt(int64(rounded.AccountLoaded)),
 		UpdateAccounts: big.NewInt(int64(rounded.AccountsUpdated)),
-		DeleteAccounts: big.NewInt(int64(rounded.AccountDeleted)),
 		CreateAccounts: big.NewInt(int64(rounded.AccountsCreated)),
 		Precompiles:    precompiles,
 	}, nil

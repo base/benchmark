@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"strconv"
 	"time"
 
 	"github.com/base/base-bench/runner/network/mempool"
@@ -164,7 +165,7 @@ func (t *simulatorPayloadWorker) mineAndConfirm(ctx context.Context, txs []*type
 	}
 
 	if receipt.Status != types.ReceiptStatusSuccessful {
-		return fmt.Errorf("contract deployment failed")
+		return fmt.Errorf("receipt status not successful: %d", receipt.Status)
 	}
 
 	return nil
@@ -210,10 +211,19 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 		return errors.Wrap(err, "failed to get current storage slots")
 	}
 
+	accountSlotsNeeded, err := simulator.NumAccountsNeeded(t.callTransactor, *contractConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to estimate account slot usage")
+	}
+
+	currentAccounts, err := simulator.NumAddressInitialized(t.callTransactor)
+	if err != nil {
+		return errors.Wrap(err, "failed to get current accounts")
+	}
+
 	sendCalls := make([]*types.Transaction, 0)
 
 	storageChunks := uint64(math.Ceil(float64(storageSlotsNeeded.Int64()-currentStorageSlots.Int64()) / 100))
-
 	log.Info("Initializing test storage chunks", "storageChunks", storageChunks)
 	for i := uint64(0); i < storageChunks; i++ {
 		storageChunkTx, err := simulator.InitializeStorageChunk(t.transactor)
@@ -225,8 +235,22 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 		sendCalls = append(sendCalls, storageChunkTx)
 	}
 
-	if err := t.mineAndConfirm(ctx, sendCalls); err != nil {
-		return errors.Wrap(err, "failed to mine and confirm storage chunk initialization")
+	accountChunks := uint64(math.Ceil(float64(accountSlotsNeeded.Int64()-currentAccounts.Int64()) / 100))
+	log.Info("Initializing test account chunks", "accountChunks", accountChunks)
+	for i := uint64(0); i < accountChunks; i++ {
+		accountChunkTx, err := simulator.InitializeAddressChunk(t.transactor)
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize storage chunk")
+		}
+		t.contractBackend.incrementNonce()
+
+		sendCalls = append(sendCalls, accountChunkTx)
+	}
+
+	if len(sendCalls) > 0 {
+		if err := t.mineAndConfirm(ctx, sendCalls); err != nil {
+			return errors.Wrap(err, "failed to mine and confirm storage chunk initialization")
+		}
 	}
 
 	contractConfig, err = t.payloadParams.ToConfig()
@@ -243,9 +267,16 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	gas := tx.Gas()
 
-	// now, we know how many calls we'll actually make, so calculate the storage slots needed
-	t.numCallsPerBlock = calcNumCalls(gas, t.params.GasLimit, buffer)
+	if t.payloadParams.CallsPerBlock == "fill" {
+		t.numCallsPerBlock = calcNumCalls(gas, t.params.GasLimit, buffer)
+	} else {
+		f, err := strconv.ParseUint(t.payloadParams.CallsPerBlock, 10, 64)
+		if err != nil {
+			return errors.Wrap(err, "failed to parse calls per block")
+		}
 
+		t.numCallsPerBlock = uint64(f)
+	}
 	t.log.Info("Calculated num calls per block", "numCalls", t.numCallsPerBlock, "gas", gas, "gasLimit", t.params.GasLimit, "buffer", buffer)
 
 	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * 1.05).ToConfig()
@@ -264,7 +295,32 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 		return errors.Wrap(err, "failed to get number of existing storage slots")
 	}
 
+	accountSlotsNeeded, err = simulator.NumAccountsNeeded(t.callTransactor, *configForAllBlocks)
+	if err != nil {
+		return errors.Wrap(err, "failed to estimate account slot usage")
+	}
+
+	currentAccounts, err = simulator.NumAddressInitialized(t.callTransactor)
+	if err != nil {
+		return errors.Wrap(err, "failed to get current accounts")
+	}
+
 	sendCalls = make([]*types.Transaction, 0)
+
+	accountChunks = uint64(math.Ceil(float64(accountSlotsNeeded.Int64()-currentAccounts.Int64()) / 100))
+	log.Info("Initializing test account chunks", "accountChunks", accountChunks)
+	for i := uint64(0); i < accountChunks; i++ {
+		accountChunkTx, err := simulator.InitializeAddressChunk(t.transactor)
+		if err != nil {
+			return errors.Wrap(err, "failed to initialize storage chunk")
+		}
+		t.contractBackend.incrementNonce()
+
+		sendCalls = append(sendCalls, accountChunkTx)
+	}
+
+	t.log.Info("Setting up storage", "numExistingStorageSlots", numExistingStorageSlots, "storageSlotsNeeded", storageSlotsNeeded)
+
 	additionalStorage := uint64(math.Ceil(float64(storageSlotsNeeded.Int64()-numExistingStorageSlots.Int64()) / 100))
 	for i := uint64(0); i < additionalStorage; i++ {
 		storageChunkTx, err := simulator.InitializeStorageChunk(t.transactor)
@@ -276,8 +332,13 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 		sendCalls = append(sendCalls, storageChunkTx)
 	}
 
-	if err := t.mineAndConfirm(ctx, sendCalls); err != nil {
-		return errors.Wrap(err, "failed to mine and confirm storage chunk initialization")
+	if len(sendCalls) > 0 {
+		for i := 0; i < len(sendCalls); i += 50 {
+			chunk := sendCalls[i:min(i+50, len(sendCalls))]
+			if err := t.mineAndConfirm(ctx, chunk); err != nil {
+				return errors.Wrap(err, "failed to mine and confirm storage chunk initialization")
+			}
+		}
 	}
 
 	return nil
@@ -327,34 +388,11 @@ func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash comm
 func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 	txs := make([]*types.Transaction, 0, maxAccounts)
 
-	actual := t.actualNumConfig
-	expected := t.payloadParams.Mul(float64(t.numCalls + 1))
-
-	blockCounts := expected.Sub(&actual).Round()
-	simulator, err := abi.NewSimulator(t.contractAddr, t.contractBackend)
-	if err != nil {
-		return errors.Wrap(err, "failed to create simulator transactor")
-	}
-
 	for i := uint64(0); i < t.numCallsPerBlock; i++ {
+		actual := t.actualNumConfig
+		expected := t.payloadParams.Mul(float64(t.numCalls + 1))
 
-		numInitialized, err := simulator.NumStorageInitialized(t.callTransactor)
-		if err != nil {
-			return errors.Wrap(err, "failed to get number of storage slots")
-		}
-		t.log.Info("Number of storage slots initialized", "numInitialized", numInitialized)
-
-		c, err := blockCounts.ToConfig()
-		if err != nil {
-			return errors.Wrap(err, "failed to convert payload params to config")
-		}
-
-		numNeeded, err := simulator.NumStorageSlotsNeeded(t.callTransactor, *c)
-		if err != nil {
-			return errors.Wrap(err, "failed to get number of storage slots needed")
-		}
-		t.log.Info("Number of storage slots needed", "numStorageSlotsNeeded", numNeeded)
-
+		blockCounts := expected.Sub(&actual).Round()
 		transferTx, err := t.createCallTx(t.transactor, t.prefundedAccount, *blockCounts)
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)

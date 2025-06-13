@@ -12,6 +12,7 @@ payloads:
     storage_created: 1149.7
     code_size_loaded: 6624731.5
     num_contracts_loaded: 43.30
+    calls_per_block: fill
     opcodes:
       EXP: 626.30
       KECCAK256: 29.21
@@ -20,7 +21,7 @@ payloads:
       ecrecover: 7.33
       bls12381G1Add: 2.44
       bls12381G1MultiExp: 2.18
-      kzgPointEvaluation: 1.17
+      # kzgPointEvaluation: 1.17
       sha256hash: 1
       dataCopy: 1
       bls12381Pairing: 1
