@@ -11,8 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
-
-	"github.com/base/base-bench/runner/network/types"
 )
 
 // ConsensusClientOptions is an object for configuring a ConsensusClient.
@@ -87,21 +85,11 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 
 // newPayload calls engine_newPayloadV4 with the given executable data.
 func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData, beaconRoot common.Hash) error {
-	newParams := *params
-
-	// newParams.WithdrawalsRoot = &common.Hash{}
-
-	block, err := engine.ExecutableDataToBlockNoHash(newParams, []common.Hash{}, &beaconRoot, [][]byte{}, types.IsthmusBlockType{})
-	if err != nil {
-		return errors.Wrap(err, "failed to convert payload to block")
-	}
-
-	newParams.BlockHash = block.Hash()
 
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
-	err = b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", newParams, []common.Hash{}, beaconRoot, []common.Hash{})
+	err := b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, beaconRoot, []common.Hash{})
 
 	if err != nil {
 		return errors.Wrap(err, "newPayload call failed")

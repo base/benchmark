@@ -169,7 +169,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		sequencerTxsHexBytes[i+1] = hexutil.Bytes(tx)
 	}
 
-	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(number)).Bytes())
+	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
 
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),
