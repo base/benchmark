@@ -36,7 +36,11 @@ contract Simulator {
     uint256 current_storage_slot_index = safe_offset;
     uint160 current_address_index = safe_address_offset;
 
-    constructor() payable {}
+    constructor(uint160 offset) payable {
+        // runtime offset allows us to run multiple simulators sequentially without conflicts
+        current_address_index += offset;
+        num_address_initialized += offset;
+    }
 
     function initialize_storage_chunk() public {
         uint256 start_index = num_storage_initialized;

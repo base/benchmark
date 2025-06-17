@@ -192,22 +192,8 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	sendTxs, sequencerTxs := f.mempool.NextBlock()
 
-	if len(sendTxs) > 0 {
-		// Attempt to parse the first transaction to get its hash for logging
-		firstTx := new(types.Transaction)
-		if err := firstTx.UnmarshalBinary(sendTxs[0]); err == nil {
-			f.log.Info("Propose: Fetched transactions from mempool", "count", len(sendTxs), "first_tx_hash_for_sending", firstTx.Hash().Hex())
-		} else {
-			f.log.Warn("Propose: Fetched transactions from mempool, but failed to parse first tx for hash", "count", len(sendTxs), "parse_error", err)
-		}
-	} else {
-		f.log.Info("Propose: Fetched transactions from mempool", "count", len(sendTxs))
-	}
-
 	sendCallsPerBatch := 100
 	batches := (len(sendTxs) + sendCallsPerBatch - 1) / sendCallsPerBatch
-
-	f.log.Info("Sending transactions", "num_transactions", len(sendTxs), "num_batches", batches)
 
 	for i := 0; i < batches; i++ {
 		batch := sendTxs[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(sendTxs))]
@@ -263,8 +249,6 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	time.Sleep(f.options.BlockTime)
 
 	startTime = time.Now()
-
-	f.log.Info("Fetching built payload")
 
 	payload, err := f.getBuiltPayload(ctx, *f.currentPayloadID)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"math/rand"
 	"strconv"
 	"time"
 
@@ -267,16 +268,20 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	gas := tx.Gas()
 
-	if t.payloadParams.CallsPerBlock == "fill" {
-		t.numCallsPerBlock = calcNumCalls(gas, t.params.GasLimit, buffer)
-	} else {
+	t.numCallsPerBlock = calcNumCalls(gas, t.params.GasLimit, buffer)
+
+	if t.payloadParams.CallsPerBlock != "fill" {
 		f, err := strconv.ParseUint(t.payloadParams.CallsPerBlock, 10, 64)
 		if err != nil {
 			return errors.Wrap(err, "failed to parse calls per block")
 		}
 
-		t.numCallsPerBlock = uint64(f)
+		// callsperblock is the max number of calls per block
+		if f < t.numCallsPerBlock {
+			t.numCallsPerBlock = f
+		}
 	}
+
 	t.log.Info("Calculated num calls per block", "numCalls", t.numCallsPerBlock, "gas", gas, "gasLimit", t.params.GasLimit, "buffer", buffer)
 
 	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * 1.05).ToConfig()
@@ -333,11 +338,8 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 	}
 
 	if len(sendCalls) > 0 {
-		for i := 0; i < len(sendCalls); i += 50 {
-			chunk := sendCalls[i:min(i+50, len(sendCalls))]
-			if err := t.mineAndConfirm(ctx, chunk); err != nil {
-				return errors.Wrap(err, "failed to mine and confirm storage chunk initialization")
-			}
+		if err := t.mineAndConfirm(ctx, sendCalls); err != nil {
+			return errors.Wrap(err, "failed to mine and confirm storage chunk initialization")
 		}
 	}
 
@@ -376,7 +378,7 @@ func (t *simulatorPayloadWorker) Setup(ctx context.Context) error {
 }
 
 func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	return retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
+	return retry.Do(ctx, 240, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
 			return nil, err
@@ -387,6 +389,8 @@ func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash comm
 
 func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 	txs := make([]*types.Transaction, 0, maxAccounts)
+
+	gas := t.params.GasLimit - 100_000
 
 	for i := uint64(0); i < t.numCallsPerBlock; i++ {
 		actual := t.actualNumConfig
@@ -399,7 +403,15 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 			return err
 		}
 
+		gasUsed := transferTx.Gas()
+		if gasUsed > gas {
+			t.log.Warn("Gas used is greater than gas limit, stopping tx sending", "gasUsed", gasUsed, "gasLimit", t.params.GasLimit)
+			break
+		}
+
 		t.contractBackend.incrementNonce()
+
+		gas -= gasUsed
 
 		txs = append(txs, transferTx)
 
@@ -435,7 +447,9 @@ func (t *simulatorPayloadWorker) createDeployTx(fromPriv *ecdsa.PrivateKey) (*co
 	transactor.GasLimit = t.params.GasLimit / 2
 	transactor.Value = new(big.Int).Div(t.prefundAmount, big.NewInt(2))
 
-	deployAddr, deployTx, _, err := abi.DeploySimulator(transactor, t.contractBackend)
+	rand64 := rand.Uint64()
+
+	deployAddr, deployTx, _, err := abi.DeploySimulator(transactor, t.contractBackend, new(big.Int).SetUint64(rand64))
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to deploy simulator")
 	}

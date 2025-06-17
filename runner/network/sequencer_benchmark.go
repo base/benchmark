@@ -187,7 +187,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
 			BlockTime:     params.BlockTime,
 			GasLimit:      params.GasLimit,
-			GasLimitSetup: params.GasLimit, // 10G gas
+			GasLimitSetup: 1e9, // 1G gas
 		}, headBlockHash, headBlockNumber, l1Chain, nb.config.BatcherAddr())
 
 		payloads := make([]engine.ExecutableData, 0)
@@ -210,7 +210,6 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			case <-setupComplete:
 				break setupLoop
 			case <-chainReady:
-				break // break if chain ready is already closed, otherwise close it
 			default:
 				close(chainReady)
 			}

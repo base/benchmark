@@ -40,7 +40,7 @@ func main() {
 	app.Flags = flags.Flags
 	app.Version = opservice.FormatVersion(Version, GitCommit, GitDate, "")
 
-	ctx := ctxinterrupt.WithSignalWaiterMain(context.Background())
+	ctx := ctxinterrupt.WithCancelOnInterrupt(context.Background())
 	err := app.RunContext(ctx, os.Args)
 	if err != nil {
 		log.Crit("Application failed", "message", err)

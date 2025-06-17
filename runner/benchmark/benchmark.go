@@ -25,7 +25,7 @@ type TestRun struct {
 
 const (
 	// MaxTotalParams is the maximum number of benchmarks that can be run in parallel.
-	MaxTotalParams = 24
+	MaxTotalParams = 30
 )
 
 var DefaultParams = &types.RunParams{

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	RPCTimeout    = 60 * time.Second
+	RPCTimeout    = 240 * time.Second
 	RetryInterval = time.Second
 )
 
