@@ -243,6 +243,8 @@ func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
 
+	randomInt := rand.Uint64()
+
 	for gasUsed < (t.params.GasLimit - 100_000) {
 
 		dest := t.addresses[(acctIdx+1)%numAccounts]
@@ -252,6 +254,8 @@ func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 
 			var addr common.Address
 			binary.BigEndian.PutUint64(addr[:], fakeAddressOffset)
+
+			binary.BigEndian.PutUint64(addr[8:], randomInt)
 			addr[19] = 0xff
 			addr[18] = 0xff
 			dest = addr
