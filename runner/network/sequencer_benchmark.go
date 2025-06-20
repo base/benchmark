@@ -146,8 +146,12 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	payloadResult := make(chan []engine.ExecutableData)
 
 	setupComplete := make(chan struct{})
+	chainReady := make(chan struct{})
 
 	go func() {
+		// allow one block to pass before sending txs to set the gas limit
+		<-chainReady
+
 		err := nb.fundTestAccount(benchmarkCtx, mempool)
 		if err != nil {
 			nb.log.Warn("failed to fund test account", "err", err)
@@ -181,8 +185,9 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 	go func() {
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
-			BlockTime: params.BlockTime,
-			GasLimit:  params.GasLimit,
+			BlockTime:     params.BlockTime,
+			GasLimit:      params.GasLimit,
+			GasLimitSetup: 1e9, // 1G gas
 		}, headBlockHash, headBlockNumber, l1Chain, nb.config.BatcherAddr())
 
 		payloads := make([]engine.ExecutableData, 0)
@@ -190,13 +195,10 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		// setup blocks
 		blockNum := uint64(0)
 
-		// sleep to allow the worker setup time to submit tx before the first block
-		time.Sleep(2 * time.Second)
-
 	setupLoop:
 		for {
 			_blockMetrics := metrics.NewBlockMetrics(blockNum)
-			payload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics)
+			payload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics, true)
 			if err != nil {
 				errChan <- err
 				return
@@ -207,8 +209,11 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			select {
 			case <-setupComplete:
 				break setupLoop
+			case <-chainReady:
 			default:
+				close(chainReady)
 			}
+
 		}
 
 		lastSetupBlock = payloads[len(payloads)-1].Number
@@ -224,7 +229,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 				return
 			}
 
-			payload, err := consensusClient.Propose(benchmarkCtx, blockMetrics)
+			payload, err := consensusClient.Propose(benchmarkCtx, blockMetrics, false)
 			if err != nil {
 				errChan <- err
 				return
@@ -243,6 +248,12 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			}
 			payloads = append(payloads, *payload)
 		}
+
+		err = consensusClient.Stop(benchmarkCtx)
+		if err != nil {
+			nb.log.Warn("failed to stop consensus client", "err", err)
+		}
+
 		payloadResult <- payloads
 	}()
 

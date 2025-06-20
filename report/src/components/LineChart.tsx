@@ -30,6 +30,11 @@ interface TooltipData {
   color: string;
 }
 
+/**
+ * Max ticks on the x axis.
+ */
+const MAX_TICKS = 10;
+
 const LineChart: React.FC<LineChartProps> = ({
   series,
   metricKey,
@@ -382,7 +387,7 @@ const LineChart: React.FC<LineChartProps> = ({
           .call(
             d3
               .axisBottom(x)
-              .ticks(maxBlock - minBlock)
+              .ticks(Math.min(maxBlock - minBlock, MAX_TICKS))
               .tickFormat((d) => (Number.isInteger(d) ? d.toString() : "")),
           )
           .selectAll("text")

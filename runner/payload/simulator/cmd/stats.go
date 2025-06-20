@@ -3,13 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"math"
 	"math/big"
-	"sort"
-	"strings"
 
-	"maps"
-
+	"github.com/base/base-bench/runner/payload/simulator/simulatorstats"
 	"github.com/ethereum-optimism/optimism/op-program/chainconfig"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
@@ -31,7 +27,7 @@ import (
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-func fetchBlockStats(log log.Logger, client *ethclient.Client, block *types.Block, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*stats, []*stats, error) {
+func fetchBlockStats(log log.Logger, client *ethclient.Client, block *types.Block, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
 	log.Info("Fetching execution witness")
 
 	var result *eth.ExecutionWitness
@@ -91,227 +87,25 @@ func (b *blockCtx) Config() *params.ChainConfig {
 	return b.config
 }
 
-type opcodeStats map[string]float64
-
-func (o opcodeStats) add(other opcodeStats) opcodeStats {
-	result := make(opcodeStats)
-	for opcode, count := range other {
-		result[opcode] = o[opcode] + count
-	}
-	return result
-}
-
-func (o opcodeStats) pow(n float64) opcodeStats {
-	result := make(opcodeStats)
-	for opcode, count := range o {
-		result[opcode] = math.Pow(count, n)
-	}
-	return result
-}
-
-func (o opcodeStats) sub(other opcodeStats) opcodeStats {
-	result := make(opcodeStats)
-	for opcode, count := range other {
-		result[opcode] = o[opcode] - count
-	}
-	return result
-}
-
-func (o opcodeStats) mul(n float64) opcodeStats {
-	result := make(opcodeStats)
-	for opcode, count := range o {
-		result[opcode] = count * n
-	}
-	return result
-}
-
-func (o opcodeStats) String() string {
-	var result strings.Builder
-	opcodes := make([]string, 0, len(o))
-	for opcode := range o {
-		opcodes = append(opcodes, opcode)
-	}
-	sort.Slice(opcodes, func(i, j int) bool {
-		return o[opcodes[i]] > o[opcodes[j]]
-	})
-	opcodes = opcodes[:min(10, len(opcodes))]
-	for _, opcode := range opcodes {
-		result.WriteString(fmt.Sprintf("\n   - %20s: %.2f", opcode, o[opcode]))
-	}
-	return result.String()
-}
-
-var allPrecompiles = map[common.Address]string{
-	common.BytesToAddress([]byte{1}):          "ecrecover",
-	common.BytesToAddress([]byte{2}):          "sha256hash",
-	common.BytesToAddress([]byte{3}):          "ripemd160hash",
-	common.BytesToAddress([]byte{4}):          "dataCopy",
-	common.BytesToAddress([]byte{5}):          "bigModExp",
-	common.BytesToAddress([]byte{6}):          "bn256Add",
-	common.BytesToAddress([]byte{7}):          "bn256ScalarMul",
-	common.BytesToAddress([]byte{8}):          "bn256Pairing",
-	common.BytesToAddress([]byte{9}):          "blake2F",
-	common.BytesToAddress([]byte{0x0a}):       "kzgPointEvaluation",
-	common.BytesToAddress([]byte{0x0b}):       "bls12381G1Add",
-	common.BytesToAddress([]byte{0x0c}):       "bls12381G1MultiExp",
-	common.BytesToAddress([]byte{0x0d}):       "bls12381G2Add",
-	common.BytesToAddress([]byte{0x0e}):       "bls12381G2MultiExp",
-	common.BytesToAddress([]byte{0x0f}):       "bls12381Pairing",
-	common.BytesToAddress([]byte{0x10}):       "bls12381MapG1",
-	common.BytesToAddress([]byte{0x11}):       "bls12381MapG2",
-	common.BytesToAddress([]byte{0x01, 0x00}): "p256Verify",
-}
-
-func (o opcodeStats) removeAllBut(opcodes ...string) opcodeStats {
-	result := make(opcodeStats)
-	for _, opcode := range opcodes {
-		result[opcode] = o[opcode]
-	}
-	return result
-}
-
-func (o opcodeStats) copy() opcodeStats {
-	result := make(opcodeStats)
-	maps.Copy(result, o)
-	return result
-}
-
-type stats struct {
-	accountLoaded      float64
-	accountDeleted     float64
-	accountsUpdated    float64
-	storageLoaded      float64
-	storageDeleted     float64
-	storageUpdated     float64
-	codeSizeLoaded     float64
-	numContractsLoaded float64
-	opcodes            opcodeStats
-	precompileStats    opcodeStats
-}
-
-func newStats() *stats {
-	return &stats{
-		accountLoaded:      0,
-		accountDeleted:     0,
-		accountsUpdated:    0,
-		storageLoaded:      0,
-		storageDeleted:     0,
-		storageUpdated:     0,
-		codeSizeLoaded:     0,
-		numContractsLoaded: 0,
-		opcodes:            make(opcodeStats),
-	}
-}
-
-func (s *stats) update(db *state.StateDB, codePrestate map[common.Hash][]byte, opcodeStats opcodeStats, precompileStats opcodeStats) {
-	s.accountLoaded = float64(db.AccountLoaded)
-	s.accountDeleted = float64(db.AccountDeleted)
-	s.accountsUpdated = float64(db.AccountUpdated)
-	s.storageLoaded = float64(db.StorageLoaded)
-	s.storageDeleted = float64(db.StorageDeleted.Load())
-	s.storageUpdated = float64(db.StorageUpdated.Load())
+func updateStats(db *state.StateDB, codePrestate map[common.Hash][]byte, s *simulatorstats.Stats) {
+	s.AccountLoaded = float64(db.AccountLoaded)
+	s.AccountDeleted = float64(db.AccountDeleted)
+	s.AccountsUpdated = float64(db.AccountUpdated)
+	s.StorageLoaded = float64(db.StorageLoaded)
+	s.StorageDeleted = float64(db.StorageDeleted.Load())
+	s.StorageUpdated = float64(db.StorageUpdated.Load())
 
 	totalCodeSize := uint64(0)
 	for _, code := range codePrestate {
 		totalCodeSize += uint64(len(code))
 	}
 
-	s.codeSizeLoaded = float64(totalCodeSize)
-	s.numContractsLoaded = float64(len(codePrestate))
-	s.opcodes = opcodeStats.removeAllBut("EXP", "KECCAK256")
-	s.precompileStats = precompileStats
+	s.CodeSizeLoaded = float64(totalCodeSize)
+	s.NumContractsLoaded = float64(len(codePrestate))
+	s.Opcodes = s.Opcodes.RemoveAllBut("EXP", "KECCAK256")
+	s.Precompiles = s.Precompiles.RemoveAllBut("EXP", "KECCAK256")
 }
-
-func (s *stats) sub(other *stats) *stats {
-	return &stats{
-		accountLoaded:      s.accountLoaded - other.accountLoaded,
-		accountDeleted:     s.accountDeleted - other.accountDeleted,
-		accountsUpdated:    s.accountsUpdated - other.accountsUpdated,
-		storageLoaded:      s.storageLoaded - other.storageLoaded,
-		storageDeleted:     s.storageDeleted - other.storageDeleted,
-		storageUpdated:     s.storageUpdated - other.storageUpdated,
-		opcodes:            s.opcodes.sub(other.opcodes),
-		codeSizeLoaded:     s.codeSizeLoaded - other.codeSizeLoaded,
-		numContractsLoaded: s.numContractsLoaded - other.numContractsLoaded,
-		precompileStats:    s.precompileStats.sub(other.precompileStats),
-	}
-}
-
-func (s *stats) pow(n float64) *stats {
-	return &stats{
-		accountLoaded:      math.Pow(s.accountLoaded, n),
-		accountDeleted:     math.Pow(s.accountDeleted, n),
-		accountsUpdated:    math.Pow(s.accountsUpdated, n),
-		storageLoaded:      math.Pow(s.storageLoaded, n),
-		storageDeleted:     math.Pow(s.storageDeleted, n),
-		storageUpdated:     math.Pow(s.storageUpdated, n),
-		opcodes:            s.opcodes.pow(n),
-		codeSizeLoaded:     math.Pow(s.codeSizeLoaded, n),
-		numContractsLoaded: math.Pow(s.numContractsLoaded, n),
-		precompileStats:    s.precompileStats.pow(n),
-	}
-}
-
-func (s *stats) add(other *stats) *stats {
-	return &stats{
-		accountLoaded:      s.accountLoaded + other.accountLoaded,
-		accountDeleted:     s.accountDeleted + other.accountDeleted,
-		accountsUpdated:    s.accountsUpdated + other.accountsUpdated,
-		storageLoaded:      s.storageLoaded + other.storageLoaded,
-		storageDeleted:     s.storageDeleted + other.storageDeleted,
-		storageUpdated:     s.storageUpdated + other.storageUpdated,
-		opcodes:            s.opcodes.add(other.opcodes),
-		codeSizeLoaded:     s.codeSizeLoaded + other.codeSizeLoaded,
-		numContractsLoaded: s.numContractsLoaded + other.numContractsLoaded,
-		precompileStats:    s.precompileStats.add(other.precompileStats),
-	}
-}
-
-func (s *stats) mul(n float64) *stats {
-	return &stats{
-		accountLoaded:      s.accountLoaded * n,
-		accountDeleted:     s.accountDeleted * n,
-		accountsUpdated:    s.accountsUpdated * n,
-		storageLoaded:      s.storageLoaded * n,
-		storageDeleted:     s.storageDeleted * n,
-		storageUpdated:     s.storageUpdated * n,
-		opcodes:            s.opcodes.mul(n),
-		codeSizeLoaded:     s.codeSizeLoaded * n,
-		numContractsLoaded: s.numContractsLoaded * n,
-		precompileStats:    s.precompileStats.mul(n),
-	}
-}
-
-func (s *stats) copy() *stats {
-	return &stats{
-		accountLoaded:      s.accountLoaded,
-		accountDeleted:     s.accountDeleted,
-		accountsUpdated:    s.accountsUpdated,
-		storageLoaded:      s.storageLoaded,
-		storageDeleted:     s.storageDeleted,
-		storageUpdated:     s.storageUpdated,
-		codeSizeLoaded:     s.codeSizeLoaded,
-		numContractsLoaded: s.numContractsLoaded,
-		opcodes:            s.opcodes.copy(),
-		precompileStats:    s.precompileStats.copy(),
-	}
-}
-
-func (s *stats) String() string {
-	res := fmt.Sprintf("- Accounts Reads: %.2f\n", s.accountLoaded)
-	res += fmt.Sprintf("- Accounts Deletes: %.2f\n", s.accountDeleted)
-	res += fmt.Sprintf("- Accounts Updates: %.2f\n", s.accountsUpdated)
-	res += fmt.Sprintf("- Storage Reads: %.2f\n", s.storageLoaded)
-	res += fmt.Sprintf("- Storage Deletes: %.2f\n", s.storageDeleted)
-	res += fmt.Sprintf("- Storage Updates: %.2f\n", s.storageUpdated)
-	res += fmt.Sprintf("- Code Size Loaded: %.2f\n", s.codeSizeLoaded)
-	res += fmt.Sprintf("- Number of Contracts Loaded: %.2f\n", s.numContractsLoaded)
-	res += fmt.Sprintf("- Opcode Stats: %s\n", s.opcodes.String())
-	res += fmt.Sprintf("- Precompile Stats: %s\n", s.precompileStats.String())
-	return res
-}
-
-func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block, executedBlock *types.Block, witness *eth.ExecutionWitness, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*stats, []*stats, error) {
+func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block, executedBlock *types.Block, witness *eth.ExecutionWitness, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
 	header := &types.Header{
 		ParentHash:      parent.Hash(),
 		Coinbase:        executedBlock.Coinbase(),
@@ -355,8 +149,8 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 		return nil, nil, fmt.Errorf("failed to init state db around block %s (state %s): %w", parent.Hash().Hex(), parent.Root().Hex(), err)
 	}
 
-	blockStats := newStats()
-	txStats := make([]*stats, len(executedBlock.Transactions()))
+	blockStats := simulatorstats.NewStats()
+	txStats := make([]*simulatorstats.Stats, len(executedBlock.Transactions()))
 
 	if genesis.Config.IsLondon(header.Number) {
 		header.BaseFee = eip1559.CalcBaseFee(genesis.Config, parent.Header(), header.Time)
@@ -388,7 +182,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 	gasPool := new(core.GasPool)
 	gasPool.AddGas(header.GasLimit)
 
-	blockStats.update(statedb, codes, blockTracer.opcodeStats, blockTracer.precompileStats)
+	updateStats(statedb, codes, blockStats)
 
 	log.Info("Finished initializing state db")
 
@@ -408,9 +202,9 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 			return nil, nil, fmt.Errorf("failed to apply transaction to L1 block (tx %d): %v", len(executedBlock.Transactions()), err)
 		}
 
-		prevBlockStats := blockStats.copy()
-		blockStats.update(statedb, codes, blockTracer.opcodeStats, blockTracer.precompileStats)
-		txStats[i] = blockStats.sub(prevBlockStats)
+		prevBlockStats := blockStats.Copy()
+		updateStats(statedb, codes, blockStats)
+		txStats[i] = blockStats.Sub(prevBlockStats)
 	}
 
 	header.GasUsed = header.GasLimit - (uint64(*gasPool))
@@ -418,7 +212,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 
 	log.Info("Finished executing block transactions")
 
-	blockStats.update(statedb, codes, blockTracer.opcodeStats, blockTracer.precompileStats)
+	updateStats(statedb, codes, blockStats)
 
 	isCancun := genesis.Config.IsCancun(header.Number, header.Time)
 	// Write state changes to db
