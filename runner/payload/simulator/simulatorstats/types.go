@@ -6,10 +6,12 @@ import (
 	"math"
 	"math/big"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/base/base-bench/runner/payload/simulator/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type OpcodeStats map[string]float64
@@ -113,20 +115,120 @@ func (o OpcodeStats) Copy() OpcodeStats {
 	return result
 }
 
+// StatsConfig is a struct that contains the configuration for the Stats struct.
+type StatsConfig struct {
+	AccountLoaded      *float64     `yaml:"accounts_loaded"`
+	AccountDeleted     *float64     `yaml:"accounts_deleted"`
+	AccountsUpdated    *float64     `yaml:"accounts_updated"`
+	AccountsCreated    *float64     `yaml:"accounts_created"`
+	CallsPerBlock      *string      `yaml:"calls_per_block"`
+	StorageLoaded      *float64     `yaml:"storage_loaded"`
+	StorageDeleted     *float64     `yaml:"storage_deleted"`
+	StorageUpdated     *float64     `yaml:"storage_updated"`
+	StorageCreated     *float64     `yaml:"storage_created"`
+	CodeSizeLoaded     *float64     `yaml:"code_size_loaded"`
+	NumContractsLoaded *float64     `yaml:"num_contracts_loaded"`
+	Opcodes            *OpcodeStats `yaml:"opcodes"`
+	Precompiles        *OpcodeStats `yaml:"precompiles"`
+	AvgGasUsed         *float64     `yaml:"avg_gas_used"`
+}
+
+func (s *StatsConfig) ToStats() *Stats {
+	accountLoaded := 0.0
+	accountDeleted := 0.0
+	accountsUpdated := 0.0
+	accountsCreated := 0.0
+	storageLoaded := 0.0
+	storageDeleted := 0.0
+	storageUpdated := 0.0
+	storageCreated := 0.0
+	codeSizeLoaded := 0.0
+	numContractsLoaded := 0.0
+	callsPerBlock := "fill"
+	opcodes := make(OpcodeStats)
+	precompiles := make(OpcodeStats)
+
+	if s.AccountLoaded != nil {
+		accountLoaded = *s.AccountLoaded
+	}
+	if s.AccountDeleted != nil {
+		accountDeleted = *s.AccountDeleted
+	}
+	if s.AccountsUpdated != nil {
+		accountsUpdated = *s.AccountsUpdated
+	}
+	if s.AccountsCreated != nil {
+		accountsCreated = *s.AccountsCreated
+	}
+	if s.StorageLoaded != nil {
+		storageLoaded = *s.StorageLoaded
+	}
+	if s.StorageDeleted != nil {
+		storageDeleted = *s.StorageDeleted
+	}
+	if s.StorageUpdated != nil {
+		storageUpdated = *s.StorageUpdated
+	}
+	if s.StorageCreated != nil {
+		storageCreated = *s.StorageCreated
+	}
+	if s.CodeSizeLoaded != nil {
+		codeSizeLoaded = *s.CodeSizeLoaded
+	}
+	if s.Opcodes != nil {
+		opcodes = *s.Opcodes
+	}
+	if s.Precompiles != nil {
+		precompiles = *s.Precompiles
+	}
+	if s.NumContractsLoaded != nil {
+		numContractsLoaded = *s.NumContractsLoaded
+	}
+	if s.CallsPerBlock != nil {
+		if *s.CallsPerBlock == "fill" {
+			callsPerBlock = "fill"
+		} else {
+			callsPerBlockVal, err := strconv.ParseUint(*s.CallsPerBlock, 10, 64)
+			if err != nil {
+				log.Error("failed to parse calls per block", "err", err, "callsPerBlock", *s.CallsPerBlock)
+				callsPerBlock = "fill"
+			} else {
+				callsPerBlock = fmt.Sprintf("%d", callsPerBlockVal)
+			}
+		}
+	}
+
+	return &Stats{
+		AccountLoaded:      accountLoaded,
+		AccountDeleted:     accountDeleted,
+		AccountsUpdated:    accountsUpdated,
+		AccountsCreated:    accountsCreated,
+		StorageLoaded:      storageLoaded,
+		StorageDeleted:     storageDeleted,
+		StorageUpdated:     storageUpdated,
+		StorageCreated:     storageCreated,
+		CodeSizeLoaded:     codeSizeLoaded,
+		NumContractsLoaded: numContractsLoaded,
+		CallsPerBlock:      callsPerBlock,
+		Opcodes:            opcodes,
+		Precompiles:        precompiles,
+	}
+}
+
 type Stats struct {
-	AccountLoaded      float64     `yaml:"account_loaded"`
-	AccountDeleted     float64     `yaml:"account_deleted"`
-	AccountsUpdated    float64     `yaml:"accounts_updated"`
-	CallsPerBlock      string      `yaml:"calls_per_block"`
-	AccountsCreated    float64     `yaml:"accounts_created"`
-	StorageLoaded      float64     `yaml:"storage_loaded"`
-	StorageDeleted     float64     `yaml:"storage_deleted"`
-	StorageUpdated     float64     `yaml:"storage_updated"`
-	StorageCreated     float64     `yaml:"storage_created"`
-	CodeSizeLoaded     float64     `yaml:"code_size_loaded"`
-	NumContractsLoaded float64     `yaml:"num_contracts_loaded"`
-	Opcodes            OpcodeStats `yaml:"opcodes"`
-	Precompiles        OpcodeStats `yaml:"precompiles"`
+	AccountLoaded      float64
+	AccountDeleted     float64
+	AccountsUpdated    float64
+	AccountsCreated    float64
+	StorageLoaded      float64
+	StorageDeleted     float64
+	StorageUpdated     float64
+	StorageCreated     float64
+	CodeSizeLoaded     float64
+	NumContractsLoaded float64
+	CallsPerBlock      string
+	Opcodes            OpcodeStats
+	Precompiles        OpcodeStats
 }
 
 func (s *Stats) ToConfig() (*abi.SimulatorConfig, error) {

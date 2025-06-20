@@ -248,6 +248,12 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			}
 			payloads = append(payloads, *payload)
 		}
+
+		err = consensusClient.Stop(benchmarkCtx)
+		if err != nil {
+			nb.log.Warn("failed to stop consensus client", "err", err)
+		}
+
 		payloadResult <- payloads
 	}()
 

@@ -2,8 +2,8 @@ payloads:
   - name: Simulator
     id: simulator
     type: simulator
-    account_loaded: 300
-    account_deleted: 1.27
+    accounts_loaded: 300
+    accounts_deleted: 1.27
     accounts_updated: 481.17
     accounts_created: 481.17
     storage_loaded: 300

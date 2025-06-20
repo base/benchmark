@@ -36,7 +36,7 @@ type Contract struct {
 	Bytecode Bytecode `json:"bytecode"`
 }
 
-type SimulatorPayloadDefinition = simulatorstats.Stats
+type SimulatorPayloadDefinition = simulatorstats.StatsConfig
 
 type simulatorPayloadWorker struct {
 	log log.Logger
@@ -52,8 +52,11 @@ type simulatorPayloadWorker struct {
 
 	contractAddr common.Address
 
-	payloadParams   SimulatorPayloadDefinition
-	actualNumConfig SimulatorPayloadDefinition
+	// scaleFactor is the factor by which to scale the numCallsPerBlock to match the gas limit
+	scaleFactor float64
+
+	payloadParams   *simulatorstats.Stats
+	actualNumConfig *simulatorstats.Stats
 	numCalls        uint64
 	contractBackend *backendWithTrackedNonce
 
@@ -131,6 +134,11 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 		Context: context.Background(),
 	}
 
+	scaleFactor := 1.0
+	if simulatorParams.AvgGasUsed != nil && simulatorParams.CallsPerBlock != nil && *simulatorParams.CallsPerBlock != "fill" {
+		scaleFactor = float64(params.GasLimit) / float64(*simulatorParams.AvgGasUsed)
+	}
+
 	t := &simulatorPayloadWorker{
 		log:              log,
 		client:           client,
@@ -139,10 +147,12 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 		chainID:          chainID,
 		prefundedAccount: &prefundedPrivateKey,
 		prefundAmount:    prefundAmount,
-		payloadParams:    *simulatorParams,
+		payloadParams:    simulatorParams.ToStats(),
 		contractBackend:  contractBackend,
 		transactor:       transactor,
 		callTransactor:   callTransactor,
+		scaleFactor:      scaleFactor,
+		actualNumConfig:  simulatorstats.NewStats(),
 	}
 
 	return t, nil
@@ -268,23 +278,25 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	gas := tx.Gas()
 
+	// max num calls per block is the gas limit divided by the gas used per call (we'll estimate that here)
 	t.numCallsPerBlock = calcNumCalls(gas, t.params.GasLimit, buffer)
 
+	// if the user specifies calls per block, use that if it's under the max
 	if t.payloadParams.CallsPerBlock != "fill" {
 		f, err := strconv.ParseUint(t.payloadParams.CallsPerBlock, 10, 64)
 		if err != nil {
-			return errors.Wrap(err, "failed to parse calls per block")
+			t.log.Warn("failed to parse calls per block", "err", err, "callsPerBlock", t.payloadParams.CallsPerBlock)
 		}
 
 		// callsperblock is the max number of calls per block
-		if f < t.numCallsPerBlock {
+		if err == nil && f < t.numCallsPerBlock {
 			t.numCallsPerBlock = f
 		}
 	}
 
 	t.log.Info("Calculated num calls per block", "numCalls", t.numCallsPerBlock, "gas", gas, "gasLimit", t.params.GasLimit, "buffer", buffer)
 
-	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * 1.05).ToConfig()
+	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * t.scaleFactor * 1.05).ToConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload params to config")
 	}
@@ -392,12 +404,12 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 
 	gas := t.params.GasLimit - 100_000
 
-	for i := uint64(0); i < t.numCallsPerBlock; i++ {
+	for i := uint64(0); i < uint64(math.Ceil(float64(t.numCallsPerBlock)*t.scaleFactor)); i++ {
 		actual := t.actualNumConfig
-		expected := t.payloadParams.Mul(float64(t.numCalls + 1))
+		expected := t.payloadParams.Mul(float64(t.numCalls+1) * t.scaleFactor)
 
-		blockCounts := expected.Sub(&actual).Round()
-		transferTx, err := t.createCallTx(t.transactor, t.prefundedAccount, *blockCounts)
+		blockCounts := expected.Sub(actual).Round()
+		transferTx, err := t.createCallTx(t.transactor, t.prefundedAccount, blockCounts)
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
 			return err
@@ -415,7 +427,7 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 
 		txs = append(txs, transferTx)
 
-		t.actualNumConfig = *t.actualNumConfig.Add(blockCounts)
+		t.actualNumConfig = t.actualNumConfig.Add(blockCounts)
 		t.numCalls++
 	}
 
@@ -423,7 +435,7 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 	return nil
 }
 
-func (t *simulatorPayloadWorker) createCallTx(transactor *bind.TransactOpts, fromPriv *ecdsa.PrivateKey, config SimulatorPayloadDefinition) (*types.Transaction, error) {
+func (t *simulatorPayloadWorker) createCallTx(transactor *bind.TransactOpts, fromPriv *ecdsa.PrivateKey, config *simulatorstats.Stats) (*types.Transaction, error) {
 	simulator, err := abi.NewSimulator(t.contractAddr, t.contractBackend)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create simulator transactor")

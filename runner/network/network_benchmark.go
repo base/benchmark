@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/payload"
+	"github.com/ethereum-optimism/optimism/op-service/retry"
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
@@ -86,7 +88,15 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	}
 
 	// Ensure client is stopped even if benchmark fails
-	defer sequencerClient.Stop()
+	defer func() {
+		currentHeader, err := sequencerClient.Client().HeaderByNumber(ctx, nil)
+		if err != nil {
+			nb.log.Error("Failed to get current block number", "error", err)
+		} else {
+			nb.log.Info("Sequencer node stopped at block", "number", currentHeader.Number.Uint64(), "hash", currentHeader.Hash().Hex())
+		}
+		sequencerClient.Stop()
+	}()
 
 	// Create metrics collector and writer
 	metricsCollector := metrics.NewMetricsCollector(nb.log, sequencerClient.Client(), nb.testConfig.Params.NodeType, sequencerClient.MetricsPort())
@@ -113,8 +123,15 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		return fmt.Errorf("failed to setup validator node: %w", err)
 	}
 
-	// Ensure client is stopped even if benchmark fails
-	defer validatorClient.Stop()
+	defer func() {
+		currentHeader, err := validatorClient.Client().HeaderByNumber(ctx, nil)
+		if err != nil {
+			nb.log.Error("Failed to get current block number", "error", err)
+		} else {
+			nb.log.Info("Validator node stopped at block", "number", currentHeader.Number.Uint64(), "hash", currentHeader.Hash().Hex())
+		}
+		validatorClient.Stop()
+	}()
 
 	// Create metrics collector and writer
 	metricsCollector := metrics.NewMetricsCollector(nb.log, validatorClient.Client(), nb.testConfig.Params.NodeType, validatorClient.MetricsPort())
@@ -182,6 +199,17 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	if err := client.Run(ctx, runtimeConfig); err != nil {
 		return nil, fmt.Errorf("failed to run execution layer client: %w", err)
 	}
+
+	_, _ = retry.Do(ctx, 10, retry.Fixed(100*time.Millisecond), func() (any, error) {
+		currentBlockNumber, err := client.Client().HeaderByNumber(ctx, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current block number: %w", err)
+		}
+
+		l.Info("Starting node with head block", "number", currentBlockNumber.Number.Uint64(), "hash", currentBlockNumber.Hash().Hex())
+
+		return nil, nil
+	})
 
 	return client, nil
 }

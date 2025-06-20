@@ -48,6 +48,18 @@ func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authC
 	}
 }
 
+func (f *SequencerConsensusClient) Stop(ctx context.Context) error {
+	f.log.Info("Stopping sequencer consensus client")
+
+	// ensure fork choice is updated to the last block
+	_, err := f.updateForkChoice(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // marshalBinaryWithSignature creates the call data for an L1Info transaction.
 func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]byte, error) {
 	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoIsthmusLen))
@@ -261,7 +273,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(metrics.GetPayloadLatencyMetric, duration)
-	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions))
+	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "number", payload.Number, "hash", payload.BlockHash.Hex())
 
 	// get gas usage
 	gasPerBlock := payload.GasUsed
