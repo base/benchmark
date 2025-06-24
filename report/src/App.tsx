@@ -31,12 +31,10 @@ function App() {
           )}
         </div>
       </nav>
-      <div className="p-8">
-        <Routes>
-          <Route path="/" element={<RunIndex />} />
-          <Route path="/run-comparison" element={<RunComparison />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route path="/" element={<RunIndex />} />
+        <Route path="/run-comparison" element={<RunComparison />} />
+      </Routes>
     </>
   );
 }

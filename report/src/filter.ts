@@ -1,5 +1,3 @@
-import { BenchmarkRun } from "./types";
-
 // Export this type for use elsewhere
 export type FilterValue = string | number | boolean;
 type FilterSelectionsParams = Record<string, FilterValue>;
@@ -7,10 +5,10 @@ type FilterSelectionsParams = Record<string, FilterValue>;
 /**
  * Matches runs against a given set of filter criteria.
  */
-function matchRuns(
-  runs: BenchmarkRun[],
+function matchRuns<T extends { testConfig: Record<string, string | number> }>(
+  runs: T[],
   filterSelections: FilterSelectionsParams,
-): BenchmarkRun[] {
+): T[] {
   return runs.filter((run) => {
     return Object.entries(filterSelections).every(([key, value]) => {
       return `${run.testConfig[key]}` === `${value}`;
@@ -22,8 +20,10 @@ function matchRuns(
  * Extracts variables, calculates available filter options, and filters runs based on selections.
  * Ensures that filter options remain available even if the current selection yields no results.
  */
-export function getBenchmarkVariables(
-  runs: BenchmarkRun[],
+export function getBenchmarkVariables<
+  T extends { testConfig: Record<string, string | number> },
+>(
+  runs: T[],
   filterSelections: {
     params: FilterSelectionsParams;
     byMetric: string;

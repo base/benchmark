@@ -9,16 +9,20 @@ import {
 import { interpolateWarm } from "d3";
 import { useBenchmarkFilters } from "../hooks/useBenchmarkFilters";
 
-export interface DataFileRequest {
+export interface SelectedData {
   outputDir: string;
   role: string;
   name: string;
   color?: string;
+  thresholds?: {
+    warning?: Record<string, number>;
+    error?: Record<string, number>;
+  };
 }
 
 interface ChartSelectorProps {
   benchmarkRuns: BenchmarkRuns;
-  onChangeDataQuery: (data: DataFileRequest[]) => void;
+  onChangeDataQuery: (data: SelectedData[]) => void;
 }
 
 const ChartSelector = ({
@@ -43,7 +47,7 @@ const ChartSelector = ({
     setByMetric,
   } = useBenchmarkFilters(runsWithRoles, "role");
 
-  const lastSentDataRef = useRef<DataFileRequest[]>([]);
+  const lastSentDataRef = useRef<SelectedData[]>([]);
 
   useEffect(() => {
     let colorMap: ((val: number) => string) | undefined = undefined;
@@ -57,8 +61,8 @@ const ChartSelector = ({
         interpolateWarm(max - min > 0 ? 1 - (val - min) / (max - min) : 0.5);
     }
 
-    const dataToSend: DataFileRequest[] = matchedRuns
-      .map((run): DataFileRequest | null => {
+    const dataToSend: SelectedData[] = matchedRuns
+      .map((run): SelectedData | null => {
         if (!run.testConfig || !run.outputDir) {
           console.warn("Skipping run with missing data:", run);
           return null;
@@ -81,17 +85,18 @@ const ChartSelector = ({
 
         const role = run.testConfig.role ?? "unknown";
 
-        const request: DataFileRequest = {
+        const request: SelectedData = {
           outputDir: run.outputDir,
           role: String(role),
           name: seriesName,
+          thresholds: run.thresholds,
         };
         if (color !== undefined) {
           request.color = color;
         }
         return request;
       })
-      .filter((item): item is DataFileRequest => item !== null);
+      .filter((item): item is SelectedData => item !== null);
 
     if (!isEqual(dataToSend, lastSentDataRef.current)) {
       lastSentDataRef.current = dataToSend;
