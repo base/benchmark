@@ -8,11 +8,17 @@ import (
 	"time"
 )
 
+type ThresholdConfig struct {
+	Warning map[string]float64 `yaml:"warning" json:"warning"`
+	Error   map[string]float64 `yaml:"error" json:"error"`
+}
+
 // TestPlan represents a list of test runs to be executed.
 type TestPlan struct {
 	Runs         []TestRun
 	Snapshot     *SnapshotDefinition
 	ProofProgram *ProofProgramOptions
+	Thresholds   *ThresholdConfig
 }
 
 func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, error) {
@@ -36,6 +42,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, er
 		Runs:         testRuns,
 		Snapshot:     c.Snapshot,
 		ProofProgram: proofProgram,
+		Thresholds:   c.Metrics,
 	}, nil
 }
 
