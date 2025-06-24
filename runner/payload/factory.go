@@ -32,7 +32,7 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 			log, sequencerClient.ClientURL(), params, privateKey, amount, config.TxFuzzBinary(), genesis.Config.ChainID)
 	case "transfer-only":
 		worker, err = transferonly.NewTransferPayloadWorker(
-			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis)
+			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, definition.Params)
 	case "contract":
 		worker, err = contract.NewContractPayloadWorker(
 			log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, config, definition.Params)
