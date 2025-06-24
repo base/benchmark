@@ -3,6 +3,7 @@ package transferonly
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"time"
@@ -26,6 +27,7 @@ import (
 )
 
 type TransferOnlyPayloadDefinition struct {
+	CreateAccounts *bool `yaml:"create_accounts"`
 }
 
 type transferOnlyPayloadWorker struct {
@@ -36,24 +38,35 @@ type transferOnlyPayloadWorker struct {
 	nextNonce   map[common.Address]uint64
 	balance     map[common.Address]*big.Int
 
-	params  benchtypes.RunParams
-	chainID *big.Int
-	client  *ethclient.Client
+	params        benchtypes.RunParams
+	chainID       *big.Int
+	client        *ethclient.Client
+	payloadParams TransferOnlyPayloadDefinition
 
 	prefundedAccount *ecdsa.PrivateKey
 	prefundAmount    *big.Int
+
+	currFakeAddr uint64
 
 	mempool *mempool.StaticWorkloadMempool
 }
 
 const numAccounts = 1000
 
-func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis) (worker.Worker, error) {
+func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, definition any) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log, genesis.Config.ChainID)
 
 	client, err := ethclient.Dial(elRPCURL)
 	if err != nil {
 		return nil, err
+	}
+
+	var payloadParams TransferOnlyPayloadDefinition
+	if definition != nil {
+		payloadParamsPtr, ok := definition.(*TransferOnlyPayloadDefinition)
+		if ok {
+			payloadParams = *payloadParamsPtr
+		}
 	}
 
 	chainID := genesis.Config.ChainID
@@ -66,6 +79,7 @@ func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL stri
 		chainID:          chainID,
 		prefundedAccount: &prefundedPrivateKey,
 		prefundAmount:    prefundAmount,
+		payloadParams:    payloadParams,
 	}
 
 	if err := t.generateAccounts(ctx); err != nil {
@@ -226,8 +240,25 @@ func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
 
+	randomInt := rand.Uint64()
+
 	for gasUsed < (t.params.GasLimit - 100_000) {
-		transferTx, err := t.createTransferTx(t.privateKeys[acctIdx], t.nextNonce[t.addresses[acctIdx]], t.addresses[(acctIdx+1)%numAccounts], big.NewInt(1))
+
+		dest := t.addresses[(acctIdx+1)%numAccounts]
+		if t.payloadParams.CreateAccounts != nil && *t.payloadParams.CreateAccounts {
+			fakeAddressOffset := t.currFakeAddr
+			t.currFakeAddr++
+
+			var addr common.Address
+			binary.BigEndian.PutUint64(addr[:], fakeAddressOffset)
+
+			binary.BigEndian.PutUint64(addr[8:], randomInt)
+			addr[19] = 0xff
+			addr[18] = 0xff
+			dest = addr
+		}
+
+		transferTx, err := t.createTransferTx(t.privateKeys[acctIdx], t.nextNonce[t.addresses[acctIdx]], dest, big.NewInt(1))
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
 			return err
