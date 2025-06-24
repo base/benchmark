@@ -1,0 +1,43 @@
+payloads:
+  - name: Simulator
+    id: simulator
+    type: simulator
+    accounts_loaded: 300
+    accounts_deleted: 1.27
+    accounts_updated: 481.17
+    accounts_created: 481.17
+    storage_loaded: 300
+    storage_deleted: 46.1
+    storage_updated: 1149.7
+    storage_created: 1149.7
+    code_size_loaded: 6624731.5
+    num_contracts_loaded: 43.30
+    calls_per_block: fill
+    opcodes:
+      EXP: 626.30
+      KECCAK256: 29.21
+    precompiles:
+      bls12381MapG2: 69.81
+      ecrecover: 7.33
+      bls12381G1Add: 2.44
+      bls12381G1MultiExp: 2.18
+      sha256hash: 1
+      dataCopy: 1
+      bls12381Pairing: 1
+      bls12381G2Add: 1
+      bls12381G2MultiExp: 1
+
+benchmarks:
+  - name: Transfer-only execution speed
+    description: Transfer-only execution speed
+    variables:
+      - type: payload
+        value: simulator
+      - type: node_type
+        values:
+          - geth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 90000000
