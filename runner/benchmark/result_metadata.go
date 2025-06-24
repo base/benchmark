@@ -20,6 +20,7 @@ type CommonKeyMetrics struct {
 
 type BenchmarkRunResult struct {
 	Success          bool                `json:"success"`
+	Complete         bool                `json:"complete"`
 	SequencerMetrics SequencerKeyMetrics `json:"sequencerMetrics"`
 	ValidatorMetrics ValidatorKeyMetrics `json:"validatorMetrics"`
 }

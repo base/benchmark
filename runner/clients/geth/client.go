@@ -59,22 +59,25 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	g.stdout = cfg.Stdout
 	g.stderr = cfg.Stderr
+	args := make([]string, 0)
 
 	// first init geth
-	args := make([]string, 0)
-	args = append(args, "--datadir", g.options.DataDirPath)
-	args = append(args, "--state.scheme", "hash")
+	if !g.options.SkipInit {
+		args = append(args, "--datadir", g.options.DataDirPath)
+		args = append(args, "--state.scheme", "hash")
 
-	args = append(args, "init", g.options.ChainCfgPath)
+		args = append(args, "init", g.options.ChainCfgPath)
 
-	cmd := exec.CommandContext(ctx, g.options.GethBin, args...)
-	cmd.Stdout = g.stdout
-	cmd.Stderr = g.stderr
+		cmd := exec.CommandContext(ctx, g.options.GethBin, args...)
+		cmd.Stdout = g.stdout
+		cmd.Stderr = g.stderr
 
-	err := cmd.Run()
-	if err != nil {
-		return errors.Wrap(err, "failed to init geth")
+		err := cmd.Run()
+		if err != nil {
+			return errors.Wrap(err, "failed to init geth")
+		}
 	}
+
 
 	args = make([]string, 0)
 	args = append(args, "--datadir", g.options.DataDirPath)
@@ -94,6 +97,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--txpool.accountqueue", "1000000")
 	args = append(args, "--maxpeers", "0")
 	args = append(args, "--nodiscover")
+	args = append(args, "--rpc.txfeecap", "20")
 	args = append(args, "--syncmode", "full")
 	args = append(args, "--http.api", "eth,net,web3,miner,debug")
 	args = append(args, "--gcmode", "archive")

@@ -91,7 +91,8 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 	}
 
 	var dataDirPath string
-	if snapshot != nil && snapshot.Command != "" {
+	isSnapshot := snapshot != nil && snapshot.Command != ""
+	if isSnapshot {
 		// if we have a snapshot, restore it if needed or reuse from a previous test
 		snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
 		if err != nil {
@@ -131,6 +132,8 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 
 	options := s.config.ClientOptions()
 	options = params.ClientOptions(options)
+
+	options.SkipInit = isSnapshot
 
 	internalOptions := &config.InternalClientOptions{
 		ClientOptions: options,
@@ -379,17 +382,17 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	}
 	err = benchmark.Run(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to run benchmark")
 	}
 
 	err = s.exportOutput(testName, err, sequencerOptions, outputDir, "sequencer")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to export sequencer output")
 	}
 
 	err = s.exportOutput(testName, err, validatorOptions, outputDir, "validator")
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to export output")
+		return nil, errors.Wrap(err, "failed to export validator output")
 	}
 
 	result, err := benchmark.GetResult()
@@ -481,7 +484,8 @@ func (s *service) Run(ctx context.Context) error {
 				} else {
 					log.Error("Failed to run test", "err", err)
 					metricSummary = &benchmark.BenchmarkRunResult{
-						Success: false,
+						Success:  false,
+						Complete: true,
 					}
 					numFailure++
 				}
@@ -495,6 +499,13 @@ func (s *service) Run(ctx context.Context) error {
 				return errors.Wrap(err, "failed to write test metadata")
 			}
 			runIdx++
+
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				continue
+			}
 		}
 	}
 
