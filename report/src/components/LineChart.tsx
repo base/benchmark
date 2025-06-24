@@ -1,4 +1,11 @@
-import React, { useRef, useEffect, useCallback, useId, useState } from "react";
+import React, {
+  useRef,
+  useEffect,
+  useCallback,
+  useId,
+  useState,
+  useMemo,
+} from "react";
 import * as d3 from "d3";
 import { DataSeries, MetricData, ChartConfig } from "../types";
 import BaseChart from "./BaseChart";
@@ -15,6 +22,10 @@ interface LineChartProps {
   unit?: ChartConfig["unit"];
   xAxisDomain?: [number, number];
   xAxisLabel?: string;
+  thresholds?: {
+    warning?: Record<string, number>;
+    error?: Record<string, number>;
+  };
 }
 
 interface TooltipData {
@@ -30,6 +41,11 @@ interface TooltipData {
   color: string;
 }
 
+/**
+ * Max ticks on the x axis.
+ */
+const MAX_TICKS = 10;
+
 const LineChart: React.FC<LineChartProps> = ({
   series,
   metricKey,
@@ -38,6 +54,7 @@ const LineChart: React.FC<LineChartProps> = ({
   unit,
   xAxisDomain,
   xAxisLabel = "Block Number",
+  thresholds,
 }) => {
   // Generate a unique ID for this chart
   const chartId = useId();
@@ -322,6 +339,18 @@ const LineChart: React.FC<LineChartProps> = ({
     handleHoverEnd,
   );
 
+  const maxThreshold = useMemo(() => {
+    let maxThreshold = 0;
+    for (const thresholdMap of [thresholds?.warning, thresholds?.error]) {
+      if (thresholdMap) {
+        if (thresholdMap[metricKey] > maxThreshold) {
+          maxThreshold = thresholdMap[metricKey];
+        }
+      }
+    }
+    return maxThreshold;
+  }, [thresholds]);
+
   return (
     <BaseChart
       data={validData}
@@ -342,7 +371,7 @@ const LineChart: React.FC<LineChartProps> = ({
 
         const y = d3
           .scaleLinear()
-          .domain([0, maxValue > 0 ? maxValue : 1]) // Ensure non-zero domain to avoid NaN
+          .domain([0, maxValue > 0 ? Math.max(maxValue, maxThreshold) : 1]) // Ensure non-zero domain to avoid NaN
           .range([dimensions.height, 0]);
 
         // Store scales in refs for hover calculations
@@ -375,6 +404,43 @@ const LineChart: React.FC<LineChartProps> = ({
           .style("stroke-dasharray", "3,3")
           .style("stroke-opacity", 0.2);
 
+        // Add threshold lines if thresholds are provided
+        if (thresholds) {
+          // Add warning threshold line (yellow)
+          if (
+            thresholds.warning &&
+            thresholds.warning[metricKey] !== undefined
+          ) {
+            const warningY = y(thresholds.warning[metricKey]);
+            svg
+              .append("line")
+              .attr("class", "threshold-line warning")
+              .attr("x1", 0)
+              .attr("x2", dimensions.width)
+              .attr("y1", warningY)
+              .attr("y2", warningY)
+              .attr("stroke", "#ffc107") // Yellow color
+              .attr("stroke-dasharray", "3,4")
+              .style("opacity", 0.8);
+          }
+
+          // Add error threshold line (red)
+          if (thresholds.error && thresholds.error[metricKey] !== undefined) {
+            let errorY = y(thresholds.error[metricKey]);
+            svg
+              .append("line")
+              .attr("class", "threshold-line error")
+              .attr("x1", 0)
+              .attr("x2", dimensions.width)
+              .attr("y1", errorY)
+              .attr("y2", errorY)
+              .attr("stroke", "#dc3545") // Red color
+              .attr("stroke-width", 1)
+              .attr("stroke-dasharray", "6,4")
+              .style("opacity", 0.8);
+          }
+        }
+
         // Add axes
         svg
           .append("g")
@@ -382,7 +448,7 @@ const LineChart: React.FC<LineChartProps> = ({
           .call(
             d3
               .axisBottom(x)
-              .ticks(maxBlock - minBlock)
+              .ticks(Math.min(maxBlock - minBlock, MAX_TICKS))
               .tickFormat((d) => (Number.isInteger(d) ? d.toString() : "")),
           )
           .selectAll("text")

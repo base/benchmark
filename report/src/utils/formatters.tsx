@@ -56,6 +56,20 @@ export const formatLabel = (label: string) => {
   return label.length > 50 ? label.substring(0, 50) + "..." : label;
 };
 
+export const MetricValue = ({
+  value,
+  unit,
+}: {
+  value: number;
+  unit: ChartConfig["unit"];
+}) => {
+  if (unit === undefined || typeof value !== "number" || isNaN(value)) {
+    return value?.toString() ?? "";
+  }
+
+  return formatValue(value, unit);
+};
+
 export const formatValue = (
   value: number,
   unit?: ChartConfig["unit"],
