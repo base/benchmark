@@ -86,7 +86,15 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	}
 
 	// Ensure client is stopped even if benchmark fails
-	defer sequencerClient.Stop()
+	defer func() {
+		currentHeader, err := sequencerClient.Client().HeaderByNumber(ctx, nil)
+		if err != nil {
+			nb.log.Error("Failed to get current block number", "error", err)
+		} else {
+			nb.log.Info("Sequencer node stopped at block", "number", currentHeader.Number.Uint64(), "hash", currentHeader.Hash().Hex())
+		}
+		sequencerClient.Stop()
+	}()
 
 	// Create metrics collector and writer
 	metricsCollector := metrics.NewMetricsCollector(nb.log, sequencerClient.Client(), nb.testConfig.Params.NodeType, sequencerClient.MetricsPort())
@@ -113,8 +121,15 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		return fmt.Errorf("failed to setup validator node: %w", err)
 	}
 
-	// Ensure client is stopped even if benchmark fails
-	defer validatorClient.Stop()
+	defer func() {
+		currentHeader, err := validatorClient.Client().HeaderByNumber(ctx, nil)
+		if err != nil {
+			nb.log.Error("Failed to get current block number", "error", err)
+		} else {
+			nb.log.Info("Validator node stopped at block", "number", currentHeader.Number.Uint64(), "hash", currentHeader.Hash().Hex())
+		}
+		validatorClient.Stop()
+	}()
 
 	// Create metrics collector and writer
 	metricsCollector := metrics.NewMetricsCollector(nb.log, validatorClient.Client(), nb.testConfig.Params.NodeType, validatorClient.MetricsPort())
@@ -144,6 +159,7 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
 		SequencerMetrics: *nb.collectedSequencerMetrics,
 		ValidatorMetrics: *nb.collectedValidatorMetrics,
 		Success:          true,
+		Complete:         true,
 	}, nil
 }
 

@@ -48,6 +48,18 @@ func NewSequencerConsensusClient(log log.Logger, client *ethclient.Client, authC
 	}
 }
 
+func (f *SequencerConsensusClient) Stop(ctx context.Context) error {
+	f.log.Info("Stopping sequencer consensus client")
+
+	// ensure fork choice is updated to the last block
+	_, err := f.updateForkChoice(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // marshalBinaryWithSignature creates the call data for an L1Info transaction.
 func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]byte, error) {
 	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoIsthmusLen))
@@ -95,8 +107,11 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 	return w.Bytes(), nil
 }
 
-func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte) (*eth.PayloadAttributes, *common.Hash, error) {
+func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte, isSetupPayload bool) (*eth.PayloadAttributes, *common.Hash, error) {
 	gasLimit := eth.Uint64Quantity(f.options.GasLimit)
+	if isSetupPayload {
+		gasLimit = eth.Uint64Quantity(f.options.GasLimitSetup)
+	}
 
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 1))
@@ -166,7 +181,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		sequencerTxsHexBytes[i+1] = hexutil.Bytes(tx)
 	}
 
-	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(number)).Bytes())
+	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
 
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),
@@ -184,27 +199,13 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 }
 
 // Propose starts block generation, waits BlockTime, and generates a block.
-func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics) (*engine.ExecutableData, error) {
+func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics, isSetupPayload bool) (*engine.ExecutableData, error) {
 	startTime := time.Now()
 
 	sendTxs, sequencerTxs := f.mempool.NextBlock()
 
-	if len(sendTxs) > 0 {
-		// Attempt to parse the first transaction to get its hash for logging
-		firstTx := new(types.Transaction)
-		if err := firstTx.UnmarshalBinary(sendTxs[0]); err == nil {
-			f.log.Info("Propose: Fetched transactions from mempool", "count", len(sendTxs), "first_tx_hash_for_sending", firstTx.Hash().Hex())
-		} else {
-			f.log.Warn("Propose: Fetched transactions from mempool, but failed to parse first tx for hash", "count", len(sendTxs), "parse_error", err)
-		}
-	} else {
-		f.log.Info("Propose: Fetched transactions from mempool", "count", len(sendTxs))
-	}
-
 	sendCallsPerBatch := 100
 	batches := (len(sendTxs) + sendCallsPerBatch - 1) / sendCallsPerBatch
-
-	f.log.Info("Sending transactions", "num_transactions", len(sendTxs), "num_batches", batches)
 
 	for i := 0; i < batches; i++ {
 		batch := sendTxs[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(sendTxs))]
@@ -238,7 +239,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	f.log.Info("Starting block building")
 
-	payloadAttrs, beaconRoot, err := f.generatePayloadAttributes(sequencerTxs)
+	payloadAttrs, beaconRoot, err := f.generatePayloadAttributes(sequencerTxs, isSetupPayload)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate payload attributes")
 	}
@@ -261,8 +262,6 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	startTime = time.Now()
 
-	f.log.Info("Fetching built payload")
-
 	payload, err := f.getBuiltPayload(ctx, *f.currentPayloadID)
 	if err != nil {
 		return nil, err
@@ -274,7 +273,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(metrics.GetPayloadLatencyMetric, duration)
-	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions))
+	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "number", payload.Number, "hash", payload.BlockHash.Hex())
 
 	// get gas usage
 	gasPerBlock := payload.GasUsed

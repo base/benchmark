@@ -29,7 +29,6 @@ func NewSyncingConsensusClient(log log.Logger, client *ethclient.Client, authCli
 
 // Propose starts block generation, waits BlockTime, and generates a block.
 func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.ExecutableData, blockMetrics *metrics.BlockMetrics) error {
-	f.log.Info("Updating fork choice before validating payload", "payload_index", payload.Number)
 
 	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(1).Bytes())
 

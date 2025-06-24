@@ -7,4 +7,5 @@ type GethOptions struct {
 	GethHttpPort    int
 	GethAuthRpcPort int
 	GethMetricsPort int
+	SkipInit        bool
 }
