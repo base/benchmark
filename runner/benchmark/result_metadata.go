@@ -34,6 +34,7 @@ type BenchmarkRun struct {
 	TestDescription string                 `json:"testDescription"`
 	TestConfig      map[string]interface{} `json:"testConfig"`
 	Result          *BenchmarkRunResult    `json:"result"`
+	Thresholds      *ThresholdConfig       `json:"thresholds"`
 }
 
 // BenchmarkRuns is the output JSON metadata file schema.
@@ -65,6 +66,7 @@ func BenchmarkMetadataFromTestPlans(testPlans []TestPlan) BenchmarkRuns {
 				TestDescription: params.Description,
 				TestConfig:      params.Params.ToConfig(),
 				OutputDir:       params.OutputDir,
+				Thresholds:      testPlan.Thresholds,
 			})
 		}
 	}

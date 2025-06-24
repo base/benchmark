@@ -92,8 +92,9 @@ type BenchmarkConfig struct {
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
-	Name         string               `yaml:"name"`
-	Snapshot     *SnapshotDefinition  `yaml:"snapshot"`
+	Name     string              `yaml:"name"`
+	Snapshot *SnapshotDefinition `yaml:"snapshot"`
+	Metrics  *ThresholdConfig    `yaml:"metrics"`
 	Description  string               `yaml:"description"`
 	Tags         *map[string]string   `yaml:"tags"`
 	Variables    []Param              `yaml:"variables"`
