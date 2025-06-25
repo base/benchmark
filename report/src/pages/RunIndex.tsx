@@ -111,7 +111,7 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
   );
 
   return (
-    <>
+    <div className="flex flex-col w-full flex-grow">
       <div className="overflow-x-auto p-8 pb-0 flex">
         <RunListFilter
           filterOptions={filterOptions}
@@ -124,7 +124,7 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
         expandedSections={expandedSections}
         toggleSection={toggleSection}
       />
-    </>
+    </div>
   );
 };
 

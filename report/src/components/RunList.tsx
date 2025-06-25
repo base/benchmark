@@ -1,10 +1,12 @@
 import { groupBy } from "lodash";
 import { useState } from "react";
 import { formatValue, MetricValue } from "../utils/formatters";
-import { camelToTitleCase } from "../utils/formatters";
-import { formatLabel } from "../utils/formatters";
 import ThresholdDisplay from "../pages/ThresholdDisplay";
 import { BenchmarkRunWithStatus } from "../types";
+import StatusBadge from "./StatusBadge";
+import StatusSummary from "./StatusSummary";
+import ConfigurationTags from "./ConfigurationTags";
+import Tooltip from "./Tooltip";
 
 interface ProvidedProps {
   groupedSections: {
@@ -25,6 +27,56 @@ type SortColumn =
   | "newPayload";
 
 type SortDirection = "asc" | "desc" | "disabled";
+
+// Column definitions with tooltips
+const COLUMN_DEFINITIONS = {
+  sendTxs: {
+    label: "Send Txs",
+    tooltip: "Time taken to send transactions to the sequencer (seconds)",
+    category: "sequencer" as const,
+  },
+  forkChoice: {
+    label: "Fork Choice",
+    tooltip: "Time for fork choice updates (seconds)",
+    category: "sequencer" as const,
+  },
+  getPayload: {
+    label: "Get Payload",
+    tooltip: "Time to retrieve execution payload from sequencer (seconds)",
+    category: "sequencer" as const,
+  },
+  gasPerSecond: {
+    label: "Val. Gas/s",
+    tooltip: "Gas processed per second by the validator",
+    category: "validator" as const,
+  },
+  newPayload: {
+    label: "New Payload",
+    tooltip: "Time to process new payload on validator (seconds)",
+    category: "validator" as const,
+  },
+} as const;
+
+// Helper function to get metric value from run
+const getMetricValue = (
+  run: BenchmarkRunWithStatus,
+  column: SortColumn,
+): number => {
+  switch (column) {
+    case "sendTxs":
+      return run.result?.sequencerMetrics?.sendTxs ?? 0;
+    case "forkChoice":
+      return run.result?.sequencerMetrics?.forkChoiceUpdated ?? 0;
+    case "getPayload":
+      return run.result?.sequencerMetrics?.getPayload ?? 0;
+    case "gasPerSecond":
+      return run.result?.validatorMetrics?.gasPerSecond ?? 0;
+    case "newPayload":
+      return run.result?.validatorMetrics?.newPayload ?? 0;
+    default:
+      return 0;
+  }
+};
 
 const RunList = ({
   groupedSections,
@@ -59,33 +111,8 @@ const RunList = ({
     if (sortDirection === "disabled") return runs;
 
     return [...runs].sort((a, b) => {
-      let aValue: number;
-      let bValue: number;
-
-      switch (sortColumn) {
-        case "sendTxs":
-          aValue = a.result?.sequencerMetrics?.sendTxs ?? 0;
-          bValue = b.result?.sequencerMetrics?.sendTxs ?? 0;
-          break;
-        case "forkChoice":
-          aValue = a.result?.sequencerMetrics?.forkChoiceUpdated ?? 0;
-          bValue = b.result?.sequencerMetrics?.forkChoiceUpdated ?? 0;
-          break;
-        case "getPayload":
-          aValue = a.result?.sequencerMetrics?.getPayload ?? 0;
-          bValue = b.result?.sequencerMetrics?.getPayload ?? 0;
-          break;
-        case "gasPerSecond":
-          aValue = a.result?.validatorMetrics?.gasPerSecond ?? 0;
-          bValue = b.result?.validatorMetrics?.gasPerSecond ?? 0;
-          break;
-        case "newPayload":
-          aValue = a.result?.validatorMetrics?.newPayload ?? 0;
-          bValue = b.result?.validatorMetrics?.newPayload ?? 0;
-          break;
-        default:
-          return 0;
-      }
+      const aValue = getMetricValue(a, sortColumn);
+      const bValue = getMetricValue(b, sortColumn);
 
       if (sortDirection === "asc") {
         return aValue - bValue;
@@ -95,259 +122,163 @@ const RunList = ({
     });
   };
 
+  const renderMetricCell = (
+    run: BenchmarkRunWithStatus,
+    column: SortColumn,
+  ) => {
+    const value = getMetricValue(run, column);
+
+    // Handle threshold displays for specific columns
+    if (column === "getPayload") {
+      const warningThreshold =
+        (run.thresholds?.warning?.["latency/get_payload"] ?? 0) / 1e9;
+      const errorThreshold =
+        (run.thresholds?.error?.["latency/get_payload"] ?? 0) / 1e9;
+
+      return (
+        <ThresholdDisplay
+          value={value}
+          warningThreshold={warningThreshold}
+          errorThreshold={errorThreshold}
+        >
+          <MetricValue value={value} unit="s" />
+        </ThresholdDisplay>
+      );
+    }
+
+    if (column === "newPayload") {
+      const warningThreshold =
+        (run.thresholds?.warning?.["latency/new_payload"] ?? 0) / 1e9;
+      const errorThreshold =
+        (run.thresholds?.error?.["latency/new_payload"] ?? 0) / 1e9;
+
+      return (
+        <ThresholdDisplay
+          value={value}
+          warningThreshold={warningThreshold}
+          errorThreshold={errorThreshold}
+        >
+          <MetricValue value={value} unit="s" />
+        </ThresholdDisplay>
+      );
+    }
+
+    // Default metric display
+    const unit = column === "gasPerSecond" ? "gas/s" : "s";
+    return <MetricValue value={value} unit={unit} />;
+  };
+
   return (
-    <div className="p-8 overflow-x-auto border-t border-slate-200">
-      {/* Render all grouped sections */}
+    <div className="p-6 overflow-x-auto flex-grow border-t border-slate-200">
       {groupedSections.map((section) => {
         const isExpanded = expandedSections.has(section.key);
-
-        // Compute pass/fail counts
-        const { warning, error, success, incomplete, fatal } = groupBy(
-          section.runs,
-          "status",
-        );
-
-        // Sort runs if section is expanded
+        const statusCounts = groupBy(section.runs, "status");
         const sortedRuns = isExpanded ? sortRuns(section.runs) : section.runs;
 
         return (
-          <div key={section.key} className="mb-10">
-            {/* Clickable heading */}
+          <div key={section.key} className="mb-4">
             <button
-              className="flex items-center gap-4 text-lg font-semibold mb-2 focus:outline-none"
-              onClick={() => {
-                toggleSection(section.key);
-              }}
+              className="flex items-center gap-4 w-full text-left p-4 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              onClick={() => toggleSection(section.key)}
             >
-              <span className="inline-block w-5 text-center">
+              <span className="inline-flex items-center justify-center w-6 h-6 text-slate-400 transition-transform duration-150">
                 {isExpanded ? "▼" : "►"}
               </span>
-              <span>
-                {formatValue(
-                  Number(section.runs?.[0]?.testConfig?.GasLimit),
-                  "gas/s",
-                )}
-              </span>
-              {/* Pass/Fail summary */}
-              <span className="text-base font-normal text-slate-500">
-                <span className="text-green-600">
-                  {success?.length ?? 0} Passed
-                </span>
-                {fatal?.length > 0 && (
-                  <>
-                    {" / "}
-                    <span className="text-red-600">{fatal.length} Errored</span>
-                  </>
-                )}
-
-                {error?.length > 0 && (
-                  <>
-                    {" / "}
-                    <span className="text-red-600">{error.length} Failed</span>
-                  </>
-                )}
-                {warning?.length > 0 && (
-                  <>
-                    {" / "}
-                    <span className="text-yellow-600">
-                      {warning.length} Warning
-                    </span>
-                  </>
-                )}
-                {incomplete?.length > 0 && (
-                  <>
-                    {" / "}
-                    <span className="text-yellow-600">
-                      {incomplete.length} In Progress
-                    </span>
-                  </>
-                )}
-              </span>
+              <div className="flex-1">
+                <div className="flex items-center gap-4">
+                  <span className="text-xl font-medium text-slate-900">
+                    {formatValue(
+                      Number(section.runs?.[0]?.testConfig?.GasLimit),
+                      "gas/s",
+                    )}
+                  </span>
+                  <StatusSummary statusCounts={statusCounts} />
+                </div>
+              </div>
             </button>
-            {/* Only render table if expanded */}
-            {isExpanded && (
-              <table className="min-w-full divide-y divide-slate-200 rounded-lg mb-8">
-                <thead>
-                  <tr>
-                    <td colSpan={3} />
-                    <td
-                      colSpan={3}
-                      className="bg-blue-100 text-sm text-center py-2 font-bold"
-                    >
-                      Sequencer
-                    </td>
-                    <td
-                      colSpan={2}
-                      className="bg-green-100 text-sm text-center py-2 font-bold"
-                    >
-                      Validator
-                    </td>
-                  </tr>
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                      Test Name
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                      Config
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th
-                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100 cursor-pointer hover:bg-blue-200"
-                      onClick={() => handleSort("sendTxs")}
-                    >
-                      Send Txs {getSortIcon("sendTxs")}
-                    </th>
-                    <th
-                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100 cursor-pointer hover:bg-blue-200"
-                      onClick={() => handleSort("forkChoice")}
-                    >
-                      Fork Choice {getSortIcon("forkChoice")}
-                    </th>
-                    <th
-                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100 cursor-pointer hover:bg-blue-200"
-                      onClick={() => handleSort("getPayload")}
-                    >
-                      Get Payload {getSortIcon("getPayload")}
-                    </th>
-                    <th
-                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-green-100 cursor-pointer hover:bg-green-200"
-                      onClick={() => handleSort("gasPerSecond")}
-                    >
-                      Val. Gas/s {getSortIcon("gasPerSecond")}
-                    </th>
-                    <th
-                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-green-100 cursor-pointer hover:bg-green-200"
-                      onClick={() => handleSort("newPayload")}
-                    >
-                      New Payload {getSortIcon("newPayload")}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-slate-200 border-left border border-slate-200">
-                  {sortedRuns.map((run) => {
-                    const newPayloadWarningThreshold =
-                      run.thresholds?.warning?.["latency/new_payload"] ?? 0;
-                    const newPayloadErrorThreshold =
-                      run.thresholds?.error?.["latency/new_payload"] ?? 0;
-                    const getPayloadWarningThreshold =
-                      run.thresholds?.warning?.["latency/get_payload"] ?? 0;
-                    const getPayloadErrorThreshold =
-                      run.thresholds?.error?.["latency/get_payload"] ?? 0;
 
-                    return (
-                      <tr key={run.outputDir} className="hover:bg-slate-50">
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-900 align-top">
+            {isExpanded && (
+              <div className="mt-4 border border-slate-200">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr>
+                      <td colSpan={3} />
+                      <td
+                        colSpan={3}
+                        className="bg-blue-50 text-sm text-center py-3 font-medium text-blue-900 border-b border-blue-200 uppercase"
+                      >
+                        Sequencer Metrics
+                      </td>
+                      <td
+                        colSpan={2}
+                        className="bg-emerald-50 text-sm text-center py-3 font-medium text-emerald-900 border-b border-emerald-200 uppercase"
+                      >
+                        Validator Metrics
+                      </td>
+                    </tr>
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-slate-700 tracking-wider uppercase">
+                        Test Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-slate-700 tracking-wider uppercase">
+                        Configuration
+                      </th>
+                      <th className="px-6 py-3 text-left text-sm font-medium text-slate-700 tracking-wider uppercase">
+                        Status
+                      </th>
+                      {Object.entries(COLUMN_DEFINITIONS).map(([key, def]) => (
+                        <th
+                          key={key}
+                          className={`px-6 py-3 text-left text-sm font-medium text-slate-700 tracking-wider cursor-pointer transition-colors duration-150 uppercase ${
+                            def.category === "sequencer"
+                              ? "bg-blue-50 hover:bg-blue-100"
+                              : "bg-emerald-50 hover:bg-emerald-100"
+                          }`}
+                          onClick={() => handleSort(key as SortColumn)}
+                        >
+                          <Tooltip content={def.tooltip}>
+                            <div className="flex items-center gap-1">
+                              <span>{def.label.toUpperCase()}</span>
+                              <span className="text-slate-400 font-normal">
+                                {getSortIcon(key as SortColumn)}
+                              </span>
+                            </div>
+                          </Tooltip>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-slate-200">
+                    {sortedRuns.map((run) => (
+                      <tr
+                        key={run.outputDir}
+                        className="hover:bg-slate-50 transition-colors duration-150"
+                      >
+                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-slate-900">
                           {run.testName}
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-900 align-top">
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {Object.entries(run.testConfig || {}).map(
-                              ([key, value]) => (
-                                <span
-                                  key={key}
-                                  title={`${camelToTitleCase(key)}: ${value}`}
-                                  className="inline-flex items-center rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 ring-1 ring-inset ring-slate-500/10 overflow-hidden text-ellipsis whitespace-nowrap"
-                                >
-                                  <span className="mr-1 text-slate-500">
-                                    {camelToTitleCase(key)}:
-                                  </span>
-                                  {key === "GasLimit" ? (
-                                    <pre>
-                                      {formatValue(Number(value), "gas")}
-                                    </pre>
-                                  ) : (
-                                    String(formatLabel(`${value}`))
-                                  )}
-                                </span>
-                              ),
-                            )}
-                          </div>
+                        <td className="px-4 py-2 text-sm text-slate-900">
+                          <ConfigurationTags testConfig={run.testConfig} />
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                          {run.status === "incomplete" ? (
-                            <span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
-                              In Progress
-                            </span>
-                          ) : run.status === "success" ? (
-                            <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
-                              Success
-                            </span>
-                          ) : run.status === "warning" ? (
-                            <span className="inline-flex items-center rounded-md bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
-                              Warning
-                            </span>
-                          ) : run.status === "error" ? (
-                            <span className="inline-flex items-center rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
-                              Error
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-700 ring-1 ring-inset ring-gray-600/20">
-                              {run.status}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                          <MetricValue
-                            value={run.result?.sequencerMetrics?.sendTxs ?? 0}
-                            unit="s"
+                        <td className="px-4 py-2 whitespace-nowrap text-sm">
+                          <StatusBadge
+                            status={run.status}
+                            className="text-xs"
                           />
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                          <MetricValue
-                            value={
-                              run.result?.sequencerMetrics?.forkChoiceUpdated ??
-                              0
-                            }
-                            unit="s"
-                          />
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                          <ThresholdDisplay
-                            value={
-                              run.result?.sequencerMetrics?.getPayload ?? 0
-                            }
-                            warningThreshold={getPayloadWarningThreshold / 1e9}
-                            errorThreshold={getPayloadErrorThreshold / 1e9}
+                        {Object.keys(COLUMN_DEFINITIONS).map((column) => (
+                          <td
+                            key={column}
+                            className="px-4 py-2 whitespace-nowrap text-sm text-slate-600 font-mono"
                           >
-                            <MetricValue
-                              value={
-                                run.result?.sequencerMetrics?.getPayload ?? 0
-                              }
-                              unit="s"
-                            />
-                          </ThresholdDisplay>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                          <MetricValue
-                            value={
-                              run.result?.validatorMetrics?.gasPerSecond ?? 0
-                            }
-                            unit="gas/s"
-                          />
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500">
-                          <ThresholdDisplay
-                            value={
-                              run.result?.validatorMetrics?.newPayload ?? 0
-                            }
-                            warningThreshold={newPayloadWarningThreshold / 1e9}
-                            errorThreshold={newPayloadErrorThreshold / 1e9}
-                          >
-                            <MetricValue
-                              value={
-                                run.result?.validatorMetrics?.newPayload ?? 0
-                              }
-                              unit="s"
-                            />
-                          </ThresholdDisplay>
-                        </td>
+                            {renderMetricCell(run, column as SortColumn)}
+                          </td>
+                        ))}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         );

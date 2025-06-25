@@ -12,7 +12,7 @@ function App() {
     : null;
 
   return (
-    <>
+    <div className="flex flex-col w-full min-h-screen">
       <nav className="flex px-8 border-b border-slate-300 items-center bg-white gap-x-4">
         <div className="flex items-center gap-x-4 flex-grow">
           <div className="flex items-center gap-x-4 py-4">
@@ -35,7 +35,7 @@ function App() {
         <Route path="/" element={<RunIndex />} />
         <Route path="/run-comparison" element={<RunComparison />} />
       </Routes>
-    </>
+    </div>
   );
 }
 
