@@ -349,7 +349,7 @@ const LineChart: React.FC<LineChartProps> = ({
       }
     }
     return maxThreshold;
-  }, [thresholds]);
+  }, [thresholds, metricKey]);
 
   return (
     <BaseChart

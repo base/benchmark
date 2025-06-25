@@ -1,4 +1,5 @@
 import { groupBy } from "lodash";
+import { useState } from "react";
 import { formatValue, MetricValue } from "../utils/formatters";
 import { camelToTitleCase } from "../utils/formatters";
 import { formatLabel } from "../utils/formatters";
@@ -16,11 +17,84 @@ interface ProvidedProps {
   toggleSection: (section: string) => void;
 }
 
+type SortColumn =
+  | "sendTxs"
+  | "forkChoice"
+  | "getPayload"
+  | "gasPerSecond"
+  | "newPayload";
+
+type SortDirection = "asc" | "desc" | "disabled";
+
 const RunList = ({
   groupedSections,
   expandedSections,
   toggleSection,
 }: ProvidedProps) => {
+  const [sortColumn, setSortColumn] = useState<SortColumn>("gasPerSecond");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  const handleSort = (column: SortColumn) => {
+    if (sortColumn === column) {
+      // Cycle through: asc -> desc -> disabled -> asc
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortDirection("disabled");
+      } else {
+        setSortDirection("asc");
+      }
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (column: SortColumn) => {
+    if (sortColumn !== column || sortDirection === "disabled") return "↕";
+    return sortDirection === "asc" ? "↑" : "↓";
+  };
+
+  const sortRuns = (runs: BenchmarkRunWithStatus[]) => {
+    if (sortDirection === "disabled") return runs;
+
+    return [...runs].sort((a, b) => {
+      let aValue: number;
+      let bValue: number;
+
+      switch (sortColumn) {
+        case "sendTxs":
+          aValue = a.result?.sequencerMetrics?.sendTxs ?? 0;
+          bValue = b.result?.sequencerMetrics?.sendTxs ?? 0;
+          break;
+        case "forkChoice":
+          aValue = a.result?.sequencerMetrics?.forkChoiceUpdated ?? 0;
+          bValue = b.result?.sequencerMetrics?.forkChoiceUpdated ?? 0;
+          break;
+        case "getPayload":
+          aValue = a.result?.sequencerMetrics?.getPayload ?? 0;
+          bValue = b.result?.sequencerMetrics?.getPayload ?? 0;
+          break;
+        case "gasPerSecond":
+          aValue = a.result?.validatorMetrics?.gasPerSecond ?? 0;
+          bValue = b.result?.validatorMetrics?.gasPerSecond ?? 0;
+          break;
+        case "newPayload":
+          aValue = a.result?.validatorMetrics?.newPayload ?? 0;
+          bValue = b.result?.validatorMetrics?.newPayload ?? 0;
+          break;
+        default:
+          return 0;
+      }
+
+      if (sortDirection === "asc") {
+        return aValue - bValue;
+      } else {
+        return bValue - aValue;
+      }
+    });
+  };
+
   return (
     <div className="p-8 overflow-x-auto border-t border-slate-200">
       {/* Render all grouped sections */}
@@ -32,6 +106,9 @@ const RunList = ({
           section.runs,
           "status",
         );
+
+        // Sort runs if section is expanded
+        const sortedRuns = isExpanded ? sortRuns(section.runs) : section.runs;
 
         return (
           <div key={section.key} className="mb-10">
@@ -100,7 +177,7 @@ const RunList = ({
                       Sequencer
                     </td>
                     <td
-                      colSpan={3}
+                      colSpan={2}
                       className="bg-green-100 text-sm text-center py-2 font-bold"
                     >
                       Validator
@@ -116,25 +193,40 @@ const RunList = ({
                     <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100">
-                      Send Txs
+                    <th
+                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100 cursor-pointer hover:bg-blue-200"
+                      onClick={() => handleSort("sendTxs")}
+                    >
+                      Send Txs {getSortIcon("sendTxs")}
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100">
-                      Fork Choice
+                    <th
+                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100 cursor-pointer hover:bg-blue-200"
+                      onClick={() => handleSort("forkChoice")}
+                    >
+                      Fork Choice {getSortIcon("forkChoice")}
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100">
-                      Get Payload
+                    <th
+                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-blue-100 cursor-pointer hover:bg-blue-200"
+                      onClick={() => handleSort("getPayload")}
+                    >
+                      Get Payload {getSortIcon("getPayload")}
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-green-100">
-                      Val. Gas/s
+                    <th
+                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-green-100 cursor-pointer hover:bg-green-200"
+                      onClick={() => handleSort("gasPerSecond")}
+                    >
+                      Val. Gas/s {getSortIcon("gasPerSecond")}
                     </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-green-100">
-                      New Payload
+                    <th
+                      className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase tracking-wider bg-green-100 cursor-pointer hover:bg-green-200"
+                      onClick={() => handleSort("newPayload")}
+                    >
+                      New Payload {getSortIcon("newPayload")}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-slate-200 border-left border border-slate-200">
-                  {section.runs.map((run) => {
+                  {sortedRuns.map((run) => {
                     const newPayloadWarningThreshold =
                       run.thresholds?.warning?.["latency/new_payload"] ?? 0;
                     const newPayloadErrorThreshold =
