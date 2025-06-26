@@ -1,0 +1,167 @@
+payloads:
+  - name: Simulator
+    id: base-mainnet-simulation
+    type: simulator
+    account_loaded: 12.382
+    account_deleted: 0.0127
+    accounts_updated: 4.6117
+    accounts_created: 0.16
+    storage_loaded: 49.405
+    storage_deleted: 0.4651
+    storage_updated: 9.439
+    storage_created: 2
+    code_size_loaded: 662473.15
+    num_contracts_loaded: 4.330
+    avg_gas_used: 35000000
+    calls_per_block: 100
+    opcodes:
+      EXP: 626.30
+      KECCAK256: 29.21
+    precompiles:
+      bls12381MapG2: 0.6981
+      ecrecover: 0.0733
+      bls12381G1Add: 0.0244
+      bls12381G1MultiExp: 0.0218
+  - name: account create (full block)
+    id: account-create-full-block
+    type: simulator
+    accounts_created: 100
+  - name: account update (full block)
+    id: account-update-full-block
+    type: simulator
+    accounts_updated: 100
+  - name: storage create (full block)
+    id: storage-create-full-block
+    type: simulator
+    storage_created: 100
+  - name: storage update (full block)
+    id: storage-update-full-block
+    type: simulator
+    storage_updated: 100
+  - name: ecrecover (full block)
+    id: ecrecover-full-block
+    type: simulator
+    precompiles:
+      ecrecover: 100
+  - name: sha256hash (full block)
+    id: sha256hash-full-block
+    type: simulator
+    precompiles:
+      sha256hash: 100
+  - name: ripemd160hash (full block)
+    id: ripemd160hash-full-block
+    type: simulator
+    precompiles:
+      ripemd160hash: 100
+  - name: bigModExp (full block)
+    id: bigModExp-full-block
+    type: simulator
+    precompiles:
+      bigModExp: 100
+  - name: bn256Add (full block)
+    id: bn256Add-full-block
+    type: simulator
+    precompiles:
+      bn256Add: 100
+  - name: bn256ScalarMul (full block)
+    id: bn256ScalarMul-full-block
+    type: simulator
+    precompiles:
+      bn256ScalarMul: 100
+  - name: bn256Pairing (full block)
+    id: bn256Pairing-full-block
+    type: simulator
+    precompiles:
+      bn256Pairing: 100
+  - name: blake2F (full block)
+    id: blake2F-full-block
+    type: simulator
+    precompiles:
+      blake2F: 100
+  - name: bls12381G1Add (full block)
+    id: bls12381G1Add-full-block
+    type: simulator
+    precompiles:
+      bls12381G1Add: 100
+  - name: bls12381G1MultiExp (full block)
+    id: bls12381G1MultiExp-full-block
+    type: simulator
+    precompiles:
+      bls12381G1MultiExp: 100
+  - name: bls12381G2Add (full block)
+    id: bls12381G2Add-full-block
+    type: simulator
+    precompiles:
+      bls12381G2Add: 100
+  - name: bls12381G2MultiExp (full block)
+    id: bls12381G2MultiExp-full-block
+    type: simulator
+    precompiles:
+      bls12381G2MultiExp: 100
+  - name: bls12381Pairing (full block)
+    id: bls12381Pairing-full-block
+    type: simulator
+    precompiles:
+      bls12381Pairing: 100
+  - name: bls12381MapG1 (full block)
+    id: bls12381MapG1-full-block
+    type: simulator
+    precompiles:
+      bls12381MapG1: 100
+  - name: bls12381MapG2 (full block)
+    id: bls12381MapG2-full-block
+    type: simulator
+    precompiles:
+      bls12381MapG2: 100
+  - name: p256Verify (full block)
+    id: p256Verify-full-block
+    type: simulator
+    precompiles:
+      p256Verify: 100
+
+benchmarks:
+  - name: Base mainnet snapshot test
+    description: Base mainnet snapshot test
+    metrics:
+      warning:
+        sequencer/latency/get_payload: 1000000000
+        validator/latency/new_payload: 1000000000
+      error:
+        sequencer/latency/get_payload: 1500000000
+        validator/latency/new_payload: 1500000000
+    variables:
+      - type: payload
+        values:
+          - base-mainnet-simulation
+          - account-create-full-block
+          # - account-update-full-block
+          - storage-create-full-block
+          - storage-update-full-block
+          - ecrecover-full-block
+          - sha256hash-full-block
+          - ripemd160hash-full-block
+          - bigModExp-full-block
+          - bn256Add-full-block
+          - bn256ScalarMul-full-block
+          - bn256Pairing-full-block
+          - blake2F-full-block
+          - bls12381G1Add-full-block
+          - bls12381G1MultiExp-full-block
+          - bls12381G2Add-full-block
+          - bls12381G2MultiExp-full-block
+          - bls12381Pairing-full-block
+          - bls12381MapG1-full-block
+          - bls12381MapG2-full-block
+          - p256Verify-full-block
+      - type: node_type
+        values:
+          # - reth
+          - geth
+      - type: num_blocks
+        value: 20
+      - type: gas_limit
+        values:
+          - 25000000
+          - 50000000
+          - 75000000
+          - 100000000

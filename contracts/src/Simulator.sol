@@ -65,51 +65,35 @@ contract Simulator {
     }
 
     function num_storage_slots_needed(SimulatorConfig calldata config) public view returns (uint256) {
-        return current_storage_slot_index +
-                config.load_storage +
-                config.update_storage;
+        return current_storage_slot_index + config.load_storage + config.update_storage;
     }
 
     function num_accounts_needed(SimulatorConfig calldata config) public view returns (uint160) {
-        return current_address_index +
-                config.load_accounts +
-                config.update_accounts;
+        return current_address_index + config.load_accounts + config.update_accounts;
     }
 
     function run(SimulatorConfig calldata config) public {
         require(
-            current_storage_slot_index +
-                config.load_storage +
-                config.update_storage <=
-                num_storage_initialized,
+            current_storage_slot_index + config.load_storage + config.update_storage <= num_storage_initialized,
             "Not enough storage slots to load/update"
         );
 
         require(
-            current_address_index +
-                config.load_accounts +
-                config.update_accounts <=
-                num_address_initialized,
+            current_address_index + config.load_accounts + config.update_accounts <= num_address_initialized,
             "Not enough accounts to load/update"
         );
 
         // load storage slots using SLOAD in a loop. Ensure we're loading a unique storage slot each time.
         uint256 total = 0;
-        for (
-            uint256 i = current_storage_slot_index;
-            i < current_storage_slot_index + config.load_storage;
-            i++
-        ) {
-            total += uint256(IExtsload(address(0x498581fF718922c3f8e6A244956aF099B2652b2b)).extsload(bytes32(i)));
+        for (uint256 i = current_storage_slot_index; i < current_storage_slot_index + config.load_storage; i++) {
+            assembly {
+                total := add(total, sload(i))
+            }
         }
         current_storage_slot_index += config.load_storage;
 
         // starting from current_storage_slot_index, update existing storage slots in a loop (using SSTORE)
-        for (
-            uint256 i = current_storage_slot_index;
-            i < current_storage_slot_index + config.update_storage;
-            i++
-        ) {
+        for (uint256 i = current_storage_slot_index; i < current_storage_slot_index + config.update_storage; i++) {
             assembly {
                 sstore(i, i)
             }
@@ -117,11 +101,7 @@ contract Simulator {
         current_storage_slot_index += config.update_storage;
 
         // starting from num_storage_initialized, create new storage slots in a loop (using SSTORE)
-        for (
-            uint256 i = num_storage_initialized;
-            i < num_storage_initialized + config.create_storage;
-            i++
-        ) {
+        for (uint256 i = num_storage_initialized; i < num_storage_initialized + config.create_storage; i++) {
             assembly {
                 sstore(i, i)
             }
@@ -129,11 +109,7 @@ contract Simulator {
         num_storage_initialized += config.create_storage;
 
         // starting from 0, delete storage slots in a loop (using SSTORE)
-        for (
-            uint256 i = num_storage_deleted;
-            i < num_storage_deleted + config.delete_storage;
-            i++
-        ) {
+        for (uint256 i = num_storage_deleted; i < num_storage_deleted + config.delete_storage; i++) {
             assembly {
                 sstore(i, 0)
             }
@@ -161,17 +137,11 @@ contract Simulator {
         current_address_index += config.update_accounts;
 
         for (uint256 i = 0; i < config.precompiles.length; i++) {
-            run_precompile(
-                config.precompiles[i].precompile_address,
-                config.precompiles[i].num_calls
-            );
+            run_precompile(config.precompiles[i].precompile_address, config.precompiles[i].num_calls);
         }
     }
 
-    function run_precompile(
-        address precompile_address,
-        uint256 num_calls
-    ) private {
+    function run_precompile(address precompile_address, uint256 num_calls) private {
         if (precompile_address == address(1)) {
             run_ecrecover(num_calls);
         } else if (precompile_address == address(2)) {
@@ -210,7 +180,6 @@ contract Simulator {
             revert("Invalid precompile address");
         }
     }
-
 
     function hashLongString() public pure returns (string memory) {
         string memory longInput = string(
@@ -287,7 +256,7 @@ contract Simulator {
     function run_modexp(uint256 num_iterations, bool use_long) private {
         bytes memory base = "8";
         bytes memory exponent = "9";
-        
+
         for (uint256 i = 0; i < num_iterations; i++) {
             if (use_long) {
                 bytes memory modulus = abi.encodePacked(hashLongString(), i);
@@ -367,7 +336,8 @@ contract Simulator {
 
         for (uint256 i = 0; i < num_iterations; i++) {
             uint32 rounds = uint32(i);
-            (bool ok,) = address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            (bool ok,) =
+                address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
             require(ok, "Blake2f failed");
         }
     }
@@ -449,7 +419,6 @@ contract Simulator {
         }
     }
 
-
     function run_g2msm(uint256 num_iterations) private {
         bytes32[8] memory p1;
         p1[0] = 0x00000000000000000000000000000000103121a2ceaae586d240843a39896732;
@@ -486,7 +455,7 @@ contract Simulator {
         p1[1] = 0xc3688c4f9774b905a14e3a3f171bac586c55e83ff97a1aeffb3af00adb22c6bb;
         p1[2] = 0x0000000000000000000000000000000008b3f481e3aaa0f1a09e30ed741d8ae4;
         p1[3] = 0xfcf5e095d5d00af600db18cb2c04b3edd03cc744a2888ae40caa232946c5e7e1;
-        
+
         bytes32[8] memory p2;
         p2[0] = 0x00000000000000000000000000000000024aa2b2f08f0a91260805272dc51051;
         p2[1] = 0xc6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb8;
