@@ -15,11 +15,12 @@ const metricsKey = (outputDir: string, nodeType: string) => {
 };
 
 export const useTestMetadata = () => {
-  const fetcher = useCallback(async () => {
+  const fetcher = useCallback(async (): Promise<BenchmarkRuns> => {
     const response = await fetch("output/metadata.json");
     const jsonData = await response.json();
 
-    return jsonData as BenchmarkRuns;
+    const runs = jsonData as BenchmarkRuns;
+    return runs;
   }, []);
 
   return useSWR("output/metadata.json", fetcher);
