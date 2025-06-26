@@ -5,8 +5,17 @@ import RunList from "../components/RunList";
 import { BenchmarkRuns, getTestRunsWithStatus } from "../types";
 import { groupBy } from "lodash";
 import RunListFilter from "../components/RunListFilter";
+import { useParams } from "react-router-dom";
+import Navbar from "../components/Navbar";
+import BenchmarkRunDetails from "../components/BenchmarkRunDetails";
 
 const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
+  const { benchmarkRunId } = useParams();
+
+  if (!benchmarkRunId) {
+    throw new Error("Benchmark run ID is required");
+  }
+
   const [filterSelections, setFilterSelections] = useState<
     Record<string, string | number>
   >({});
@@ -65,7 +74,7 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
     return sections;
   }, [matchedRuns]);
 
-  const autoExpand = matchedRuns.length <= 20;
+  const autoExpand = true;
 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(),
@@ -111,26 +120,57 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
   );
 
   return (
-    <div className="flex flex-col w-full flex-grow">
-      <div className="overflow-x-auto p-8 pb-0 flex">
-        <RunListFilter
-          filterOptions={filterOptions}
-          filterSelections={filterSelections}
-          updateFilterSelection={updateFilterSelection}
+    <div className="flex flex-col w-full min-h-screen">
+      <Navbar />
+      <div className="flex flex-col w-full flex-grow">
+        <div className="overflow-x-auto p-8 pb-0 flex flex-col">
+          <BenchmarkRunDetails benchmarkRuns={benchmarkRuns.runs} />
+          <RunListFilter
+            benchmarkRunId={benchmarkRunId}
+            filterOptions={filterOptions}
+            filterSelections={filterSelections}
+            updateFilterSelection={updateFilterSelection}
+          />
+        </div>
+        <RunList
+          groupedSections={groupedSections}
+          expandedSections={expandedSections}
+          toggleSection={toggleSection}
         />
       </div>
-      <RunList
-        groupedSections={groupedSections}
-        expandedSections={expandedSections}
-        toggleSection={toggleSection}
-      />
     </div>
   );
 };
 
 const RunIndex = () => {
-  const { data: benchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
+  let { benchmarkRunId } = useParams();
+
+  if (!benchmarkRunId) {
+    throw new Error("Benchmark run ID is required");
+  }
+
+  const { data: allBenchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
     useTestMetadata();
+
+  const latestBenchmarkRun = useMemo(() => {
+    return allBenchmarkRuns?.runs.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0];
+  }, [allBenchmarkRuns]);
+
+  if (latestBenchmarkRun && benchmarkRunId === "latest") {
+    benchmarkRunId = `${latestBenchmarkRun.testConfig.BenchmarkRun}`;
+  }
+
+  const benchmarkRuns = useMemo((): BenchmarkRuns => {
+    return {
+      runs:
+        allBenchmarkRuns?.runs.filter(
+          (run) => run.testConfig.BenchmarkRun === benchmarkRunId,
+        ) ?? [],
+    };
+  }, [allBenchmarkRuns, benchmarkRunId]);
 
   if (!benchmarkRuns || isLoadingBenchmarkRuns) {
     return <div>Loading...</div>;

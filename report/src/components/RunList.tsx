@@ -7,6 +7,7 @@ import StatusBadge from "./StatusBadge";
 import StatusSummary from "./StatusSummary";
 import ConfigurationTags from "./ConfigurationTags";
 import Tooltip from "./Tooltip";
+import clsx from "clsx";
 
 interface ProvidedProps {
   groupedSections: {
@@ -169,7 +170,7 @@ const RunList = ({
   };
 
   return (
-    <div className="p-6 overflow-x-auto flex-grow border-t border-slate-200">
+    <div className="p-6 overflow-x-auto flex-grow border-slate-200">
       {groupedSections.map((section) => {
         const isExpanded = expandedSections.has(section.key);
         const statusCounts = groupBy(section.runs, "status");
@@ -178,11 +179,19 @@ const RunList = ({
         return (
           <div key={section.key} className="mb-4">
             <button
-              className="flex items-center gap-4 w-full text-left p-4 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="flex items-center gap-4 w-full text-left p-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               onClick={() => toggleSection(section.key)}
             >
-              <span className="inline-flex items-center justify-center w-6 h-6 text-slate-400 transition-transform duration-150">
-                {isExpanded ? "▼" : "►"}
+              <span className="inline-flex items-center justify-center w-6 h-6 text-slate-700">
+                <svg
+                  className={clsx(
+                    "w-6 h-6 transition-transform duration-150",
+                    isExpanded ? "" : "-rotate-90",
+                  )}
+                  fill="currentColor"
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
               </span>
               <div className="flex-1">
                 <div className="flex items-center gap-4">
@@ -198,28 +207,25 @@ const RunList = ({
             </button>
 
             {isExpanded && (
-              <div className="mt-4 border border-slate-200">
-                <table className="min-w-full divide-y divide-slate-200">
+              <div className="mt-4">
+                <table className="min-w-full">
                   <thead className="bg-slate-50">
                     <tr>
-                      <td colSpan={3} />
+                      <td colSpan={2} />
                       <td
                         colSpan={3}
-                        className="bg-blue-50 text-sm text-center py-3 font-medium text-blue-900 border-b border-blue-200 uppercase"
+                        className="bg-blue-50 text-sm text-center py-3 font-medium text-blue-900 uppercase"
                       >
                         Sequencer Metrics
                       </td>
                       <td
                         colSpan={2}
-                        className="bg-emerald-50 text-sm text-center py-3 font-medium text-emerald-900 border-b border-emerald-200 uppercase"
+                        className="bg-emerald-50 text-sm text-center py-3 font-medium text-emerald-900 uppercase"
                       >
                         Validator Metrics
                       </td>
                     </tr>
                     <tr>
-                      <th className="px-6 py-3 text-left text-sm font-medium text-slate-700 tracking-wider uppercase">
-                        Test Name
-                      </th>
                       <th className="px-6 py-3 text-left text-sm font-medium text-slate-700 tracking-wider uppercase">
                         Configuration
                       </th>
@@ -248,15 +254,12 @@ const RunList = ({
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-slate-200">
+                  <tbody className="bg-white">
                     {sortedRuns.map((run) => (
                       <tr
                         key={run.outputDir}
-                        className="hover:bg-slate-50 transition-colors duration-150"
+                        className="transition-colors duration-150"
                       >
-                        <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-slate-900">
-                          {run.testName}
-                        </td>
                         <td className="px-4 py-2 text-sm text-slate-900">
                           <ConfigurationTags testConfig={run.testConfig} />
                         </td>

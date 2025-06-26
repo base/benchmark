@@ -1,20 +1,23 @@
 import { Link } from "react-router-dom";
 import { camelToTitleCase, formatLabel } from "../utils/formatters";
 import { FilterValue } from "../filter";
+import Select from "./Select";
 
 interface ProvidedProps {
+  benchmarkRunId: string;
   filterOptions: Record<string, FilterValue[]>;
   filterSelections: Record<string, FilterValue>;
   updateFilterSelection: (key: string, value: string | null) => void;
 }
 
 const RunListFilter = ({
+  benchmarkRunId,
   filterOptions,
   filterSelections,
   updateFilterSelection,
 }: ProvidedProps) => {
   return (
-    <div className="flex justify-between items-center mb-4 w-full">
+    <div className="flex justify-between items-start mb-4 w-full">
       <div className="flex flex-wrap gap-4">
         {Object.entries(filterOptions)
           .sort((a, b) => a[0].localeCompare(b[0]))
@@ -25,8 +28,7 @@ const RunListFilter = ({
                 <div className="text-sm text-slate-500 mb-1">
                   {camelToTitleCase(key)}
                 </div>
-                <select
-                  className="bg-white border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                <Select
                   value={String(currentValue)}
                   onChange={(e) => {
                     const newValue = e.target.value;
@@ -42,12 +44,12 @@ const RunListFilter = ({
                       {formatLabel(String(val))}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             );
           })}
       </div>
-      <Link to="/run-comparison">
+      <Link to={`/run-comparison/${benchmarkRunId}`}>
         <button
           type="button"
           className="px-4 py-2 bg-slate-100 text-slate-900 rounded hover:bg-slate-200 transition-colors flex items-center gap-2"
