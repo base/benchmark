@@ -49,6 +49,7 @@ export interface BenchmarkRun {
   testName: string;
   testDescription: string;
   outputDir: string;
+  createdAt: string;
   testConfig: Record<string, string | number>;
   thresholds?: {
     warning?: Record<string, number>;
@@ -67,12 +68,11 @@ export interface BenchmarkRun {
       gasPerSecond: number;
       newPayload: number;
     };
-  };
+  } | null;
 }
 
 export interface BenchmarkRuns {
   runs: BenchmarkRun[];
-  createdAt: string;
 }
 
 export type RunStatus =
@@ -94,10 +94,10 @@ export const getTestRunsWithStatus = (
   runs: BenchmarkRuns,
 ): BenchmarkRunWithStatus[] => {
   return runs.runs.map((run) => {
-    if (!run.result.complete) {
+    if (!run.result?.complete) {
       return { ...run, status: "incomplete" as RunStatus };
     }
-    if (!run.result.success) {
+    if (!run.result?.success) {
       return { ...run, status: "error" as RunStatus };
     }
     const warnThresholds = run.thresholds?.warning;
@@ -109,7 +109,8 @@ export const getTestRunsWithStatus = (
     ): RunStatus | undefined => {
       for (const [metric, threshold] of Object.entries(thresholds)) {
         const [statusThresholdName, statusType, scale] =
-          statusRelatedMetrics[metric as keyof typeof statusRelatedMetrics];
+          statusRelatedMetrics[metric as keyof typeof statusRelatedMetrics] ??
+          [];
         if (!statusThresholdName || !statusType || !scale) {
           // metrics not related to a summary stat are not considered for status
           continue;
@@ -118,7 +119,7 @@ export const getTestRunsWithStatus = (
         const metricsName = `${statusType}Metrics` as const;
 
         // cast to never to avoid type errors here - if an error occurs, check statusRelatedMetrics
-        const value = run.result[metricsName]?.[statusThresholdName as never];
+        const value = run.result?.[metricsName]?.[statusThresholdName as never];
         if (typeof value !== "number") {
           // non-numbers and undefined values are skipped
           continue;

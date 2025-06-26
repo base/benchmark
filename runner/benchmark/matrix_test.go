@@ -132,10 +132,12 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			// ignore outputDir and id
 			for i := range tt.want {
 				tt.want[i].OutputDir = ""
+				tt.want[i].Params.BenchmarkRunID = ""
 				tt.want[i].ID = ""
 			}
 			for i := range got {
 				got[i].OutputDir = ""
+				got[i].Params.BenchmarkRunID = ""
 				got[i].ID = ""
 			}
 			require.ElementsMatch(t, tt.want, got)
