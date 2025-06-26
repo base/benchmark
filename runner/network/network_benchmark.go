@@ -150,12 +150,12 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 	return benchmark.Run(ctx, payloads, firstTestBlock, metricsCollector)
 }
 
-func (nb *NetworkBenchmark) GetResult() (*benchmark.BenchmarkRunResult, error) {
+func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 	if nb.collectedSequencerMetrics == nil || nb.collectedValidatorMetrics == nil {
 		return nil, errors.New("metrics not collected")
 	}
 
-	return &benchmark.BenchmarkRunResult{
+	return &benchmark.RunResult{
 		SequencerMetrics: *nb.collectedSequencerMetrics,
 		ValidatorMetrics: *nb.collectedValidatorMetrics,
 		Success:          true,

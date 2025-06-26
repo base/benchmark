@@ -51,13 +51,14 @@ func (c *TestConfig) BatcherAddr() common.Address {
 
 // Params is the parameters for a single benchmark run.
 type RunParams struct {
-	NodeType  string
-	GasLimit  uint64
-	PayloadID string
-	BlockTime time.Duration
-	Env       map[string]string
-	NumBlocks int
-	Tags      map[string]string
+	NodeType       string
+	GasLimit       uint64
+	PayloadID      string
+	BenchmarkRunID string
+	BlockTime      time.Duration
+	Env            map[string]string
+	NumBlocks      int
+	Tags           map[string]string
 }
 
 func (p RunParams) ToConfig() map[string]interface{} {
@@ -65,6 +66,7 @@ func (p RunParams) ToConfig() map[string]interface{} {
 		"NodeType":           p.NodeType,
 		"GasLimit":           p.GasLimit,
 		"TransactionPayload": p.PayloadID,
+		"BenchmarkRun":       p.BenchmarkRunID,
 	}
 
 	for k, v := range p.Tags {

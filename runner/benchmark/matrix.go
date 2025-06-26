@@ -2,9 +2,6 @@ package benchmark
 
 import (
 	"fmt"
-	"path"
-	"regexp"
-	"strings"
 	"time"
 )
 
@@ -44,12 +41,6 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, er
 		ProofProgram: proofProgram,
 		Thresholds:   c.Metrics,
 	}, nil
-}
-
-var alphaNumericRegex = regexp.MustCompile(`[^a-zA-Z0-9]+`)
-
-func nameToSlug(name string) string {
-	return strings.ToLower(alphaNumericRegex.ReplaceAllString(name, "-"))
 }
 
 // ResolveTestRunsFromMatrix constructs a new ParamsMatrix from a config.
@@ -101,11 +92,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 	// Create the params matrix
 	testParams := make([]TestRun, totalParams)
 
-	fileNameWithoutExt := strings.TrimSuffix(path.Base(testFileName), path.Ext(testFileName))
-
-	testOutDir := fmt.Sprintf("%s-%s-%d", nameToSlug(fileNameWithoutExt), nameToSlug(c.Name), time.Now().Unix())
-
-	id := fmt.Sprintf("%s-%s-%d", nameToSlug(fileNameWithoutExt), nameToSlug(c.Name), time.Now().Unix())
+	id := fmt.Sprintf("test-%d", time.Now().UnixMicro())
 
 	for i := 0; i < totalParams; i++ {
 		valueSelections := make(map[string]interface{})
@@ -118,6 +105,8 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 			return nil, err
 		}
 
+		params.BenchmarkRunID = id
+
 		if c.Tags != nil {
 			params.Tags = *c.Tags
 		}
@@ -125,7 +114,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 		testParams[i] = TestRun{
 			ID:          id,
 			Params:      *params,
-			OutputDir:   fmt.Sprintf("%s-%d", testOutDir, i),
+			OutputDir:   fmt.Sprintf("%s-%d", id, i),
 			Name:        c.Name,
 			Description: c.Description,
 			TestFile:    testFileName,
