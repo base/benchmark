@@ -1,12 +1,18 @@
+name: Snapshot Functionality Test
+description: |
+  Snapshot Functionality Test - Tests client snapshot creation and loading capabilities to validate state snapshot performance for fast sync operations.
+
+  This benchmark suite tests snapshot functionality with both Sepolia Alpha and development network data, including snapshot creation, loading, and validation processes. Features skip-if-nonempty optimization for development efficiency and tests multiple gas limit configurations.
+
+  Use Case: Validate state snapshot performance for fast sync operations, test snapshot creation and loading capabilities across different environments, and ensure snapshot performance remains consistent in development workflows.
+
 payloads:
   - name: Transfer-only
     id: transfer-only
     type: transfer-only
 
 benchmarks:
-  - name: Sepolia Alpha snapshot test
-    description: Sepolia Alpha snapshot test
-    snapshot:
+  - snapshot:
       # skip non-empty for testing so we don't copy every time we run this
       # just delete the snapshot directory to force a full copy
       command: ./scripts/setup-snapshot.sh --skip-if-nonempty
@@ -27,9 +33,7 @@ benchmarks:
           - 30000000
           - 60000000
           - 90000000
-  - name: Devnet snapshot test
-    description: Devnet snapshot test
-    variables:
+  - variables:
       - type: payload
         value: transfer-only
       - type: node_type

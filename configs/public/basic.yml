@@ -1,0 +1,29 @@
+name: Transfer-only execution speed
+description: |
+  Basic Transfer Benchmark - Simple baseline performance test for quick client comparison and CI/CD performance regression testing.
+
+  This benchmark provides a straightforward transfer-only transaction test with multiple gas limits (15M - 90M) to establish baseline performance metrics for both Geth and Reth clients.
+
+  Use Case: Quick client comparison, CI/CD performance regression testing, baseline performance measurement, and initial validation of client performance characteristics.
+
+payloads:
+  - name: Transfer-only execution speed
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  - variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 15000000
+          - 30000000
+          - 60000000
+          - 90000000

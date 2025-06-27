@@ -1,0 +1,39 @@
+name: Simulation example
+description: |
+  Simulate stats for a single block
+payloads:
+  - name: Simulator
+    id: simulator
+    type: simulator
+    accounts_loaded: 30
+    accounts_deleted: 1.27
+    accounts_updated: 20.17
+    accounts_created: 1
+    storage_loaded: 30
+    storage_deleted: 4.1
+    storage_updated: 14.7
+    storage_created: 14.7
+    calls_per_block: fill
+    precompiles:
+      bls12381MapG2: 6.81
+      ecrecover: 0.33
+      bls12381G1Add: 0.44
+      bls12381G1MultiExp: 0.18
+      sha256hash: 1
+      dataCopy: 1
+      bls12381Pairing: 1
+      bls12381G2Add: 1
+      bls12381G2MultiExp: 1
+
+benchmarks:
+  - variables:
+      - type: payload
+        value: simulator
+      - type: node_type
+        values:
+          - geth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 90000000

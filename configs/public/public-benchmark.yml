@@ -1,3 +1,11 @@
+name: Public Benchmark Suite
+description: |
+  Public Benchmark Suite - Standard benchmark collection for public performance comparison and community benchmarking with client performance transparency.
+
+  This comprehensive benchmark suite includes transfer-only performance testing, EC pairing stress tests, EC multiplication testing, and storage write performance testing. Designed to provide standardized metrics for public comparison between execution clients across various workload types.
+
+  Use Case: Community benchmarking, client performance transparency, standardized performance measurement across multiple operation types, and validation of client behavior under various stress conditions.
+
 payloads:
   - name: Transfer-only
     id: transfer-only
@@ -25,9 +33,7 @@ payloads:
     contract_bytecode: Precompile
 
 benchmarks:
-  - name: Transfer-only execution speed
-    description: Transfer-only execution speed
-    variables:
+  - variables:
       - type: payload
         value: transfer-only
       - type: node_type
@@ -42,9 +48,7 @@ benchmarks:
           - 30000000
           - 60000000
           - 90000000
-  - name: EC Pairing Precompile
-    description: This shows that at 60% of gas target as input, geth fails but reth succeeds. Both get payload times are unacceptable (over 2s)
-    benchmark:
+  - benchmark:
       - sequencer
     variables:
       - type: node_type
@@ -57,9 +61,7 @@ benchmarks:
         value: 505000000
       - type: payload
         value: ecpairing
-  - name: EC Mul Precompile
-    description: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
-    benchmark:
+  - benchmark:
       - sequencer
     variables:
       - type: payload
@@ -72,9 +74,7 @@ benchmarks:
         value: 5
       - type: gas_limit
         value: 1005000000
-  - name: SStore Performance
-    description: https://github.com/base/fp-test-cases/blob/main/src/Writer.sol
-    benchmark:
+  - benchmark:
       - sequencer
     variables:
       - type: payload
