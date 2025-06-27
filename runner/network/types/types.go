@@ -55,6 +55,8 @@ type RunParams struct {
 	GasLimit       uint64
 	PayloadID      string
 	BenchmarkRunID string
+	Name           string
+	Description    string
 	BlockTime      time.Duration
 	Env            map[string]string
 	NumBlocks      int

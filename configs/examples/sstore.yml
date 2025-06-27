@@ -1,0 +1,33 @@
+name: SStore Performance
+description: |
+  Storage Write Performance Test - Tests storage write (SSTORE) operation performance to optimize storage write operations and identify storage bottlenecks.
+
+  This benchmark calls the `writer(uint256,bytes)` function to measure storage modification speed, helping identify performance characteristics of storage write operations across different execution clients.
+
+  Use Case: Optimize storage write operations, identify storage bottlenecks, and compare storage write performance between different client implementations.
+
+  Reference: https://github.com/base/fp-test-cases/blob/main/src/Writer.sol
+
+payloads:
+  - name: SStore Performance
+    id: sstore
+    type: contract
+    calls_per_block: 1
+    function_signature: writer(uint256,bytes)
+    gas_per_tx: 10000000
+    contract_bytecode: Precompile
+
+benchmarks:
+  - benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        value: sstore
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 5
+      - type: gas_limit
+        value: 1000000000

@@ -85,6 +85,8 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 }
 
 type BenchmarkConfig struct {
+	Name                string               `yaml:"name"`
+	Description         *string              `yaml:"description"`
 	Benchmarks          []TestDefinition     `yaml:"benchmarks"`
 	TransactionPayloads []payload.Definition `yaml:"payloads"`
 }
@@ -92,22 +94,14 @@ type BenchmarkConfig struct {
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
-	Name     string              `yaml:"name"`
-	Snapshot *SnapshotDefinition `yaml:"snapshot"`
-	Metrics  *ThresholdConfig    `yaml:"metrics"`
-	Description  string               `yaml:"description"`
+	Snapshot     *SnapshotDefinition  `yaml:"snapshot"`
+	Metrics      *ThresholdConfig     `yaml:"metrics"`
 	Tags         *map[string]string   `yaml:"tags"`
 	Variables    []Param              `yaml:"variables"`
 	ProofProgram *ProofProgramOptions `yaml:"proof_program"`
 }
 
 func (bc *TestDefinition) Check() error {
-	if bc.Name == "" {
-		return errors.New("name is required")
-	}
-	if bc.Description == "" {
-		return errors.New("description is required")
-	}
 	for _, b := range bc.Variables {
 		err := b.Check()
 		if err != nil {

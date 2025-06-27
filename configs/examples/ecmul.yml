@@ -1,0 +1,33 @@
+name: EC Mul Precompile
+description: |
+  Elliptic Curve Multiplication Test - Tests EC scalar multiplication precompile (0x07) performance to benchmark cryptographic operations used in signature schemes and ZK systems.
+
+  This benchmark measures elliptic curve scalar multiplication operations, which are essential for cryptographic protocols including digital signatures, key derivation, and zero-knowledge proof systems.
+
+  Use Case: Benchmark cryptographic operations used in signature schemes and ZK systems, validate precompile performance under load, and compare scalar multiplication efficiency between different client implementations.
+
+  Reference: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+
+payloads:
+  - name: EC Mul Precompile
+    id: ecmul
+    type: contract
+    calls_per_block: 1
+    function_signature: ecmul(uint256,bytes)
+    gas_per_tx: 10000000
+    contract_bytecode: Precompile
+
+benchmarks:
+  - benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        value: ecmul
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 5
+      - type: gas_limit
+        value: 1000000000

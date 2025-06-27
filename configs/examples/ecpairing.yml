@@ -1,0 +1,34 @@
+name: EC Pairing Precompile
+description: |
+  Elliptic Curve Pairing Test - Tests EC pairing precompile (0x08) performance under stress conditions to identify pairing operation limits and client-specific performance differences.
+
+  This is a stress test that demonstrates performance characteristics under high load. Testing shows that at 60% of gas target as input, Geth fails while Reth succeeds, but both clients exhibit unacceptable payload generation times (over 2 seconds).
+
+  Use Case: Identify pairing operation limits and client-specific performance differences, validate precompile behavior under stress conditions, and benchmark cryptographic operations critical for advanced blockchain applications like zk-SNARKs.
+
+  Gas Limit: 1,000,000,000 (high stress test configuration)
+
+payloads:
+  - name: EC Pairing Precompile
+    id: ecpairing
+    type: contract
+    calls_per_block: 1
+    function_signature: ecpairing(uint256,bytes)
+    gas_per_tx: 10000000
+    contract_bytecode: Precompile
+
+benchmarks:
+  - benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        values:
+          - ecpairing
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 5
+      - type: gas_limit
+        value: 1000000000

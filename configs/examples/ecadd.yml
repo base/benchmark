@@ -1,0 +1,33 @@
+name: EC Add Precompile
+description: |
+  Elliptic Curve Addition Test - Tests EC addition precompile (0x06) performance to validate cryptographic operation performance for ZK proofs and signature verification.
+
+  This benchmark measures elliptic curve point addition operations, which are fundamental cryptographic operations used in various blockchain applications including zero-knowledge proofs and signature schemes.
+
+  Use Case: Validate cryptographic operation performance for ZK proofs and signature verification, benchmark elliptic curve operations, and compare precompile performance across different client implementations.
+
+  Reference: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+
+payloads:
+  - name: EC Add Precompile
+    id: ecadd
+    type: contract
+    calls_per_block: 1
+    function_signature: ecadd(uint256,bytes)
+    gas_per_tx: 10000000
+    contract_bytecode: Precompile
+
+benchmarks:
+  - benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        value: ecadd
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 5
+      - type: gas_limit
+        value: 1000000000

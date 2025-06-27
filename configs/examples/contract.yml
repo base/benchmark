@@ -1,0 +1,33 @@
+name: Basic EC Pairing Precompile
+description: |
+  Basic EC Pairing Test - Basic elliptic curve pairing precompile test for simple pairing operation validation without stress conditions.
+
+  This benchmark tests basic EC pairing functionality with minimal calldata, providing a baseline for pairing operation performance under normal conditions, in contrast to the stress test version.
+
+  Use Case: Simple pairing operation validation without stress conditions, baseline performance measurement for pairing operations, and validation of basic precompile functionality.
+
+  Reference: https://github.com/base/fp-test-cases/blob/main/src/Precompiler.sol
+
+payloads:
+  - name: Basic EC Pairing Precompile
+    id: basic-ec-pairing-precompile
+    type: contract
+    calls_per_block: 1
+    function_signature: ecpairing(uint256,bytes)
+    gas_per_tx: 10000000
+    calldata: 0x
+    contract_bytecode: Precompile
+
+benchmarks:
+  - benchmark:
+      - sequencer
+    variables:
+      - type: payload
+        value: basic-ec-pairing-precompile
+      - type: node_type
+        values:
+          - geth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 1000000000

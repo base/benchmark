@@ -1,0 +1,22 @@
+name: TX-Fuzz Geth Performance
+description: |
+  Transaction Fuzzing Test - Stress tests Geth with randomized transaction patterns to discover edge cases and performance degradation under unusual transaction loads.
+
+  This benchmark uses a transaction fuzzer to generate diverse transaction patterns, helping identify potential vulnerabilities, performance bottlenecks, and edge cases that might not be covered by standard transaction patterns.
+
+  Use Case: Discover edge cases and performance degradation under unusual transaction loads, stress test transaction processing logic, validate client robustness under diverse transaction patterns, and identify potential security or performance issues.
+
+payloads:
+  - name: TX-Fuzz Geth Performance
+    id: tx-fuzz
+    type: tx-fuzz
+
+benchmarks:
+  - variables:
+      - type: payload
+        value: tx-fuzz
+      - type: node_type
+        values:
+          - geth
+      - type: num_blocks
+        value: 20

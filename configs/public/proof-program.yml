@@ -1,0 +1,33 @@
+name: Fault proof program execution speed
+description: |
+  Fault Proof Program Benchmark - Tests fault proof program execution speed to validate fraud proof system performance for L2 dispute resolution.
+
+  This benchmark uses OP-Program v1.6.1-rc.1 with transfer-only payload and conservative settings (2 blocks, 15M gas) designed for proof generation testing in Layer 2 dispute resolution systems.
+
+  Use Case: Validate fraud proof system performance for L2 dispute resolution, benchmark proof generation speed, and ensure fault proof program performance meets requirements for dispute resolution timelines.
+
+payloads:
+  - name: Transfer-only execution speed
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  - proof_program:
+    enabled: true
+    type: op-program
+    version: v1.6.1-rc.1
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - geth
+          # - reth
+      - type: num_blocks
+        value: 2
+      - type: gas_limit
+        values:
+          - 15000000
+          # - 30000000
+          # - 60000000
+          # - 90000000
