@@ -1,3 +1,13 @@
+name: Base mainnet snapshot test
+description: |
+  Base Mainnet Simulation - Comprehensive benchmark simulating Base mainnet transaction patterns for production readiness testing and mainnet performance prediction.
+
+  This benchmark provides comprehensive testing with Base mainnet transaction simulation (35M average gas used, 100 calls per block) and individual precompile stress tests using 100% gas limit usage per precompile. All major precompiles are covered including ECRECOVER, SHA256, RIPEMD160, BLS12-381, and more.
+
+  Features multiple gas limits (25M - 100M) and includes latency warning/error thresholds configured for production readiness validation.
+
+  Use Case: Production readiness testing, mainnet performance prediction, comprehensive precompile validation, and performance benchmarking under realistic mainnet conditions.
+
 payloads:
   - name: Simulator
     id: base-mainnet-simulation
@@ -22,14 +32,6 @@ payloads:
       ecrecover: 0.0733
       bls12381G1Add: 0.0244
       bls12381G1MultiExp: 0.0218
-  - name: account create (full block)
-    id: account-create-full-block
-    type: simulator
-    accounts_created: 100
-  - name: account update (full block)
-    id: account-update-full-block
-    type: simulator
-    accounts_updated: 100
   - name: storage create (full block)
     id: storage-create-full-block
     type: simulator
@@ -120,9 +122,7 @@ payloads:
       p256Verify: 100
 
 benchmarks:
-  - name: Base mainnet snapshot test
-    description: Base mainnet snapshot test
-    metrics:
+  - metrics:
       warning:
         sequencer/latency/get_payload: 1000000000
         validator/latency/new_payload: 1000000000
@@ -133,8 +133,6 @@ benchmarks:
       - type: payload
         values:
           - base-mainnet-simulation
-          - account-create-full-block
-          # - account-update-full-block
           - storage-create-full-block
           - storage-update-full-block
           - ecrecover-full-block

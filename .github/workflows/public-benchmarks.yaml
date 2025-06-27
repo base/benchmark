@@ -39,7 +39,7 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
-    
+
       - name: Build Contracts
         run: |
           forge build --force
@@ -78,7 +78,7 @@ jobs:
           go run benchmark/cmd/main.go \
             --log.level info \
             run \
-            --config ./configs/public-benchmark.yml \
+            --config ./configs/public/public-benchmark.yml \
             --root-dir ${{ runner.temp }}/data-dir \
             --output-dir ${{ runner.temp }}/output \
             --reth-bin ${{ runner.temp }}/bin/reth \

@@ -21,7 +21,7 @@ Base Benchmark provides comprehensive testing capabilities:
 
 [Install Forge](https://book.getfoundry.sh/getting-started/installation)
 
-Recursively clone github submodules: 
+Recursively clone github submodules:
 
 ```bash
 git submodule update --init --recursive
@@ -33,7 +33,7 @@ make build
 
 # Run the basic benchmark
 ./bin/base-bench run \
-  --config ./configs/basic.yml \
+  --config ./configs/examples/basic.yml \
   --root-dir ./data-dir \
   --reth-bin path_to_reth_bin \
   --geth-bin path_to_geth_bin \
@@ -44,6 +44,17 @@ cd report/
 npm i
 npm run dev
 ```
+
+## 📋 Available Benchmarks
+
+Explore the comprehensive collection of benchmark configurations:
+
+**[📁 Configuration Guide](configs/README.md)** - Detailed documentation of all available benchmark configurations
+
+- **[examples/](configs/examples/)** - Development and testing configurations for specific workloads
+- **[public/](configs/public/)** - Production-ready benchmarks for standardized testing
+
+Choose from storage operations, precompile tests, token workloads, mainnet simulations, and more.
 
 ## 🏗️ Architecture
 
