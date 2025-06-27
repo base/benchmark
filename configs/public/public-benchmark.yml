@@ -48,9 +48,7 @@ benchmarks:
           - 30000000
           - 60000000
           - 90000000
-  - benchmark:
-      - sequencer
-    variables:
+  - variables:
       - type: node_type
         values:
           - geth
@@ -61,9 +59,7 @@ benchmarks:
         value: 505000000
       - type: payload
         value: ecpairing
-  - benchmark:
-      - sequencer
-    variables:
+  - variables:
       - type: payload
         value: ecmul
       - type: node_type
@@ -74,9 +70,7 @@ benchmarks:
         value: 5
       - type: gas_limit
         value: 1005000000
-  - benchmark:
-      - sequencer
-    variables:
+  - variables:
       - type: payload
         value: sstore
       - type: node_type

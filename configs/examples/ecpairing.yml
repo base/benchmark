@@ -18,9 +18,7 @@ payloads:
     contract_bytecode: Precompile
 
 benchmarks:
-  - benchmark:
-      - sequencer
-    variables:
+  - variables:
       - type: payload
         values:
           - ecpairing

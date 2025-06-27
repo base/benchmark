@@ -19,9 +19,7 @@ payloads:
     contract_bytecode: Precompile
 
 benchmarks:
-  - benchmark:
-      - sequencer
-    variables:
+  - variables:
       - type: payload
         value: basic-ec-pairing-precompile
       - type: node_type
