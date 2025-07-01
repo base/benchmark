@@ -131,6 +131,8 @@ func NewMetricsCollector(
 		return NewGethMetricsCollector(log, client, metricsPort)
 	case "reth":
 		return NewRethMetricsCollector(log, client, metricsPort)
+	case "rbuilder":
+		return NewRethMetricsCollector(log, client, metricsPort)
 	}
 	panic(fmt.Sprintf("unknown client: %s", clientName))
 }

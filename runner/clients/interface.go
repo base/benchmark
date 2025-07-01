@@ -4,6 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 
 	"github.com/base/base-bench/runner/clients/geth"
+	"github.com/base/base-bench/runner/clients/rbuilder"
 	"github.com/base/base-bench/runner/clients/reth"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
@@ -16,6 +17,8 @@ func NewClient(client Client, logger log.Logger, options *config.InternalClientO
 		return reth.NewRethClient(logger, options)
 	case Geth:
 		return geth.NewGethClient(logger, options)
+	case Rbuilder:
+		return rbuilder.NewRbuilderClient(logger, options)
 	default:
 		panic("unknown client")
 	}
@@ -27,4 +30,5 @@ type Client uint
 const (
 	Reth Client = iota
 	Geth
+	Rbuilder
 )
