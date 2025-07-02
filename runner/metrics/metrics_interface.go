@@ -7,18 +7,6 @@ import (
 	"os"
 	"path"
 	"time"
-
-	"github.com/base/base-bench/runner/benchmark"
-)
-
-const (
-	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
-	NewPayloadLatencyMetric       = "latency/new_payload"
-	GetPayloadLatencyMetric       = "latency/get_payload"
-	SendTxsLatencyMetric          = "latency/send_txs"
-	GasPerBlockMetric             = "gas/per_block"
-	GasPerSecondMetric            = "gas/per_second"
-	TransactionsPerBlockMetric    = "transactions/per_block"
 )
 
 type Collector interface {
@@ -74,49 +62,6 @@ func (m *BlockMetrics) GetMetricFloat(name string) (float64, bool) {
 	}
 
 	return 0, false
-}
-
-func getAverage(metrics []BlockMetrics, metricName string) float64 {
-	var total float64
-	var count int
-	for _, metric := range metrics {
-		if value, ok := metric.GetMetricFloat(metricName); ok {
-			total += value
-			count++
-		}
-	}
-	if count == 0 {
-		return 0
-	}
-	return total / float64(count)
-}
-
-func BlockMetricsToValidatorSummary(metrics []BlockMetrics) *benchmark.ValidatorKeyMetrics {
-	averageNewPayloadLatency := getAverage(metrics, NewPayloadLatencyMetric)
-	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
-
-	return &benchmark.ValidatorKeyMetrics{
-		AverageNewPayloadLatency: averageNewPayloadLatency,
-		CommonKeyMetrics: benchmark.CommonKeyMetrics{
-			AverageGasPerSecond: averageGasPerSecond,
-		},
-	}
-}
-
-func BlockMetricsToSequencerSummary(metrics []BlockMetrics) *benchmark.SequencerKeyMetrics {
-	averageUpdateForkChoiceLatency := getAverage(metrics, UpdateForkChoiceLatencyMetric)
-	averageSendTxsLatency := getAverage(metrics, SendTxsLatencyMetric)
-	averageGetPayloadLatency := getAverage(metrics, GetPayloadLatencyMetric)
-	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
-
-	return &benchmark.SequencerKeyMetrics{
-		AverageFCULatency:        averageUpdateForkChoiceLatency,
-		AverageSendTxsLatency:    averageSendTxsLatency,
-		AverageGetPayloadLatency: averageGetPayloadLatency,
-		CommonKeyMetrics: benchmark.CommonKeyMetrics{
-			AverageGasPerSecond: averageGasPerSecond,
-		},
-	}
 }
 
 type MetricsWriter interface {

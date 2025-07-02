@@ -21,6 +21,7 @@ import (
 	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -41,6 +42,9 @@ type RethClient struct {
 
 	stdout io.WriteCloser
 	stderr io.WriteCloser
+
+	binPath          string
+	metricsCollector metrics.Collector
 }
 
 // NewRethClient creates a new client for reth.
@@ -49,7 +53,21 @@ func NewRethClient(logger log.Logger, options *config.InternalClientOptions, por
 		logger:  logger,
 		options: options,
 		ports:   ports,
+		binPath: options.RethBin,
 	}
+}
+
+func NewRethClientWithBin(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager, binPath string) types.ExecutionClient {
+	return &RethClient{
+		logger:  logger,
+		options: options,
+		ports:   ports,
+		binPath: binPath,
+	}
+}
+
+func (r *RethClient) MetricsCollector() metrics.Collector {
+	return r.metricsCollector
 }
 
 // Run runs the reth client with the given runtime config.
@@ -122,7 +140,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	r.logger.Debug("starting reth", "args", strings.Join(args, " "))
 
-	r.process = exec.Command(r.options.RethBin, args...)
+	r.process = exec.Command(r.binPath, args...)
 	r.process.Stdout = r.stdout
 	r.process.Stderr = r.stderr
 	err = r.process.Start()
@@ -139,6 +157,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	r.client = ethclient.NewClient(rpcClient)
+	r.metricsCollector = newMetricsCollector(r.logger, r.client, int(r.metricsPort))
 
 	err = common.WaitForRPC(ctx, r.client)
 	if err != nil {

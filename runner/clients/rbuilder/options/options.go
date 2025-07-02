@@ -1,4 +1,4 @@
-package options
+package rbuilderoptions
 
 import "github.com/base/base-bench/runner/clients/reth/options"
 
@@ -8,13 +8,4 @@ type RbuilderOptions struct {
 
 	// RbuilderBin is the path to the rbuilder binary.
 	RbuilderBin string
-
-	// RbuilderHttpPort is the port for the rbuilder HTTP API.
-	RbuilderHttpPort int
-
-	// RbuilderAuthRpcPort is the port for the rbuilder auth RPC.
-	RbuilderAuthRpcPort int
-
-	// RbuilderMetricsPort is the port for the rbuilder metrics.
-	RbuilderMetricsPort int
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -22,4 +23,5 @@ type ExecutionClient interface {
 	ClientURL() string // needed for external transaction payload workers
 	AuthClient() client.RPC
 	MetricsPort() int
+	MetricsCollector() metrics.Collector
 }

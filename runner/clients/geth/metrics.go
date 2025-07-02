@@ -18,7 +18,7 @@ type metricsCollector struct {
 	metricsPort int
 }
 
-func NewMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) metrics.Collector {
+func newMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) metrics.Collector {
 	return &metricsCollector{
 		log:         log,
 		client:      client,

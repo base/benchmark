@@ -10,6 +10,7 @@ import (
 	"github.com/base/base-bench/runner/clients/reth"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -33,7 +34,7 @@ type RbuilderClient struct {
 // NewRbuilderClient creates a new client for reth.
 func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager) types.ExecutionClient {
 	// only support reth for now
-	rethClient := reth.NewRethClient(logger, options, ports)
+	rethClient := reth.NewRethClientWithBin(logger, options, ports, options.RbuilderBin)
 
 	return &RbuilderClient{
 		logger:   logger,
@@ -45,6 +46,10 @@ func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions,
 // Run runs the reth client with the given runtime config.
 func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	return r.elClient.Run(ctx, cfg)
+}
+
+func (r *RbuilderClient) MetricsCollector() metrics.Collector {
+	return r.elClient.MetricsCollector()
 }
 
 // Stop stops the reth client.

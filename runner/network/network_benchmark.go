@@ -33,8 +33,8 @@ type NetworkBenchmark struct {
 	sequencerOptions *config.InternalClientOptions
 	validatorOptions *config.InternalClientOptions
 
-	collectedSequencerMetrics *benchmark.SequencerKeyMetrics
-	collectedValidatorMetrics *benchmark.ValidatorKeyMetrics
+	collectedSequencerMetrics *benchtypes.SequencerKeyMetrics
+	collectedValidatorMetrics *benchtypes.ValidatorKeyMetrics
 
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
@@ -100,14 +100,14 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	}()
 
 	// Create metrics collector and writer
-	metricsCollector := NewMetricsCollector(nb.log, sequencerClient.Client(), nb.testConfig.Params.NodeType, sequencerClient.MetricsPort())
+	metricsCollector := sequencerClient.MetricsCollector()
 	metricsWriter := metrics.NewFileMetricsWriter(nb.sequencerOptions.MetricsPath)
 
 	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		sequencerMetrics := metricsCollector.GetMetrics()
 		if sequencerMetrics != nil {
-			nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
+			nb.collectedSequencerMetrics = benchtypes.BlockMetricsToSequencerSummary(sequencerMetrics)
 			if err := metricsWriter.Write(sequencerMetrics); err != nil {
 				nb.log.Error("Failed to write sequencer metrics", "error", err)
 			}
@@ -135,14 +135,14 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 	}()
 
 	// Create metrics collector and writer
-	metricsCollector := NewMetricsCollector(nb.log, validatorClient.Client(), nb.testConfig.Params.NodeType, validatorClient.MetricsPort())
+	metricsCollector := validatorClient.MetricsCollector()
 	metricsWriter := metrics.NewFileMetricsWriter(nb.validatorOptions.MetricsPath)
 
 	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		validatorMetrics := metricsCollector.GetMetrics()
 		if validatorMetrics != nil {
-			nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
+			nb.collectedValidatorMetrics = benchtypes.BlockMetricsToValidatorSummary(validatorMetrics)
 			if err := metricsWriter.Write(validatorMetrics); err != nil {
 				nb.log.Error("Failed to write validator metrics", "error", err)
 			}

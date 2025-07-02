@@ -21,6 +21,7 @@ import (
 	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -41,6 +42,8 @@ type GethClient struct {
 
 	stdout io.WriteCloser
 	stderr io.WriteCloser
+
+	metricsCollector metrics.Collector
 }
 
 // NewGethClient creates a new client for geth.
@@ -50,6 +53,10 @@ func NewGethClient(logger log.Logger, options *config.InternalClientOptions, por
 		options: options,
 		ports:   ports,
 	}
+}
+
+func (g *GethClient) MetricsCollector() metrics.Collector {
+	return g.metricsCollector
 }
 
 // Run runs the geth client with the given runtime config.
@@ -154,6 +161,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	g.client = ethclient.NewClient(rpcClient)
+	g.metricsCollector = newMetricsCollector(g.logger, g.client, int(g.metricsPort))
 
 	err = common.WaitForRPC(ctx, g.client)
 	if err != nil {
