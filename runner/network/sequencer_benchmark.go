@@ -122,7 +122,7 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	return nil
 }
 
-func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.MetricsCollector) ([]engine.ExecutableData, uint64, error) {
+func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.Collector) ([]engine.ExecutableData, uint64, error) {
 	transactionWorker, err := payload.NewPayloadWorker(ctx, nb.log, &nb.config, nb.sequencerClient, nb.transactionPayload)
 	if err != nil {
 		return nil, 0, err

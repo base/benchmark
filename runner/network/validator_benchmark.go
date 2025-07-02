@@ -54,7 +54,7 @@ func (vb *validatorBenchmark) benchmarkFaultProofProgram(ctx context.Context, pa
 	return opProgramBenchmark.Run(ctx, payloads, firstTestBlock)
 }
 
-func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, metricsCollector metrics.MetricsCollector) error {
+func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, metricsCollector metrics.Collector) error {
 	headBlockHeader, err := vb.validatorClient.Client().HeaderByNumber(ctx, nil)
 	if err != nil {
 		vb.log.Warn("failed to get head block header", "err", err)

@@ -1,4 +1,4 @@
-package metrics
+package reth
 
 import (
 	"bytes"
@@ -7,43 +7,44 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/common/expfmt"
 )
 
-type RethMetricsCollector struct {
+type metricsCollector struct {
 	log         log.Logger
 	client      *ethclient.Client
-	metrics     []BlockMetrics
+	metrics     []metrics.BlockMetrics
 	metricsPort int
 }
 
-func NewRethMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) *RethMetricsCollector {
-	return &RethMetricsCollector{
+func NewMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) metrics.Collector {
+	return &metricsCollector{
 		log:         log,
 		client:      client,
 		metricsPort: metricsPort,
-		metrics:     make([]BlockMetrics, 0),
+		metrics:     make([]metrics.BlockMetrics, 0),
 	}
 }
 
-func (r *RethMetricsCollector) GetMetricsEndpoint() string {
+func (r *metricsCollector) GetMetricsEndpoint() string {
 	return fmt.Sprintf("http://localhost:%d/metrics", r.metricsPort)
 }
 
-func (r *RethMetricsCollector) GetMetrics() []BlockMetrics {
+func (r *metricsCollector) GetMetrics() []metrics.BlockMetrics {
 	return r.metrics
 }
 
-func (r *RethMetricsCollector) GetMetricTypes() map[string]bool {
+func (r *metricsCollector) GetMetricTypes() map[string]bool {
 	return map[string]bool{
 		"reth_sync_execution_execution_duration":         true,
 		"reth_sync_block_validation_state_root_duration": true,
 	}
 }
 
-func (r *RethMetricsCollector) Collect(ctx context.Context, m *BlockMetrics) error {
+func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics) error {
 	resp, err := http.Get(r.GetMetricsEndpoint())
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)

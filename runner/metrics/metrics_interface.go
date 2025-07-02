@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/clients/geth"
+	"github.com/base/base-bench/runner/clients/reth"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
@@ -23,7 +25,7 @@ const (
 	TransactionsPerBlockMetric    = "transactions/per_block"
 )
 
-type MetricsCollector interface {
+type Collector interface {
 	Collect(ctx context.Context, metrics *BlockMetrics) error
 	GetMetrics() []BlockMetrics
 }
@@ -125,14 +127,14 @@ func NewMetricsCollector(
 	log log.Logger,
 	client *ethclient.Client,
 	clientName string,
-	metricsPort int) MetricsCollector {
+	metricsPort int) Collector {
 	switch clientName {
 	case "geth":
-		return NewGethMetricsCollector(log, client, metricsPort)
+		return geth.NewMetricsCollector(log, client, metricsPort)
 	case "reth":
-		return NewRethMetricsCollector(log, client, metricsPort)
+		return reth.NewMetricsCollector(log, client, metricsPort)
 	case "rbuilder":
-		return NewRethMetricsCollector(log, client, metricsPort)
+		return rbuilder.NewMetricsCollector(log, client, metricsPort)
 	}
 	panic(fmt.Sprintf("unknown client: %s", clientName))
 }
