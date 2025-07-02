@@ -76,7 +76,14 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 	for _, metric := range metrics {
 		name := metric.GetName()
 		if metricTypes[name] {
-			m.AddExecutionMetric(name, metric.GetMetric())
+			metricVal := metric.GetMetric()
+			if len(metricVal) != 1 {
+				r.log.Warn("expected 1 metric, got %d for metric %s", len(metricVal), name)
+			}
+			err = m.AddPrometheusMetric(name, metricVal[0])
+			if err != nil {
+				r.log.Warn("failed to add metric %s: %s", name, err)
+			}
 		}
 	}
 

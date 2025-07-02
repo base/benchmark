@@ -7,6 +7,8 @@ import (
 	"os"
 	"path"
 	"time"
+
+	io_prometheus_client "github.com/prometheus/client_model/go"
 )
 
 type Collector interface {
@@ -28,6 +30,44 @@ func NewBlockMetrics(blockNumber uint64) *BlockMetrics {
 	}
 }
 
+func (m *BlockMetrics) AddPrometheusMetric(name string, value *io_prometheus_client.Metric) error {
+	if value.Histogram != nil {
+		sum := 0.0
+		if value.Histogram.SampleSum != nil {
+			sum = *value.Histogram.SampleSum
+		}
+		count := 0.0
+		if value.Histogram.SampleCount != nil {
+			count = float64(*value.Histogram.SampleCount)
+		}
+		if count == 0 {
+			count = 1
+		}
+		average := sum / count
+		m.ExecutionMetrics[name] = average
+	} else if value.Gauge != nil {
+		m.ExecutionMetrics[name] = *value.Gauge.Value
+	} else if value.Counter != nil {
+		m.ExecutionMetrics[name] = *value.Counter.Value
+	} else if value.Summary != nil {
+		sum := 0.0
+		if value.Summary.SampleSum != nil {
+			sum = *value.Summary.SampleSum
+		}
+		count := 0.0
+		if value.Summary.SampleCount != nil {
+			count = float64(*value.Summary.SampleCount)
+		}
+		if count == 0 {
+			count = 1
+		}
+		average := sum / count
+		m.ExecutionMetrics[name] = average
+	} else {
+		return fmt.Errorf("invalid metric type for %s: %#v", name, value)
+	}
+	return nil
+}
 func (m *BlockMetrics) AddExecutionMetric(name string, value interface{}) {
 	m.ExecutionMetrics[name] = value
 }
@@ -81,6 +121,7 @@ func NewFileMetricsWriter(baseDir string) *FileMetricsWriter {
 const MetricsFileName = "metrics.json"
 
 func (w *FileMetricsWriter) Write(metrics []BlockMetrics) error {
+	fmt.Println("Writing metrics to", w.BaseDir)
 	filename := path.Join(w.BaseDir, MetricsFileName)
 
 	data, err := json.MarshalIndent(metrics, "", "  ")
