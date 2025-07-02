@@ -39,8 +39,15 @@ func (r *metricsCollector) GetMetrics() []metrics.BlockMetrics {
 
 func (r *metricsCollector) GetMetricTypes() map[string]bool {
 	return map[string]bool{
-		"reth_sync_execution_execution_duration":         true,
-		"reth_sync_block_validation_state_root_duration": true,
+		"reth_sync_execution_execution_duration":           true,
+		"reth_sync_block_validation_state_root_duration":   true,
+		"reth_op_rbuilder_block_built_success":             true,
+		"reth_op_rbuilder_flashblock_count":                true,
+		"reth_op_rbuilder_total_block_built_duration":      true,
+		"reth_op_rbuilder_flashblock_build_duration":       true,
+		"reth_op_rbuilder_state_root_calculation_duration": true,
+		"reth_op_rbuilder_sequencer_tx_duration":           true,
+		"reth_op_rbuilder_payload_tx_simulation_duration":  true,
 	}
 }
 
@@ -68,7 +75,6 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 
 	for _, metric := range metrics {
 		name := metric.GetName()
-		fmt.Println(name, metric.GetMetric())
 		if metricTypes[name] {
 			m.AddExecutionMetric(name, metric.GetMetric())
 		}
