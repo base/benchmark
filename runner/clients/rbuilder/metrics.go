@@ -68,6 +68,7 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 
 	for _, metric := range metrics {
 		name := metric.GetName()
+		fmt.Println(name, metric.GetMetric())
 		if metricTypes[name] {
 			m.AddExecutionMetric(name, metric.GetMetric())
 		}

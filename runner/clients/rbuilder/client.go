@@ -2,6 +2,7 @@ package rbuilder
 
 import (
 	"context"
+	"errors"
 
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/log"
@@ -29,6 +30,8 @@ type RbuilderClient struct {
 
 	elClient types.ExecutionClient
 	ports    portmanager.PortManager
+
+	metricsCollector metrics.Collector
 }
 
 // NewRbuilderClient creates a new client for reth.
@@ -45,11 +48,20 @@ func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions,
 
 // Run runs the reth client with the given runtime config.
 func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
-	return r.elClient.Run(ctx, cfg)
+	err := r.elClient.Run(ctx, cfg)
+	if err != nil {
+		return err
+	}
+
+	r.metricsCollector = newMetricsCollector(r.logger, r.elClient.Client(), int(r.elClient.MetricsPort()))
+	if r.metricsCollector == nil {
+		return errors.New("failed to create metrics collector")
+	}
+	return nil
 }
 
 func (r *RbuilderClient) MetricsCollector() metrics.Collector {
-	return r.elClient.MetricsCollector()
+	return r.metricsCollector
 }
 
 // Stop stops the reth client.
