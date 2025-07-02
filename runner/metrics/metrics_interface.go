@@ -9,10 +9,6 @@ import (
 	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
-	"github.com/base/base-bench/runner/clients/geth"
-	"github.com/base/base-bench/runner/clients/reth"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
 )
 
 const (
@@ -121,22 +117,6 @@ func BlockMetricsToSequencerSummary(metrics []BlockMetrics) *benchmark.Sequencer
 			AverageGasPerSecond: averageGasPerSecond,
 		},
 	}
-}
-
-func NewMetricsCollector(
-	log log.Logger,
-	client *ethclient.Client,
-	clientName string,
-	metricsPort int) Collector {
-	switch clientName {
-	case "geth":
-		return geth.NewMetricsCollector(log, client, metricsPort)
-	case "reth":
-		return reth.NewMetricsCollector(log, client, metricsPort)
-	case "rbuilder":
-		return rbuilder.NewMetricsCollector(log, client, metricsPort)
-	}
-	panic(fmt.Sprintf("unknown client: %s", clientName))
 }
 
 type MetricsWriter interface {

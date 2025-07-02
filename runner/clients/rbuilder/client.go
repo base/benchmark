@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/log"
 
+	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/clients/reth"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
@@ -26,12 +27,13 @@ type RbuilderClient struct {
 	// stderr io.WriteCloser
 
 	elClient types.ExecutionClient
+	ports    portmanager.PortManager
 }
 
 // NewRbuilderClient creates a new client for reth.
-func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions) types.ExecutionClient {
+func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager) types.ExecutionClient {
 	// only support reth for now
-	rethClient := reth.NewRethClient(logger, options)
+	rethClient := reth.NewRethClient(logger, options, ports)
 
 	return &RbuilderClient{
 		logger:   logger,
