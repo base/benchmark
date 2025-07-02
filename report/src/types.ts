@@ -40,7 +40,16 @@ export interface ChartConfig {
   title: string;
   description: string;
   type: "line";
-  unit?: "ns" | "us" | "ms" | "s" | "bytes" | "gas" | "count" | "gas/s"; // Add 'gas/s', ensure 's' is present
+  unit?:
+    | "ns"
+    | "us"
+    | "ms"
+    | "s"
+    | "bytes"
+    | "gas"
+    | "count"
+    | "gas/s"
+    | "blocks"; // Add 'gas/s', ensure 's' is present
 }
 
 export interface BenchmarkRun {

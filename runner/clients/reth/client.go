@@ -89,6 +89,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--authrpc.port", fmt.Sprintf("%d", r.authRPCPort))
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
+	args = append(args, "--flashblocks.enabled")
 	args = append(args, "-vvv")
 
 	// increase mempool size
