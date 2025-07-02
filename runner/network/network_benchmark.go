@@ -179,6 +179,8 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 		nodeType = clients.Reth
 	case "rbuilder":
 		nodeType = clients.Rbuilder
+	case "nethermind":
+		nodeType = clients.Nethermind
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", params.NodeType)
 	}

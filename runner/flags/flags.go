@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	RethBin     = "reth-bin"
-	RbuilderBin = "rbuilder-bin"
-	GethBin     = "geth-bin"
+	RethBin       = "reth-bin"
+	RbuilderBin   = "rbuilder-bin"
+	GethBin       = "geth-bin"
+	NethermindBin = "nethermind-bin"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -31,6 +32,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "Rbuilder binary path",
 			Value:   "rbuilder",
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "RBUILDER_BIN"),
+		},
+		&cli.StringFlag{
+			Name:    NethermindBin,
+			Usage:   "Nethermind binary path",
+			Value:   "nethermind",
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "NETHERMIND_BIN"),
 		},
 	}
 }

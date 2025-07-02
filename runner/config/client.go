@@ -5,6 +5,7 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark/portmanager"
 	gethoptions "github.com/base/base-bench/runner/clients/geth/options"
+	nethermindomptions "github.com/base/base-bench/runner/clients/nethermind/options"
 	rbuilderoptions "github.com/base/base-bench/runner/clients/rbuilder/options"
 	rethoptions "github.com/base/base-bench/runner/clients/reth/options"
 	"github.com/base/base-bench/runner/flags"
@@ -16,6 +17,7 @@ type ClientOptions struct {
 	rethoptions.RethOptions
 	gethoptions.GethOptions
 	rbuilderoptions.RbuilderOptions
+	nethermindomptions.NethermindOptions
 	PortOverrides PortOverrides
 }
 
@@ -57,6 +59,9 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 		},
 		RbuilderOptions: rbuilderoptions.RbuilderOptions{
 			RbuilderBin: ctx.String(flags.RbuilderBin),
+		},
+		NethermindOptions: nethermindomptions.NethermindOptions{
+			NethermindBin: ctx.String(flags.NethermindBin),
 		},
 	}
 
