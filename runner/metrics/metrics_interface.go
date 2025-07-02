@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"time"
@@ -22,19 +23,51 @@ type BlockMetrics struct {
 	ExecutionMetrics map[string]interface{}
 }
 
-func NewBlockMetrics(blockNumber uint64) *BlockMetrics {
+func NewBlockMetrics() *BlockMetrics {
 	return &BlockMetrics{
-		BlockNumber:      blockNumber,
+		BlockNumber:      0,
 		ExecutionMetrics: make(map[string]interface{}),
 		Timestamp:        time.Now(),
 	}
 }
 
-func (m *BlockMetrics) AddPrometheusMetric(name string, value *io_prometheus_client.Metric) error {
+func (m *BlockMetrics) SetBlockNumber(blockNumber uint64) {
+	m.BlockNumber = blockNumber
+}
+
+func (m *BlockMetrics) Copy() *BlockMetrics {
+	newMetrics := make(map[string]interface{})
+	maps.Copy(newMetrics, m.ExecutionMetrics)
+	return &BlockMetrics{
+		BlockNumber:      m.BlockNumber,
+		ExecutionMetrics: newMetrics,
+		Timestamp:        m.Timestamp,
+	}
+}
+
+func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_client.Metric) error {
 	if value.Histogram != nil {
+		avgName := name + "_avg"
+		// get the average change in sum divided by the average change in count
+		prevSum := 0.0
+		prevValue, ok := m.ExecutionMetrics[name].(*io_prometheus_client.Metric)
+		if !ok {
+			prevValue = nil
+		}
+		if prevValue != nil {
+			if prevValue.Histogram.SampleSum != nil {
+				prevSum = *prevValue.Histogram.SampleSum
+			}
+		}
 		sum := 0.0
 		if value.Histogram.SampleSum != nil {
 			sum = *value.Histogram.SampleSum
+		}
+		prevCount := 0.0
+		if prevValue != nil {
+			if prevValue.Histogram.SampleCount != nil {
+				prevCount = float64(*prevValue.Histogram.SampleCount)
+			}
 		}
 		count := 0.0
 		if value.Histogram.SampleCount != nil {
@@ -43,16 +76,36 @@ func (m *BlockMetrics) AddPrometheusMetric(name string, value *io_prometheus_cli
 		if count == 0 {
 			count = 1
 		}
-		average := sum / count
-		m.ExecutionMetrics[name] = average
+		averageChange := (sum - prevSum) / (count - prevCount)
+		m.ExecutionMetrics[name] = value
+		m.ExecutionMetrics[avgName] = averageChange
 	} else if value.Gauge != nil {
 		m.ExecutionMetrics[name] = *value.Gauge.Value
 	} else if value.Counter != nil {
 		m.ExecutionMetrics[name] = *value.Counter.Value
 	} else if value.Summary != nil {
+		avgName := name + "_avg"
+		// get the average change in sum divided by the average change in count
+		prevSum := 0.0
+
+		prevValue, ok := m.ExecutionMetrics[name].(*io_prometheus_client.Metric)
+		if !ok {
+			prevValue = nil
+		}
+		if prevValue != nil {
+			if prevValue.Summary.SampleSum != nil {
+				prevSum = *prevValue.Summary.SampleSum
+			}
+		}
 		sum := 0.0
 		if value.Summary.SampleSum != nil {
 			sum = *value.Summary.SampleSum
+		}
+		prevCount := 0.0
+		if prevValue != nil {
+			if prevValue.Summary.SampleCount != nil {
+				prevCount = float64(*prevValue.Summary.SampleCount)
+			}
 		}
 		count := 0.0
 		if value.Summary.SampleCount != nil {
@@ -61,8 +114,9 @@ func (m *BlockMetrics) AddPrometheusMetric(name string, value *io_prometheus_cli
 		if count == 0 {
 			count = 1
 		}
-		average := sum / count
-		m.ExecutionMetrics[name] = average
+		averageChange := (sum - prevSum) / (count - prevCount)
+		m.ExecutionMetrics[name] = value
+		m.ExecutionMetrics[avgName] = averageChange
 	} else {
 		return fmt.Errorf("invalid metric type for %s: %#v", name, value)
 	}

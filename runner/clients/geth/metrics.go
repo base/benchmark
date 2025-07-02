@@ -78,6 +78,6 @@ func (g *metricsCollector) Collect(ctx context.Context, metrics *metrics.BlockMe
 		}
 	}
 
-	g.metrics = append(g.metrics, *metrics)
+	g.metrics = append(g.metrics, *metrics.Copy())
 	return nil
 }

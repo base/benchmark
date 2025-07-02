@@ -192,12 +192,9 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		payloads := make([]engine.ExecutableData, 0)
 
-		// setup blocks
-		blockNum := uint64(0)
-
 	setupLoop:
 		for {
-			_blockMetrics := metrics.NewBlockMetrics(blockNum)
+			_blockMetrics := metrics.NewBlockMetrics()
 			payload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics, true)
 			if err != nil {
 				errChan <- err
@@ -205,7 +202,6 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			}
 
 			payloads = append(payloads, *payload)
-			blockNum = payload.Number
 			select {
 			case <-setupComplete:
 				break setupLoop
@@ -218,10 +214,11 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		lastSetupBlock = payloads[len(payloads)-1].Number
 		nb.log.Info("Last setup block", "block", lastSetupBlock)
+		blockMetrics := metrics.NewBlockMetrics()
 
 		// run for a few blocks
 		for i := 0; i < params.NumBlocks; i++ {
-			blockMetrics := metrics.NewBlockMetrics(uint64(i))
+			blockMetrics.SetBlockNumber(uint64(i))
 			err := transactionWorker.SendTxs(benchmarkCtx)
 			if err != nil {
 				nb.log.Warn("failed to send transactions", "err", err)
