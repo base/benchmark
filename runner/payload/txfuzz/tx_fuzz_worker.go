@@ -8,7 +8,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/base/base-bench/runner/clients/proxy"
+	"github.com/base/base-bench/runner/clients/common/proxy"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"

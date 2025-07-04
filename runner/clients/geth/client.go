@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,9 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
+	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -34,16 +35,28 @@ type GethClient struct {
 	authClient client.RPC
 	process    *exec.Cmd
 
+	ports       portmanager.PortManager
+	metricsPort uint64
+	rpcPort     uint64
+	authRPCPort uint64
+
 	stdout io.WriteCloser
 	stderr io.WriteCloser
+
+	metricsCollector metrics.Collector
 }
 
 // NewGethClient creates a new client for geth.
-func NewGethClient(logger log.Logger, options *config.InternalClientOptions) types.ExecutionClient {
+func NewGethClient(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager) types.ExecutionClient {
 	return &GethClient{
 		logger:  logger,
 		options: options,
+		ports:   ports,
 	}
+}
+
+func (g *GethClient) MetricsCollector() metrics.Collector {
+	return g.metricsCollector
 }
 
 // Run runs the geth client with the given runtime config.
@@ -78,17 +91,20 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		}
 	}
 
-
 	args = make([]string, 0)
 	args = append(args, "--datadir", g.options.DataDirPath)
 	args = append(args, "--http")
 
+	g.rpcPort = g.ports.AcquirePort("geth", portmanager.ELPortPurpose)
+	g.authRPCPort = g.ports.AcquirePort("geth", portmanager.AuthELPortPurpose)
+	g.metricsPort = g.ports.AcquirePort("geth", portmanager.ELMetricsPortPurpose)
+
 	// TODO: allocate these dynamically eventually
-	args = append(args, "--http.port", strconv.Itoa(g.options.GethHttpPort))
-	args = append(args, "--authrpc.port", strconv.Itoa(g.options.GethAuthRpcPort))
+	args = append(args, "--http.port", fmt.Sprintf("%d", g.rpcPort))
+	args = append(args, "--authrpc.port", fmt.Sprintf("%d", g.authRPCPort))
 	args = append(args, "--metrics")
 	args = append(args, "--metrics.addr", "localhost")
-	args = append(args, "--metrics.port", strconv.Itoa(g.options.GethMetricsPort))
+	args = append(args, "--metrics.port", fmt.Sprintf("%d", g.metricsPort))
 
 	// Set mempool size to 100x default
 	args = append(args, "--txpool.globalslots", "10000000")
@@ -136,7 +152,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return err
 	}
 
-	g.clientURL = fmt.Sprintf("http://127.0.0.1:%d", g.options.GethHttpPort)
+	g.clientURL = fmt.Sprintf("http://127.0.0.1:%d", g.rpcPort)
 	rpcClient, err := rpc.DialOptions(ctx, g.clientURL, rpc.WithHTTPClient(&http.Client{
 		Timeout: 30 * time.Second,
 	}))
@@ -145,13 +161,14 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	g.client = ethclient.NewClient(rpcClient)
+	g.metricsCollector = newMetricsCollector(g.logger, g.client, int(g.metricsPort))
 
 	err = common.WaitForRPC(ctx, g.client)
 	if err != nil {
 		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
-	l2Node, err := client.NewRPC(ctx, g.logger, fmt.Sprintf("http://127.0.0.1:%d", g.options.GethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(30*time.Second))
+	l2Node, err := client.NewRPC(ctx, g.logger, fmt.Sprintf("http://127.0.0.1:%d", g.authRPCPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(30*time.Second))
 	if err != nil {
 		return err
 	}
@@ -181,6 +198,10 @@ func (g *GethClient) Stop() {
 	_ = g.stdout.Close()
 	_ = g.stderr.Close()
 
+	g.ports.ReleasePort(g.rpcPort)
+	g.ports.ReleasePort(g.authRPCPort)
+	g.ports.ReleasePort(g.metricsPort)
+
 	g.stdout = nil
 	g.stderr = nil
 	g.process = nil
@@ -202,5 +223,5 @@ func (g *GethClient) AuthClient() client.RPC {
 }
 
 func (r *GethClient) MetricsPort() int {
-	return r.options.GethMetricsPort
+	return int(r.metricsPort)
 }

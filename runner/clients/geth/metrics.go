@@ -1,4 +1,4 @@
-package metrics
+package geth
 
 import (
 	"context"
@@ -6,27 +6,28 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 )
 
-type GethMetricsCollector struct {
+type metricsCollector struct {
 	log         log.Logger
 	client      *ethclient.Client
-	metrics     []BlockMetrics
+	metrics     []metrics.BlockMetrics
 	metricsPort int
 }
 
-func NewGethMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) *GethMetricsCollector {
-	return &GethMetricsCollector{
+func newMetricsCollector(log log.Logger, client *ethclient.Client, metricsPort int) metrics.Collector {
+	return &metricsCollector{
 		log:         log,
 		client:      client,
 		metricsPort: metricsPort,
-		metrics:     make([]BlockMetrics, 0),
+		metrics:     make([]metrics.BlockMetrics, 0),
 	}
 }
 
-func (g *GethMetricsCollector) GetMetricTypes() map[string]bool {
+func (g *metricsCollector) GetMetricTypes() map[string]bool {
 	return map[string]bool{
 		"chain/account/reads.50-percentile":    true,
 		"chain/execution.50-percentile":        true,
@@ -45,15 +46,15 @@ func (g *GethMetricsCollector) GetMetricTypes() map[string]bool {
 	}
 }
 
-func (g *GethMetricsCollector) GetMetricsEndpoint() string {
+func (g *metricsCollector) GetMetricsEndpoint() string {
 	return fmt.Sprintf("http://127.0.0.1:%d/debug/metrics", g.metricsPort)
 }
 
-func (g *GethMetricsCollector) GetMetrics() []BlockMetrics {
+func (g *metricsCollector) GetMetrics() []metrics.BlockMetrics {
 	return g.metrics
 }
 
-func (g *GethMetricsCollector) Collect(ctx context.Context, metrics *BlockMetrics) error {
+func (g *metricsCollector) Collect(ctx context.Context, metrics *metrics.BlockMetrics) error {
 	resp, err := http.Get(g.GetMetricsEndpoint())
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
@@ -77,6 +78,6 @@ func (g *GethMetricsCollector) Collect(ctx context.Context, metrics *BlockMetric
 		}
 	}
 
-	g.metrics = append(g.metrics, *metrics)
+	g.metrics = append(g.metrics, *metrics.Copy())
 	return nil
 }
