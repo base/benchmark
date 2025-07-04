@@ -175,6 +175,10 @@ const RunList = ({
         const isExpanded = expandedSections.has(section.key);
         const statusCounts = groupBy(section.runs, "status");
         const sortedRuns = isExpanded ? sortRuns(section.runs) : section.runs;
+        const gasLimit = Number(section.runs?.[0]?.testConfig?.GasLimit);
+        const blockTimeMilliseconds =
+          Number(section.runs?.[0]?.testConfig?.BlockTimeMilliseconds);
+        const gasPerSecond = gasLimit / (blockTimeMilliseconds / 1000);
 
         return (
           <div key={section.key} className="mb-4">
@@ -196,10 +200,7 @@ const RunList = ({
               <div className="flex-1">
                 <div className="flex items-center gap-4">
                   <span className="text-xl font-medium text-slate-900">
-                    {formatValue(
-                      Number(section.runs?.[0]?.testConfig?.GasLimit),
-                      "gas/s",
-                    )}
+                    {formatValue(gasPerSecond, "gas/s")}
                   </span>
                   <StatusSummary statusCounts={statusCounts} />
                 </div>

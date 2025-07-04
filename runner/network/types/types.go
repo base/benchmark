@@ -65,10 +65,11 @@ type RunParams struct {
 
 func (p RunParams) ToConfig() map[string]interface{} {
 	params := map[string]interface{}{
-		"NodeType":           p.NodeType,
-		"GasLimit":           p.GasLimit,
-		"TransactionPayload": p.PayloadID,
-		"BenchmarkRun":       p.BenchmarkRunID,
+		"NodeType":              p.NodeType,
+		"GasLimit":              p.GasLimit,
+		"TransactionPayload":    p.PayloadID,
+		"BenchmarkRun":          p.BenchmarkRunID,
+		"BlockTimeMilliseconds": p.BlockTime.Milliseconds(),
 	}
 
 	for k, v := range p.Tags {
