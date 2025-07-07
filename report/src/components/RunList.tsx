@@ -178,7 +178,7 @@ const RunList = ({
         const gasLimit = Number(section.runs?.[0]?.testConfig?.GasLimit);
         const blockTimeMilliseconds = Number(
           section.runs?.[0]?.testConfig?.BlockTimeMilliseconds,
-        );
+        ) || 2000;
         const gasPerSecond = gasLimit / (blockTimeMilliseconds / 1000);
 
         return (
