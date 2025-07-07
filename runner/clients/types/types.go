@@ -12,6 +12,7 @@ import (
 type RuntimeConfig struct {
 	Stdout io.WriteCloser
 	Stderr io.WriteCloser
+	Args   []string
 }
 
 // ExecutionClient is an abstraction over the different clients that can be used to run the chain like

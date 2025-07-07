@@ -32,6 +32,10 @@ payloads:
       ecrecover: 0.0733
       bls12381G1Add: 0.0244
       bls12381G1MultiExp: 0.0218
+  - name: account create (full block)
+    id: account-create-full-block
+    type: transfer-only
+    create_accounts: true
   - name: storage create (full block)
     id: storage-create-full-block
     type: simulator
@@ -132,34 +136,34 @@ benchmarks:
     variables:
       - type: payload
         values:
-          - base-mainnet-simulation
-          - storage-create-full-block
-          - storage-update-full-block
-          - ecrecover-full-block
-          - sha256hash-full-block
-          - ripemd160hash-full-block
-          - bigModExp-full-block
-          - bn256Add-full-block
-          - bn256ScalarMul-full-block
+          # - base-mainnet-simulation
+          - account-create-full-block
+          # - storage-update-full-block
+          # - ecrecover-full-block
+          # - sha256hash-full-block
+          # - ripemd160hash-full-block
+          # - bigModExp-full-block
+          # - bn256Add-full-block
+          # - bn256ScalarMul-full-block
           - bn256Pairing-full-block
-          - blake2F-full-block
-          - bls12381G1Add-full-block
+          # - blake2F-full-block
+          # - bls12381G1Add-full-block
           - bls12381G1MultiExp-full-block
-          - bls12381G2Add-full-block
+          # - bls12381G2Add-full-block
           - bls12381G2MultiExp-full-block
-          - bls12381Pairing-full-block
-          - bls12381MapG1-full-block
-          - bls12381MapG2-full-block
+          # - bls12381Pairing-full-block
+          # - bls12381MapG1-full-block
+          # - bls12381MapG2-full-block
           - p256Verify-full-block
       - type: node_type
         values:
-          # - reth
-          - geth
+          - reth
+          - rbuilder
       - type: num_blocks
         value: 20
       - type: gas_limit
         values:
           - 25000000
           - 50000000
-          - 75000000
+          # - 75000000
           - 100000000

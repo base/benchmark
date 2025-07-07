@@ -48,7 +48,9 @@ func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions,
 
 // Run runs the reth client with the given runtime config.
 func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
-	err := r.elClient.Run(ctx, cfg)
+	cfg2 := *cfg
+	cfg2.Args = append(cfg2.Args, "--flashblocks.enabled")
+	err := r.elClient.Run(ctx, &cfg2)
 	if err != nil {
 		return err
 	}
