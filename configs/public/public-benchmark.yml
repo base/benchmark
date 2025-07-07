@@ -2,6 +2,8 @@ name: Public Benchmark Suite
 description: |
   This benchmark shows a cross section of different workloads across different clients.
 
+  These workloads do not run on snapshots because they run on GitHub Actions, so this is a lower bound on performance.
+
 payloads:
   - name: Simulator
     id: base-mainnet-simulation
