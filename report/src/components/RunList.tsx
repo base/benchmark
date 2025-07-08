@@ -176,9 +176,8 @@ const RunList = ({
         const statusCounts = groupBy(section.runs, "status");
         const sortedRuns = isExpanded ? sortRuns(section.runs) : section.runs;
         const gasLimit = Number(section.runs?.[0]?.testConfig?.GasLimit);
-        const blockTimeMilliseconds = Number(
-          section.runs?.[0]?.testConfig?.BlockTimeMilliseconds,
-        ) || 2000;
+        const blockTimeMilliseconds =
+          Number(section.runs?.[0]?.testConfig?.BlockTimeMilliseconds) || 2000;
         const gasPerSecond = gasLimit / (blockTimeMilliseconds / 1000);
 
         return (
