@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -11,6 +12,7 @@ import (
 type RuntimeConfig struct {
 	Stdout io.WriteCloser
 	Stderr io.WriteCloser
+	Args   []string
 }
 
 // ExecutionClient is an abstraction over the different clients that can be used to run the chain like
@@ -22,4 +24,5 @@ type ExecutionClient interface {
 	ClientURL() string // needed for external transaction payload workers
 	AuthClient() client.RPC
 	MetricsPort() int
+	MetricsCollector() metrics.Collector
 }

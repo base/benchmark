@@ -11,6 +11,7 @@ import (
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
+	networktypes "github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum-optimism/optimism/op-service/eth"
@@ -234,7 +235,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	duration := time.Since(startTime)
 	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(sendTxs))
-	blockMetrics.AddExecutionMetric(metrics.SendTxsLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(networktypes.SendTxsLatencyMetric, duration)
 	startBlockBuildingTime := time.Now()
 
 	f.log.Info("Starting block building")
@@ -254,7 +255,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 		return nil, errors.New("failed to build block")
 	}
 	duration = time.Since(startTime)
-	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(networktypes.UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID
 	// wait block time
@@ -272,18 +273,18 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	blockBuildingDuration := time.Since(startBlockBuildingTime)
 
 	duration = time.Since(startTime)
-	blockMetrics.AddExecutionMetric(metrics.GetPayloadLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(networktypes.GetPayloadLatencyMetric, duration)
 	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "number", payload.Number, "hash", payload.BlockHash.Hex())
 
 	// get gas usage
 	gasPerBlock := payload.GasUsed
 	gasPerSecond := float64(gasPerBlock) / blockBuildingDuration.Seconds()
-	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasPerBlock))
-	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
+	blockMetrics.AddExecutionMetric(networktypes.GasPerBlockMetric, float64(gasPerBlock))
+	blockMetrics.AddExecutionMetric(networktypes.GasPerSecondMetric, gasPerSecond)
 
 	// get transactions per block
 	transactionsPerBlock := len(payload.Transactions)
-	blockMetrics.AddExecutionMetric(metrics.TransactionsPerBlockMetric, transactionsPerBlock)
+	blockMetrics.AddExecutionMetric(networktypes.TransactionsPerBlockMetric, transactionsPerBlock)
 
 	err = f.newPayload(ctx, payload, *beaconRoot)
 	if err != nil {
