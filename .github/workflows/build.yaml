@@ -103,7 +103,7 @@ jobs:
           git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b
 
           pushd reth
-          cargo build --features asm-keccak --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
+          cargo build --features asm-keccak,jemalloc --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
           cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
           popd
           chmod +x ${{ runner.temp }}/bin/reth
