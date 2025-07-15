@@ -119,9 +119,14 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 		},
 	}
 
+	config := &benchmark.BenchmarkConfig{
+		Name:        "test",
+		Description: stringPtr("test"),
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := benchmark.ResolveTestRunsFromMatrix(tt.config, "")
+			got, err := benchmark.ResolveTestRunsFromMatrix(tt.config, "", config)
 
 			if tt.wantErr {
 				require.Error(t, err)
@@ -134,11 +139,19 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 				tt.want[i].OutputDir = ""
 				tt.want[i].Params.BenchmarkRunID = ""
 				tt.want[i].ID = ""
+				tt.want[i].Name = "test"
+				tt.want[i].Description = "test"
+				tt.want[i].Params.Name = "test"
+				tt.want[i].Params.Description = "test"
 			}
 			for i := range got {
 				got[i].OutputDir = ""
 				got[i].Params.BenchmarkRunID = ""
 				got[i].ID = ""
+				got[i].Name = "test"
+				got[i].Description = "test"
+				got[i].Params.Name = "test"
+				got[i].Params.Description = "test"
 			}
 			require.ElementsMatch(t, tt.want, got)
 		})

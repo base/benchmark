@@ -18,8 +18,8 @@ type TestPlan struct {
 	Thresholds   *ThresholdConfig
 }
 
-func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, error) {
-	testRuns, err := ResolveTestRunsFromMatrix(c, testFileName)
+func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *BenchmarkConfig) (*TestPlan, error) {
+	testRuns, err := ResolveTestRunsFromMatrix(c, testFileName, config)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string) (*TestPlan, er
 }
 
 // ResolveTestRunsFromMatrix constructs a new ParamsMatrix from a config.
-func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun, error) {
+func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *BenchmarkConfig) ([]TestRun, error) {
 	seenParams := make(map[string]bool)
 
 	// Multiple payloads can run in a single benchmark.
@@ -105,7 +105,10 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string) ([]TestRun
 			return nil, err
 		}
 
-		params.BenchmarkRunID = id
+		params.Name = config.Name
+		if config.Description != nil {
+			params.Description = *config.Description
+		}
 
 		if c.Tags != nil {
 			params.Tags = *c.Tags

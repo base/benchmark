@@ -469,7 +469,7 @@ func (s *service) Run(ctx context.Context) error {
 	var testPlans []benchmark.TestPlan
 
 	for _, c := range config.Benchmarks {
-		testPlan, err := benchmark.NewTestPlanFromConfig(c, s.config.ConfigPath())
+		testPlan, err := benchmark.NewTestPlanFromConfig(c, s.config.ConfigPath(), config)
 		if err != nil {
 			return errors.Wrap(err, "failed to create params matrix")
 		}
