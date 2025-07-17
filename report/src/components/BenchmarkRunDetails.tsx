@@ -5,6 +5,10 @@ interface ProvidedProps {
 }
 
 const BenchmarkRunDetails = ({ benchmarkRuns }: ProvidedProps) => {
+  if (benchmarkRuns.length === 0) {
+    return null;
+  }
+
   return (
     <div className="flex flex-col gap-4 mb-8">
       <h1 className="text-2xl font-bold">{benchmarkRuns[0].testName}</h1>

@@ -7,7 +7,6 @@ import { groupBy } from "lodash";
 import RunListFilter from "../components/RunListFilter";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import BenchmarkRunDetails from "../components/BenchmarkRunDetails";
 
 const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
   const { benchmarkRunId } = useParams();
@@ -124,7 +123,6 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
       <Navbar />
       <div className="flex flex-col w-full flex-grow">
         <div className="overflow-x-auto p-8 pb-0 flex flex-col">
-          <BenchmarkRunDetails benchmarkRuns={benchmarkRuns.runs} />
           <RunListFilter
             benchmarkRunId={benchmarkRunId}
             filterOptions={filterOptions}

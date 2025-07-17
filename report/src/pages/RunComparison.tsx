@@ -5,7 +5,6 @@ import { useTestMetadata, useMultipleDataSeries } from "../utils/useDataSeries";
 import { DataSeries } from "../types";
 import { useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import BenchmarkRunDetails from "../components/BenchmarkRunDetails";
 
 function RunComparison() {
   let { benchmarkRunId } = useParams();
@@ -74,7 +73,6 @@ function RunComparison() {
       <Navbar urlPrefix="/run-comparison" />
       <div className="flex flex-col w-full flex-grow">
         <div className="p-8">
-          <BenchmarkRunDetails benchmarkRuns={benchmarkRuns.runs} />
           <ChartSelector
             onChangeDataQuery={setSelection}
             benchmarkRuns={benchmarkRuns}
