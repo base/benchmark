@@ -1,28 +1,16 @@
 package benchmark
 
-import "time"
+import (
+	"time"
 
-type SequencerKeyMetrics struct {
-	CommonKeyMetrics
-	AverageFCULatency        float64 `json:"forkChoiceUpdated"`
-	AverageGetPayloadLatency float64 `json:"getPayload"`
-	AverageSendTxsLatency    float64 `json:"sendTxs"`
-}
-
-type ValidatorKeyMetrics struct {
-	CommonKeyMetrics
-	AverageNewPayloadLatency float64 `json:"newPayload"`
-}
-
-type CommonKeyMetrics struct {
-	AverageGasPerSecond float64 `json:"gasPerSecond"`
-}
+	"github.com/base/base-bench/runner/network/types"
+)
 
 type RunResult struct {
-	Success          bool                `json:"success"`
-	Complete         bool                `json:"complete"`
-	SequencerMetrics SequencerKeyMetrics `json:"sequencerMetrics"`
-	ValidatorMetrics ValidatorKeyMetrics `json:"validatorMetrics"`
+	Success          bool                      `json:"success"`
+	Complete         bool                      `json:"complete"`
+	SequencerMetrics types.SequencerKeyMetrics `json:"sequencerMetrics"`
+	ValidatorMetrics types.ValidatorKeyMetrics `json:"validatorMetrics"`
 }
 
 // Run is the output JSON metadata for a benchmark run.
