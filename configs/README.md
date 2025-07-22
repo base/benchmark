@@ -26,7 +26,7 @@ This directory contains benchmark configurations for testing various aspects of 
 | ------------------------------------------------------------------ | ----------------------------- | ---------- | ---------- |
 | [📄 basic.yml](./public/basic.yml)                                 | Baseline transfer performance | 15M-90M    | Geth, Reth |
 | [📄 mainnet-cross-section.yml](./public/mainnet-cross-section.yml) | Base mainnet simulation       | 25M-100M   | Geth       |
-| [📄 public-benchmark.yml](./public/public-benchmark.yml)           | Standard benchmark suite      | 15M-1005M  | Geth, Reth |
+| [📄 public-benchmark.yml](./public/public-benchmark.yml)           | Standard benchmark suite      | 15M-100M   | Geth, Reth |
 | [📄 proof-program.yml](./public/proof-program.yml)                 | Fault proof program testing   | 15M        | Geth       |
 
 ## 🚀 Usage Examples
