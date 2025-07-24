@@ -30,3 +30,18 @@ clean:
 .PHONY: test
 test:
 	go test -v ./...
+
+.PHONY: build-reth
+build-reth:
+	cd clients && ./build-reth.sh
+
+.PHONY: build-geth
+build-geth:
+	cd clients && ./build-geth.sh
+
+.PHONY: build-rbuilder
+build-rbuilder:
+	cd clients && ./build-rbuilder.sh
+
+.PHONY: build-binaries
+build-binaries: build-reth build-geth build-rbuilder
