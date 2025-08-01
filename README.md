@@ -33,7 +33,7 @@ make build
 
 # Run the basic benchmark
 ./bin/base-bench run \
-  --config ./configs/examples/basic.yml \
+  --config ./configs/public/basic.yml \
   --root-dir ./data-dir \
   --reth-bin path_to_reth_bin \
   --geth-bin path_to_geth_bin \
