@@ -2,6 +2,7 @@ package mempool
 
 import (
 	"encoding/hex"
+	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/log"
@@ -14,10 +15,15 @@ import (
 // This can be implemented as either a static workload of known gas usage, or a dynamic workload
 // that is loaded from a file after being simulated first.
 type FakeMempool interface {
+	// AddTransactions adds transactions to the mempool (thread-safe).
+	AddTransactions(transactions []*types.Transaction)
+
 	// NextBlock returns the next block of transactions to be included in the chain.
-	NextBlock() [][]byte
+	NextBlock() (sendTxs [][]byte, sequencerTxs [][]byte)
 }
 
+// StaticWorkloadMempool is a fake mempool that simulates a workload of transactions with no gas
+// or dependency tracking.
 type StaticWorkloadMempool struct {
 	// needs to be thread safe to share between workers (could be converted to channel)
 	lock sync.Mutex
@@ -25,14 +31,20 @@ type StaticWorkloadMempool struct {
 
 	addressNonce map[common.Address]uint64
 
-	currentBlock [][]byte
+	// normal block txs submitted through mempool
+	currentBlockTxs [][]byte
+
+	// sequencer txs included in payload attributes
+	currentBlockSequencerTxs [][]byte
+
+	chainID *big.Int
 }
 
-func NewStaticWorkloadMempool(log log.Logger) *StaticWorkloadMempool {
-
+func NewStaticWorkloadMempool(log log.Logger, chainID *big.Int) *StaticWorkloadMempool {
 	return &StaticWorkloadMempool{
 		log:          log,
 		addressNonce: make(map[common.Address]uint64),
+		chainID:      chainID,
 	}
 }
 
@@ -41,7 +53,7 @@ func (m *StaticWorkloadMempool) AddTransactions(transactions []*types.Transactio
 	defer m.lock.Unlock()
 
 	for _, transaction := range transactions {
-		from, err := types.Sender(types.NewIsthmusSigner(transaction.ChainId()), transaction)
+		from, err := types.Sender(types.NewIsthmusSigner(m.chainID), transaction)
 
 		if err != nil {
 			panic(err)
@@ -54,7 +66,11 @@ func (m *StaticWorkloadMempool) AddTransactions(transactions []*types.Transactio
 			panic(err)
 		}
 
-		m.currentBlock = append(m.currentBlock, bytes)
+		if transaction.Type() != types.DepositTxType {
+			m.currentBlockTxs = append(m.currentBlockTxs, bytes)
+		} else {
+			m.currentBlockSequencerTxs = append(m.currentBlockSequencerTxs, bytes)
+		}
 	}
 }
 
@@ -65,17 +81,16 @@ func (m *StaticWorkloadMempool) GetTransactionCount(address common.Address) uint
 	return m.addressNonce[address]
 }
 
-func (m *StaticWorkloadMempool) NextBlock() [][]byte {
+func (m *StaticWorkloadMempool) NextBlock() ([][]byte, [][]byte) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
-	if len(m.currentBlock) == 0 {
-		return [][]byte{}
-	}
+	block := m.currentBlockTxs
+	blockSequencerTxs := m.currentBlockSequencerTxs
+	m.currentBlockTxs = nil
+	m.currentBlockSequencerTxs = nil
 
-	block := m.currentBlock
-	m.currentBlock = nil
-	return block
+	return block, blockSequencerTxs
 }
 
 var _ FakeMempool = &StaticWorkloadMempool{}

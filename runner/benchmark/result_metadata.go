@@ -18,29 +18,33 @@ type CommonKeyMetrics struct {
 	AverageGasPerSecond float64 `json:"gasPerSecond"`
 }
 
-type BenchmarkRunResult struct {
+type RunResult struct {
 	Success          bool                `json:"success"`
+	Complete         bool                `json:"complete"`
 	SequencerMetrics SequencerKeyMetrics `json:"sequencerMetrics"`
 	ValidatorMetrics ValidatorKeyMetrics `json:"validatorMetrics"`
 }
 
-// BenchmarkRun is the output JSON metadata for a benchmark run.
-type BenchmarkRun struct {
+// Run is the output JSON metadata for a benchmark run.
+type Run struct {
+	ID              string                 `json:"id"`
 	SourceFile      string                 `json:"sourceFile"`
 	OutputDir       string                 `json:"outputDir"`
 	TestName        string                 `json:"testName"`
 	TestDescription string                 `json:"testDescription"`
 	TestConfig      map[string]interface{} `json:"testConfig"`
-	Result          *BenchmarkRunResult    `json:"result"`
+	Result          *RunResult             `json:"result"`
+	Thresholds      *ThresholdConfig       `json:"thresholds"`
+	CreatedAt       *time.Time             `json:"createdAt"`
 }
 
-// BenchmarkRuns is the output JSON metadata file schema.
-type BenchmarkRuns struct {
-	Runs      []BenchmarkRun `json:"runs"`
-	CreatedAt time.Time      `json:"createdAt"`
+// RunGroup is a group of runs that is meant to be compared.
+type RunGroup struct {
+	Runs      []Run      `json:"runs"`
+	CreatedAt *time.Time `json:"createdAt"` // deprecated - use Run.CreatedAt instead (only for backwards compatibility)
 }
 
-func (runs *BenchmarkRuns) AddResult(testIdx int, runResult BenchmarkRunResult) {
+func (runs *RunGroup) AddResult(testIdx int, runResult RunResult) {
 	if testIdx < 0 || testIdx >= len(runs.Runs) {
 		return
 	}
@@ -48,20 +52,29 @@ func (runs *BenchmarkRuns) AddResult(testIdx int, runResult BenchmarkRunResult) 
 	runs.Runs[testIdx].Result = &runResult
 }
 
-func BenchmarkMetadataFromTestPlan(testPlan TestPlan) BenchmarkRuns {
-	metadata := BenchmarkRuns{
-		Runs:      make([]BenchmarkRun, 0, len(testPlan)),
-		CreatedAt: time.Now(),
+const (
+	BenchmarkRunTag = "BenchmarkRun"
+)
+
+func RunGroupFromTestPlans(testPlans []TestPlan) RunGroup {
+	now := time.Now()
+	metadata := RunGroup{
+		Runs: make([]Run, 0),
 	}
 
-	for _, params := range testPlan {
-		metadata.Runs = append(metadata.Runs, BenchmarkRun{
-			SourceFile:      params.TestFile,
-			TestName:        params.Name,
-			TestDescription: params.Description,
-			TestConfig:      params.Params.ToConfig(),
-			OutputDir:       params.OutputDir,
-		})
+	for _, testPlan := range testPlans {
+		for _, params := range testPlan.Runs {
+			metadata.Runs = append(metadata.Runs, Run{
+				ID:              params.ID,
+				SourceFile:      params.TestFile,
+				TestName:        params.Name,
+				TestDescription: params.Description,
+				TestConfig:      params.Params.ToConfig(),
+				OutputDir:       params.OutputDir,
+				Thresholds:      testPlan.Thresholds,
+				CreatedAt:       &now,
+			})
+		}
 	}
 
 	return metadata

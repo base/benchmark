@@ -1,8 +1,8 @@
 <div align="center">
   <h1 style="font-size:32pt">Base Benchmark</h1>
-  <img src="https://img.shields.io/badge/status-beta-yellow" alt="Status: Beta">
-  <img src="https://img.shields.io/badge/language-Go-00ADD8" alt="Language: Go">
-  <img src="https://img.shields.io/github/license/base/benchmark" alt="License">
+  <a href="https://shields.io/"><img src="https://shields.io/badge/status-beta-yellow" alt="Status: Beta"></a>
+  <a href="https://go.dev/"><img src="https://shields.io/badge/language-Go-00ADD8" alt="Language: Go"></a>
+  <a href="https://github.com/base/benchmark/blob/main/LICENSE"><img src="https://shields.io/github/license/base/benchmark" alt="License"></a>
 </div>
 
 Base Benchmark is a performance testing framework for Ethereum execution clients. Compare client performance, identify bottlenecks, and ensure reliability before deployment.
@@ -19,13 +19,21 @@ Base Benchmark provides comprehensive testing capabilities:
 
 ## 📋 Quick Start
 
+[Install Forge](https://book.getfoundry.sh/getting-started/installation)
+
+Recursively clone github submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
 ```bash
 # Build the application
 make build
 
 # Run the basic benchmark
 ./bin/base-bench run \
-  --config ./configs/basic.yml \
+  --config ./configs/examples/basic.yml \
   --root-dir ./data-dir \
   --reth-bin path_to_reth_bin \
   --geth-bin path_to_geth_bin \
@@ -37,6 +45,17 @@ npm i
 npm run dev
 ```
 
+## 📋 Available Benchmarks
+
+Explore the comprehensive collection of benchmark configurations:
+
+**[📁 Configuration Guide](configs/README.md)** - Detailed documentation of all available benchmark configurations
+
+- **[examples/](configs/examples/)** - Development and testing configurations for specific workloads
+- **[public/](configs/public/)** - Production-ready benchmarks for standardized testing
+
+Choose from storage operations, precompile tests, token workloads, mainnet simulations, and more.
+
 ## 🏗️ Architecture
 
 ### Benchmark Structure
@@ -44,21 +63,26 @@ npm run dev
 Each benchmark consists of configurable tests with various input parameters:
 
 ```yaml
-- name: Test Performance
-  description: Execution Speed
-  variables:
-    - type: transaction_workload
-      values:
-        - transfer-only
-    - type: node_type
-      values:
-        - reth
-        - geth
-    - type: num_blocks
-      value: 20
+payloads:
+  - name: Transfer only
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  - name: Test Performance
+    description: Execution Speed
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - reth
+          - geth
+      - type: num_blocks
+        value: 20
 ```
 
-This configuration runs a `transfer-only` transaction workload against both Geth and Reth clients for 20 blocks.
+This configuration runs a `transfer-only` transaction payload against both Geth and Reth clients for 20 blocks.
 
 ### Test Methodology
 

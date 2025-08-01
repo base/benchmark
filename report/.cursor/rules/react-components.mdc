@@ -1,0 +1,83 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# React Component Development Guidelines
+
+## Component Structure
+
+### Functional Programming Approach
+- Prefer functional components with hooks over class components
+- Extract complex logic into helper functions outside the component
+- Keep components focused on a single responsibility
+- Use pure functions for data transformations
+
+### Helper Functions
+- Extract repetitive logic into reusable helper functions
+- Place helper functions above the main component
+- Use descriptive names that explain the function's purpose
+- Add JSDoc comments for complex helper functions
+
+### Render Functions
+- Extract complex JSX into separate render functions
+- Name render functions with the `render` prefix
+- Keep render functions focused on a single UI element
+- Pass only necessary props to render functions
+
+### State Management
+- Use `useState` for local component state
+- Prefer `useMemo` for expensive calculations
+- Use `useCallback` for functions passed as props to child components
+- Keep state as close to where it's used as possible
+
+## Code Organization
+
+### Imports
+- Group imports by type: React, third-party libraries, local utilities, types
+- Use absolute imports for local files when possible
+- Remove unused imports
+
+### TypeScript
+- Define interfaces for component props
+- Use union types for finite sets of values
+- Prefer `const assertions` for configuration objects
+- Use proper typing for event handlers
+
+### Comments
+- Only comment code that explains business logic or complex algorithms
+- Avoid comments that describe obvious operations
+- Use comments to explain "why" not "what"
+- Remove comments about styling or implementation details
+
+## Styling Guidelines
+
+### Tailwind CSS
+- Use semantic color classes (emerald for success, red for errors, etc.)
+- Prefer utility classes over custom CSS
+- Use consistent spacing and sizing scales
+- Group related classes logically
+
+### Accessibility
+- Include proper focus states for interactive elements
+- Use semantic HTML elements
+- Provide alternative text for images
+- Ensure sufficient color contrast
+
+### Responsive Design
+- Use responsive utility classes
+- Test components at different screen sizes
+- Consider mobile-first design approach
+
+## Performance
+
+### Optimization
+- Use `React.memo` for expensive components
+- Implement proper key props for list items
+- Avoid inline object/function creation in render
+- Use `useMemo` for expensive calculations
+
+### Code Splitting
+- Consider lazy loading for large components
+- Split components into smaller, focused pieces
+- Use dynamic imports for route-based code splitting

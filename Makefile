@@ -19,9 +19,14 @@ LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
 LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
+# first so that make defaults to building the benchmark
 .PHONY: build
 build:
 	env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) CGO_ENABLED=0 go build -v $(LDFLAGS) -o ./bin/base-bench ./benchmark/cmd
+
+.PHONY: contracts
+contracts:
+	make -C contracts
 
 .PHONY: clean
 clean:

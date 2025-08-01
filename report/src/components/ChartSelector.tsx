@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { BenchmarkRun } from "../types";
-import { BenchmarkRuns, getBenchmarkVariables } from "../types";
+import { BenchmarkRuns } from "../types";
 import { isEqual } from "lodash";
 import {
   camelToTitleCase,
@@ -8,173 +7,169 @@ import {
   formatLabel,
 } from "../utils/formatters";
 import { interpolateWarm } from "d3";
-import { useSearchParamsState } from "../utils/useSearchParamsState";
+import { useBenchmarkFilters } from "../hooks/useBenchmarkFilters";
+import { useNavigate, useParams } from "react-router-dom";
+import Select from "./Select";
 
-export interface DataFileRequest {
+export interface SelectedData {
   outputDir: string;
   role: string;
   name: string;
   color?: string;
+  thresholds?: {
+    warning?: Record<string, number>;
+    error?: Record<string, number>;
+  };
 }
 
 interface ChartSelectorProps {
   benchmarkRuns: BenchmarkRuns;
-  onChangeDataQuery: (data: DataFileRequest[]) => void;
-}
-
-interface BenchmarkRunWithRole extends BenchmarkRun {
-  testConfig: BenchmarkRun["testConfig"] & {
-    role: string;
-  };
+  onChangeDataQuery: (data: SelectedData[]) => void;
 }
 
 const ChartSelector = ({
   benchmarkRuns,
   onChangeDataQuery,
 }: ChartSelectorProps) => {
-  const variables = useMemo((): Record<
-    string,
-    (string | number | boolean)[]
-  > => {
-    return {
-      ...getBenchmarkVariables(benchmarkRuns.runs),
-      role: ["sequencer", "validator"],
-    };
-  }, [benchmarkRuns]);
+  const { benchmarkRunId } = useParams();
 
-  const [filterSelections, setFilterSelections] = useSearchParamsState<{
-    params: { [key: string]: string };
-    byMetric: string;
-  }>("filters", { params: {}, byMetric: "role" });
+  const navigate = useNavigate();
 
-  const validFilterSelections = useMemo(() => {
-    return Object.fromEntries(
-      Object.keys(variables)
-        .filter((key) => {
-          return key !== filterSelections.byMetric;
-        })
-        .map(
-          (key) =>
-            [key, filterSelections.params[key] ?? variables[key][0]] as const,
-        ),
-    );
-  }, [filterSelections.params, filterSelections.byMetric]);
+  const runsWithRoles = useMemo(
+    () =>
+      benchmarkRuns.runs.flatMap((r) => [
+        { ...r, testConfig: { ...r.testConfig, role: "sequencer" } },
+        { ...r, testConfig: { ...r.testConfig, role: "validator" } },
+      ]),
+    [benchmarkRuns.runs],
+  );
 
-  const matchedRuns = useMemo(() => {
-    return benchmarkRuns.runs
-      .flatMap((r): BenchmarkRunWithRole[] => [
-        {
-          ...r,
-          testConfig: {
-            ...r.testConfig,
-            role: "sequencer",
-          },
-        },
-        {
-          ...r,
-          testConfig: {
-            ...r.testConfig,
-            role: "validator",
-          },
-        },
-      ])
-      .filter((run) => {
-        return Object.entries(validFilterSelections).every(([key, value]) => {
-          return (
-            `${(run.testConfig as Record<string, string | number | boolean>)[key]}` ===
-            `${value}`
-          );
-        });
-      });
-  }, [validFilterSelections, benchmarkRuns.runs]);
+  const {
+    variables,
+    filterOptions,
+    matchedRuns,
+    filterSelections,
+    setFilters,
+    setByMetric,
+  } = useBenchmarkFilters(runsWithRoles, "role");
 
-  const lastSentDataRef = useRef<DataFileRequest[]>([]);
+  const lastSentDataRef = useRef<SelectedData[]>([]);
 
   useEffect(() => {
     let colorMap: ((val: number) => string) | undefined = undefined;
 
-    if (filterSelections.byMetric === "GasLimit") {
-      const min = matchedRuns.reduce((a, b) => {
-        return Math.min(a, Number(b.testConfig.GasLimit));
-      }, 0);
-      const max = matchedRuns.reduce((a, b) => {
-        return Math.max(a, Number(b.testConfig.GasLimit));
-      }, 0);
+    if (filterSelections.byMetric === "GasLimit" && matchedRuns.length > 0) {
+      const gasLimits = matchedRuns.map((r) => Number(r.testConfig.GasLimit));
+      const min = Math.min(...gasLimits);
+      const max = Math.max(...gasLimits);
 
       colorMap = (val: number) =>
-        interpolateWarm(1 - (max > 0 ? (val - min) / max : 0));
+        interpolateWarm(max - min > 0 ? 1 - (val - min) / (max - min) : 0.5);
     }
 
-    const dataToSend: DataFileRequest[] = matchedRuns.map((run) => {
-      let seriesName = `${run.testConfig[filterSelections.byMetric ?? "role"]}`;
-      let color = undefined;
+    const dataToSend: SelectedData[] = matchedRuns
+      .map((run): SelectedData | null => {
+        if (!run.testConfig || !run.outputDir) {
+          console.warn("Skipping run with missing data:", run);
+          return null;
+        }
 
-      if (filterSelections.byMetric === "GasLimit") {
-        seriesName = formatValue(Number(run.testConfig.GasLimit), "gas");
-        color = colorMap?.(Number(run.testConfig.GasLimit));
-      }
+        let seriesName: string;
+        let color: string | undefined = undefined;
+        const byMetricValue = run.testConfig[filterSelections.byMetric];
 
-      return {
-        outputDir: run.outputDir,
-        role: run.testConfig.role,
-        name: seriesName,
-        color,
-      };
-    });
+        if (filterSelections.byMetric === "GasLimit") {
+          const gasLimitNum = Number(byMetricValue);
+          seriesName = formatValue(gasLimitNum, "gas");
+          color = colorMap?.(gasLimitNum);
+        } else {
+          seriesName =
+            byMetricValue !== undefined
+              ? formatLabel(String(byMetricValue))
+              : "Unknown";
+        }
+
+        const role = run.testConfig.role ?? "unknown";
+
+        const request: SelectedData = {
+          outputDir: run.outputDir,
+          role: String(role),
+          name: seriesName,
+          thresholds: run.thresholds,
+        };
+        if (color !== undefined) {
+          request.color = color;
+        }
+        return request;
+      })
+      .filter((item): item is SelectedData => item !== null);
 
     if (!isEqual(dataToSend, lastSentDataRef.current)) {
       lastSentDataRef.current = dataToSend;
       onChangeDataQuery(dataToSend);
     }
-  }, [filterSelections, matchedRuns, onChangeDataQuery]);
+  }, [matchedRuns, filterSelections.byMetric, onChangeDataQuery]);
 
   return (
-    <div className="flex flex-wrap gap-4 pb-4">
-      <div>
-        <div>Show Line Per</div>
-        <select
-          className="filter-select"
-          value={filterSelections.byMetric ?? undefined}
-          onChange={(e) =>
-            setFilterSelections((fs) => ({
-              ...fs,
-              byMetric: e.target.value,
-            }))
-          }
-        >
-          {Object.entries(variables).map(([k]) => (
-            <option value={`${k}`} key={k}>
-              {camelToTitleCase(k)}
-            </option>
-          ))}
-        </select>
+    <div className="flex items-start">
+      <div className="flex flex-wrap gap-4 pb-4 items-center flex-grow">
+        <div>
+          <div className="text-sm text-slate-500 mb-1">Show Line Per</div>
+          <Select
+            value={filterSelections.byMetric}
+            onChange={(e) => setByMetric(e.target.value)}
+          >
+            {Object.keys(variables).map((k) => (
+              <option value={k} key={k}>
+                {camelToTitleCase(k)}
+              </option>
+            ))}
+          </Select>
+        </div>
+        {Object.entries(filterOptions)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .filter(([k]) => k !== filterSelections.byMetric)
+          .map(([key, availableValues]) => {
+            const currentValue =
+              filterSelections.params[key] ?? availableValues[0];
+            return (
+              <div key={key}>
+                <div className="text-sm text-slate-500 mb-1">
+                  {camelToTitleCase(key)}
+                </div>
+                <Select
+                  value={String(currentValue)}
+                  onChange={(e) => {
+                    setFilters(key, e.target.value);
+                  }}
+                >
+                  {availableValues.map((val) => (
+                    <option value={String(val)} key={String(val)}>
+                      {formatLabel(String(val))}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            );
+          })}
+        {matchedRuns.length === 0 && (
+          <div className="w-full text-center text-gray-500 italic py-2">
+            No benchmark runs match the current filter combination.
+          </div>
+        )}
       </div>
-      {Object.entries(variables)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .filter(([k]) => k !== filterSelections.byMetric)
-        .map(([key, value]) => {
-          return (
-            <div key={key}>
-              <div>{camelToTitleCase(key)}</div>
-              <select
-                className="filter-select"
-                value={filterSelections.params[key] ?? value[0]}
-                onChange={(e) => {
-                  setFilterSelections((fs) => ({
-                    ...fs,
-                    params: { ...fs.params, [key]: e.target.value },
-                  }));
-                }}
-              >
-                {value.map((val) => (
-                  <option value={`${val}`} key={`${val}`}>
-                    {formatLabel(val.toString())}
-                  </option>
-                ))}
-              </select>
-            </div>
-          );
-        })}
+      <button
+        type="button"
+        onClick={() => {
+          navigate(`/${benchmarkRunId}`);
+        }}
+        className="px-4 py-2 bg-slate-100 text-slate-900 rounded hover:bg-slate-200 transition-colors flex items-center gap-2 flex-shrink-0 ml-4"
+      >
+        <span role="img" aria-label="Blocks">
+          🔍
+        </span>{" "}
+        View All Runs
+      </button>
     </div>
   );
 };

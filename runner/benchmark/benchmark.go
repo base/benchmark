@@ -1,42 +1,22 @@
 package benchmark
 
 import (
+	"encoding/json"
 	"fmt"
-	"math/big"
+	"math"
+	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
-	"github.com/base/base-bench/runner/config"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/misc/eip1559"
+	"github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/core"
-	gethTypes "github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 )
-
-type TransactionPayload string
-
-// Params is the parameters for a single benchmark run.
-type Params struct {
-	NodeType           string
-	GasLimit           uint64
-	TransactionPayload TransactionPayload
-	BlockTime          time.Duration
-	Env                map[string]string
-	NumBlocks          int
-}
-
-func (p Params) ToConfig() map[string]interface{} {
-	return map[string]interface{}{
-		"NodeType":           p.NodeType,
-		"GasLimit":           p.GasLimit,
-		"TransactionPayload": p.TransactionPayload,
-	}
-}
 
 // TestRun is a single run of a benchmark. Each config should result in multiple test runs.
 type TestRun struct {
-	Params      Params
+	ID          string
+	Params      types.RunParams
 	TestFile    string
 	Name        string
 	Description string
@@ -45,42 +25,42 @@ type TestRun struct {
 
 const (
 	// MaxTotalParams is the maximum number of benchmarks that can be run in parallel.
-	MaxTotalParams = 24
+	MaxTotalParams = 100
 )
 
-var DefaultParams = &Params{
+var DefaultParams = &types.RunParams{
 	NodeType:  "geth",
 	GasLimit:  50e9,
 	BlockTime: 1 * time.Second,
 }
 
 // NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
-func NewParamsFromValues(assignments map[ParamType]interface{}) (*Params, error) {
+func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, error) {
 	params := *DefaultParams
 
 	for k, v := range assignments {
 		switch k {
-		case ParamTypeTxWorkload:
+		case "payload":
 			if vPtrStr, ok := v.(*string); ok {
-				params.TransactionPayload = TransactionPayload(*vPtrStr)
+				params.PayloadID = string(*vPtrStr)
 			} else if vStr, ok := v.(string); ok {
-				params.TransactionPayload = TransactionPayload(vStr)
+				params.PayloadID = string(vStr)
 			} else {
-				return nil, fmt.Errorf("invalid transaction workload %s", v)
+				return nil, fmt.Errorf("invalid payload %s", v)
 			}
-		case ParamTypeNode:
+		case "node_type":
 			if vStr, ok := v.(string); ok {
 				params.NodeType = vStr
 			} else {
 				return nil, fmt.Errorf("invalid node type %s", v)
 			}
-		case ParamTypeGasLimit:
+		case "gas_limit":
 			if vInt, ok := v.(int); ok {
 				params.GasLimit = uint64(vInt)
 			} else {
 				return nil, fmt.Errorf("invalid gas limit %s", v)
 			}
-		case ParamTypeEnv:
+		case "env":
 			if vStr, ok := v.(string); ok {
 				entries := strings.Split(vStr, ";")
 				params.Env = make(map[string]string)
@@ -94,7 +74,7 @@ func NewParamsFromValues(assignments map[ParamType]interface{}) (*Params, error)
 			} else {
 				return nil, fmt.Errorf("invalid env %s", v)
 			}
-		case ParamTypeNumBlocks:
+		case "num_blocks":
 			if vInt, ok := v.(int); ok {
 				params.NumBlocks = vInt
 			} else {
@@ -106,76 +86,32 @@ func NewParamsFromValues(assignments map[ParamType]interface{}) (*Params, error)
 	return &params, nil
 }
 
-// ClientOptions applies any client customization options to the given client options.
-func (p Params) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
-	return prevClientOptions
-}
+const MAX_GAS_LIMIT = math.MaxUint64
 
-// Genesis returns the genesis block for a given genesis time.
-func (p Params) Genesis(genesisTime time.Time) core.Genesis {
-	zero := uint64(0)
-	fifty := uint64(50)
+var cachedGenesis atomic.Pointer[core.Genesis]
 
-	allocs := make(gethTypes.GenesisAlloc)
-	// private key: 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
-	allocs[common.HexToAddress("0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266")] = gethTypes.Account{
-		Balance: new(big.Int).Mul(big.NewInt(1e6), big.NewInt(params.Ether)), // 100,000 ETH
+// DefaultGenesis returns the genesis block for a devnet.
+func DefaultDevnetGenesis() *core.Genesis {
+	if genesis := cachedGenesis.Load(); genesis != nil {
+		return genesis
+	}
+	// read from genesis.json
+	var genesis core.Genesis
+
+	f, err := os.OpenFile("./genesis.json", os.O_RDONLY, 0644)
+
+	if err != nil {
+		panic(fmt.Sprintf("failed to open genesis.json: %v", err))
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+
+	if err := json.NewDecoder(f).Decode(&genesis); err != nil {
+		panic(fmt.Sprintf("failed to decode genesis.json: %v", err))
 	}
 
-	return core.Genesis{
-		Nonce:      0,
-		Timestamp:  uint64(genesisTime.Unix()),
-		ExtraData:  eip1559.EncodeHoloceneExtraData(50, 1),
-		GasLimit:   p.GasLimit,
-		Difficulty: big.NewInt(1),
-		Alloc:      allocs,
-		Config: &params.ChainConfig{
-			ChainID: big.NewInt(13371337),
-			// Ethereum forks in proof-of-work era.
-			HomesteadBlock:      big.NewInt(0),
-			EIP150Block:         big.NewInt(0),
-			EIP155Block:         big.NewInt(0),
-			EIP158Block:         big.NewInt(0),
-			ByzantiumBlock:      big.NewInt(0),
-			ConstantinopleBlock: big.NewInt(0),
-			PetersburgBlock:     big.NewInt(0),
-			IstanbulBlock:       big.NewInt(0),
-			MuirGlacierBlock:    big.NewInt(0),
-			BerlinBlock:         big.NewInt(0),
-			LondonBlock:         big.NewInt(0),
-			ArrowGlacierBlock:   big.NewInt(0),
-			GrayGlacierBlock:    big.NewInt(0),
-			MergeNetsplitBlock:  big.NewInt(0),
-			// Ethereum forks in proof-of-stake era.
-			TerminalTotalDifficulty: big.NewInt(1),
-			ShanghaiTime:            new(uint64),
-			CancunTime:              new(uint64),
-			PragueTime:              nil,
-			VerkleTime:              nil,
-			// OP-Stack forks are disabled, since we use this for L1.
-			BedrockBlock: big.NewInt(0),
-			RegolithTime: &zero,
-			CanyonTime:   &zero,
-			EcotoneTime:  &zero,
-			FjordTime:    &zero,
-			GraniteTime:  &zero,
-			HoloceneTime: &zero,
-			// Disabled due to reth/geth mismatch
-			IsthmusTime: nil,
-			InteropTime: nil,
-			Optimism: &params.OptimismConfig{
-				EIP1559Elasticity:        1,
-				EIP1559Denominator:       50,
-				EIP1559DenominatorCanyon: &fifty,
-			},
-		},
-	}
-}
+	cachedGenesis.CompareAndSwap(nil, &genesis)
 
-type Benchmark struct {
-	Params Params
-}
-
-func NewBenchmark() *Benchmark {
-	return &Benchmark{}
+	return &genesis
 }

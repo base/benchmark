@@ -12,6 +12,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data }: ProvidedProps) => {
     <div className="charts-container">
       {Object.entries(CHART_CONFIG).map(([metricKey, config]) => {
         const chartData = data.flatMap((s) => s.data);
+        const thresholds = data[0]?.thresholds;
         const executionMetrics = chartData
           .map((d) => d.ExecutionMetrics[metricKey])
           .filter((v) => v !== undefined);
@@ -26,6 +27,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data }: ProvidedProps) => {
           title: config.title,
           description: config.description,
           unit: config.unit,
+          thresholds,
         };
 
         return (

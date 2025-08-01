@@ -1,0 +1,94 @@
+name: run-publish-benchmarks
+
+on:
+  push:
+    branches: ["*"]
+
+jobs:
+  example-benchmarks:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          submodules: true
+
+      - name: Set up Go
+        uses: actions/setup-go@be3c94b385c4f180051c996d336f57a34c397495 # v3.6.1
+        with:
+          go-version: 1.24
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
+
+      - name: Install project dependencies
+        run: |
+          go mod download
+
+      - name: Cache binaries
+        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
+        id: cache-bin
+        with:
+          path: ${{ runner.temp }}/bin
+          key: ${{ runner.os }}-binaries
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+
+      - name: Build Contracts
+        run: |
+          forge build --force
+
+      - name: Download geth and reth
+        if: steps.cache-bin.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ${{ runner.temp }}/bin
+
+          git clone https://github.com/paradigmxyz/reth
+          git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b
+
+          pushd reth
+          cargo build --features asm-keccak,jemalloc --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
+          cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
+          popd
+          chmod +x ${{ runner.temp }}/bin/reth
+
+          git clone https://github.com/ethereum-optimism/op-geth
+          git -C op-geth checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+
+          pushd op-geth
+          make geth
+          cp ./build/bin/geth ${{ runner.temp }}/bin/geth
+          chmod +x ${{ runner.temp }}/bin/geth
+          popd
+
+          echo "binaries compiled:"
+          ls -la ${{ runner.temp }}/bin
+
+      - name: Run Basic Benchmarks
+        id: unit
+        run: |
+          mkdir ${{ runner.temp }}/data-dir
+          mkdir ${{ runner.temp }}/output
+
+          ./.github/scripts/run-example-benchmarks.sh ${{ runner.temp }}
+
+      - name: Build Report
+        run: |
+          cp -r ${{ runner.temp }}/output/ ./output/
+          pushd report
+          npm install
+          npm run build
+          popd
+
+      # upload to github actions artifact
+      - name: Upload Report
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: report
+          path: report/dist/

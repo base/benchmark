@@ -5,3 +5,8 @@ data-dir/
 output/
 .vercel
 clients/build/
+
+contracts/cache/
+contracts/out/
+contracts/abi/
+benchmark/benchmark

@@ -1,0 +1,148 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Code Quality Standards
+
+## General Principles
+
+### Readability First
+- Write code that is easy to read and understand
+- Use descriptive variable and function names
+- Keep functions small and focused on a single task
+- Prefer explicit over implicit behavior
+
+### Functional Programming
+- Use pure functions when possible
+- Avoid side effects in data transformation functions
+- Prefer immutable data structures
+- Use composition over inheritance
+
+### Type Safety
+- Use TypeScript for all frontend code
+- Define proper interfaces for all data structures
+- Use union types for finite sets of values
+- Avoid `any` type - use proper typing instead
+
+## Code Organization
+
+### File Structure
+- One component per file
+- Group related functions together
+- Export only what's necessary
+- Use index files for clean imports
+
+### Function Organization
+- Helper functions at the top
+- Main component in the middle
+- Export at the bottom
+- Group related functions together
+
+## Naming Conventions
+
+### Variables and Functions
+- Use camelCase for variables and functions
+- Use descriptive names that explain purpose
+- Avoid abbreviations unless widely understood
+- Use consistent naming patterns
+
+### Constants
+- Use UPPER_SNAKE_CASE for true constants
+- Use PascalCase for component names
+- Use camelCase for configuration objects
+
+### Types and Interfaces
+- Use PascalCase for types and interfaces
+- Prefix interfaces with 'I' only when necessary
+- Use descriptive names that indicate purpose
+
+## Comments and Documentation
+
+### When to Comment
+- Explain complex business logic
+- Document non-obvious algorithms
+- Explain "why" not "what"
+- Document API contracts
+
+### When Not to Comment
+- Obvious code operations
+- Styling or implementation details
+- Comments that duplicate code
+- Outdated or incorrect information
+
+### JSDoc Comments
+- Use for public APIs
+- Document parameters and return values
+- Include examples for complex functions
+- Keep documentation up to date
+
+## Error Handling
+
+### Frontend Error Handling
+- Use try-catch blocks for async operations
+- Provide user-friendly error messages
+- Log errors for debugging
+- Implement graceful degradation
+
+### Data Validation
+- Validate data at component boundaries
+- Use TypeScript for compile-time validation
+- Provide fallback values for missing data
+- Handle edge cases explicitly
+
+## Performance
+
+### React Optimization
+- Use `React.memo` for expensive components
+- Implement proper key props for lists
+- Avoid inline object/function creation
+- Use `useMemo` and `useCallback` appropriately
+
+### Bundle Size
+- Import only what you need
+- Use tree shaking effectively
+- Consider code splitting for large components
+- Monitor bundle size regularly
+
+## Testing
+
+### Unit Tests
+- Test individual functions and components
+- Use descriptive test names
+- Test edge cases and error conditions
+- Keep tests simple and focused
+
+### Integration Tests
+- Test component interactions
+- Test data flow between components
+- Test user interactions
+- Mock external dependencies
+
+## Accessibility
+
+### Semantic HTML
+- Use appropriate HTML elements
+- Provide proper ARIA labels
+- Ensure keyboard navigation works
+- Test with screen readers
+
+### Color and Contrast
+- Ensure sufficient color contrast
+- Don't rely solely on color for information
+- Provide alternative indicators
+- Test with color-blind users
+
+## Security
+
+### Input Validation
+- Validate all user inputs
+- Sanitize data before display
+- Use proper escaping for user content
+- Implement CSRF protection
+
+### Data Handling
+- Don't store sensitive data in client-side code
+- Use secure communication protocols
+- Implement proper authentication
+- Follow OWASP guidelines

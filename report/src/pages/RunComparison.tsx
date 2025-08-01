@@ -1,19 +1,51 @@
 import { useMemo, useState } from "react";
-import ChartSelector, { DataFileRequest } from "../components/ChartSelector";
+import ChartSelector, { SelectedData } from "../components/ChartSelector";
 import ChartGrid from "../components/ChartGrid";
 import { useTestMetadata, useMultipleDataSeries } from "../utils/useDataSeries";
+import { DataSeries } from "../types";
+import { useParams } from "react-router-dom";
+import Navbar from "../components/Navbar";
 
 function RunComparison() {
-  const [dataQuery, setDataQuery] = useState<DataFileRequest[]>([]);
+  let { benchmarkRunId } = useParams();
 
-  const { data: benchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
+  if (!benchmarkRunId) {
+    throw new Error("Benchmark run ID is required");
+  }
+
+  const [selection, setSelection] = useState<SelectedData[]>([]);
+
+  const { data: allBenchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
     useTestMetadata();
 
+  const latestBenchmarkRun = useMemo(() => {
+    return allBenchmarkRuns?.runs.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )[0];
+  }, [allBenchmarkRuns]);
+
+  if (latestBenchmarkRun && benchmarkRunId === "latest") {
+    benchmarkRunId = `${latestBenchmarkRun.testConfig.BenchmarkRun}`;
+  }
+
+  const benchmarkRuns = useMemo(() => {
+    return {
+      runs:
+        allBenchmarkRuns?.runs.filter(
+          (run) =>
+            run.testConfig.BenchmarkRun === benchmarkRunId &&
+            run.result?.complete &&
+            run.result.success,
+        ) ?? [],
+    };
+  }, [allBenchmarkRuns, benchmarkRunId]);
+
   const dataQueryKey = useMemo(() => {
-    return dataQuery.map(
+    return selection.map(
       (query) => [query.outputDir, query.role] as [string, string],
     );
-  }, [dataQuery]);
+  }, [selection]);
 
   const { data: dataPerFile, isLoading } = useMultipleDataSeries(dataQueryKey);
   const data = useMemo(() => {
@@ -21,27 +53,33 @@ function RunComparison() {
       return dataPerFile;
     }
 
-    return dataPerFile.map((data, index) => {
-      const { name, color } = dataQuery[index];
+    return dataPerFile.map((data, index): DataSeries => {
+      const { name, color } = selection[index];
       return {
         name,
         data,
         color,
+        thresholds: selection[index].thresholds,
       };
     });
-  }, [dataPerFile, dataQuery]);
+  }, [dataPerFile, selection]);
 
   if (!benchmarkRuns || isLoadingBenchmarkRuns) {
     return <div>Loading...</div>;
   }
 
   return (
-    <div>
-      <ChartSelector
-        onChangeDataQuery={setDataQuery}
-        benchmarkRuns={benchmarkRuns}
-      />
-      {isLoading ? "Loading..." : <ChartGrid data={data ?? []} />}
+    <div className="flex flex-col w-full min-h-screen">
+      <Navbar urlPrefix="/run-comparison" />
+      <div className="flex flex-col w-full flex-grow">
+        <div className="p-8">
+          <ChartSelector
+            onChangeDataQuery={setSelection}
+            benchmarkRuns={benchmarkRuns}
+          />
+          {isLoading ? "Loading..." : <ChartGrid data={data ?? []} />}
+        </div>
+      </div>
     </div>
   );
 }
