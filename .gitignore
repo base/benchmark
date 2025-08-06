@@ -10,3 +10,5 @@ contracts/cache/
 contracts/out/
 contracts/abi/
 benchmark/benchmark
+
+.env

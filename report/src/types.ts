@@ -49,6 +49,7 @@ export interface BenchmarkRun {
   testName: string;
   testDescription: string;
   outputDir: string;
+  bucketPath?: string;
   createdAt: string;
   testConfig: Record<string, string | number>;
   thresholds?: {

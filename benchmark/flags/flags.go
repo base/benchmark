@@ -18,6 +18,8 @@ const (
 	ConfigFlagName    = "config"
 	RootDirFlagName   = "root-dir"
 	OutputDirFlagName = "output-dir"
+	EnableS3FlagName  = "enable-s3"
+	S3BucketFlagName  = "s3-bucket"
 	TxFuzzBinFlagName = "tx-fuzz-bin"
 	ProxyPortFlagName = "proxy-port"
 )
@@ -62,6 +64,19 @@ var (
 		Value:   8546,
 		EnvVars: prefixEnvVars("PROXY_PORT"),
 	}
+
+	EnableS3Flag = &cli.BoolFlag{
+		Name:    EnableS3FlagName,
+		Usage:   "Enable S3 upload of benchmark results",
+		EnvVars: prefixEnvVars("ENABLE_S3"),
+		Value:   false,
+	}
+
+	S3BucketFlag = &cli.StringFlag{
+		Name:    S3BucketFlagName,
+		Usage:   "S3 bucket name for storing benchmark results",
+		EnvVars: prefixEnvVars("S3_BUCKET"),
+	}
 )
 
 // Flags contains the list of configuration options available to the binary.
@@ -73,6 +88,8 @@ var RunFlags = []cli.Flag{
 	OutputDirFlag,
 	TxFuzzBinFlag,
 	ProxyPortFlag,
+	EnableS3Flag,
+	S3BucketFlag,
 }
 
 func init() {

@@ -9,6 +9,7 @@ import (
 	"github.com/base/base-bench/benchmark/config"
 	"github.com/base/base-bench/benchmark/flags"
 	"github.com/base/base-bench/runner"
+	"github.com/base/base-bench/runner/aws"
 	"github.com/base/base-bench/runner/importer"
 	"github.com/urfave/cli/v2"
 
@@ -45,6 +46,13 @@ func main() {
 			Usage:       "import runs from metadata file or URL",
 			Description: "Import benchmark runs from local metadata.json or remote URL into existing output metadata.json. Use --src-tag and --dest-tag to apply tags to runs, or use interactive mode.",
 			ArgsUsage:   "[metadata-file-or-url]",
+		},
+		{
+			Name:        "export-to-cloud",
+			Flags:       cliapp.ProtectFlags(flags.ExportFlags),
+			Action:      ExportMain(Version),
+			Usage:       "export output directory to S3",
+			Description: "Export the entire output directory to AWS S3 bucket and sync with remote metadata.json.",
 		},
 	}
 	app.Flags = flags.Flags
@@ -181,6 +189,36 @@ func ImportMain(version string) cli.ActionFunc {
 			fmt.Printf("   • Strategy: Created new run group\n")
 			fmt.Printf("   • Imported runs differentiated by BenchmarkRun ID\n")
 		}
+
+		return nil
+	}
+}
+
+func ExportMain(version string) cli.ActionFunc {
+	return func(cliCtx *cli.Context) error {
+		cfg := config.NewExportCmdConfig(cliCtx)
+		if err := cfg.Check(); err != nil {
+			return fmt.Errorf("invalid CLI flags: %w", err)
+		}
+
+		l := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.DefaultCLIConfig())
+		oplog.SetGlobalLogHandler(l.Handler())
+
+		// Initialize S3 service
+		s3Service, err := aws.NewS3Service(cfg.S3Bucket(), l)
+		if err != nil {
+			return fmt.Errorf("failed to initialize S3 service: %w", err)
+		}
+
+		// Export output directory to S3
+		err = s3Service.ExportOutputDirectory(cfg.OutputDir())
+		if err != nil {
+			return fmt.Errorf("failed to export output directory to S3: %w", err)
+		}
+
+		fmt.Printf("✅ Export completed successfully!\n")
+		fmt.Printf("   • Output directory: %s\n", cfg.OutputDir())
+		fmt.Printf("   • S3 bucket: %s\n", cfg.S3Bucket())
 
 		return nil
 	}

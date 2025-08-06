@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
+	"github.com/base/base-bench/runner/aws"
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/metrics"
@@ -41,21 +42,35 @@ type service struct {
 	dataDirState benchmark.SnapshotManager
 	metadataPath string
 
-	config  config.Config
-	version string
-	log     log.Logger
+	config    config.Config
+	version   string
+	log       log.Logger
+	s3Service *aws.S3Service
 }
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
 	metadataPath := path.Join(cfg.OutputDir(), "metadata.json")
 
-	return &service{
+	s := &service{
 		metadataPath: metadataPath,
 		dataDirState: benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
 		config:       cfg,
 		version:      version,
 		log:          log,
 	}
+
+	// Initialize S3 service if enabled
+	if cfg.EnableS3() && cfg.S3Bucket() != "" {
+		s3Service, err := aws.NewS3Service(cfg.S3Bucket(), log)
+		if err != nil {
+			log.Warn("Failed to initialize S3 service", "error", err)
+		} else {
+			s.s3Service = s3Service
+			log.Info("S3 service initialized", "bucket", cfg.S3Bucket())
+		}
+	}
+
+	return s
 }
 
 func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
@@ -526,10 +541,34 @@ outerLoop:
 			}
 			metadata.AddResult(runIdx, *metricSummary)
 
+			// Upload to S3 if enabled and test was successful
+			if s.s3Service != nil && metricSummary.Success {
+				s.log.Info("Uploading test results to S3", "runID", c.ID)
+				bucketPath, err := s.s3Service.UploadRunResults(outputDir, c.ID, c.OutputDir)
+				if err != nil {
+					s.log.Warn("Failed to upload test results to S3", "runID", c.ID, "error", err)
+				} else {
+					// Update metadata with bucket path
+					if runIdx < len(metadata.Runs) {
+						metadata.Runs[runIdx].BucketPath = bucketPath
+					}
+					s.log.Info("Successfully uploaded test results to S3", "runID", c.ID, "bucketPath", bucketPath)
+				}
+			}
+
 			err = s.writeTestMetadata(metadata)
 			if err != nil {
 				return errors.Wrap(err, "failed to write test metadata")
 			}
+
+			// Sync metadata with S3 if enabled
+			if s.s3Service != nil && runIdx < len(metadata.Runs) {
+				err = s.s3Service.SyncMetadata(metadata.Runs[runIdx])
+				if err != nil {
+					s.log.Warn("Failed to sync metadata with S3", "runID", c.ID, "error", err)
+				}
+			}
+
 			runIdx++
 
 			select {
