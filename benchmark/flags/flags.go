@@ -15,13 +15,14 @@ func prefixEnvVars(name string) []string {
 }
 
 const (
-	ConfigFlagName    = "config"
-	RootDirFlagName   = "root-dir"
-	OutputDirFlagName = "output-dir"
-	EnableS3FlagName  = "enable-s3"
-	S3BucketFlagName  = "s3-bucket"
-	TxFuzzBinFlagName = "tx-fuzz-bin"
-	ProxyPortFlagName = "proxy-port"
+	ConfigFlagName         = "config"
+	RootDirFlagName        = "root-dir"
+	OutputDirFlagName      = "output-dir"
+	EnableS3FlagName       = "enable-s3"
+	S3BucketFlagName       = "s3-bucket"
+	TxFuzzBinFlagName      = "tx-fuzz-bin"
+	ProxyPortFlagName      = "proxy-port"
+	BenchmarkRunIDFlagName = "benchmark-run-id"
 )
 
 // TxFuzz defaults
@@ -77,6 +78,12 @@ var (
 		Usage:   "S3 bucket name for storing benchmark results",
 		EnvVars: prefixEnvVars("S3_BUCKET"),
 	}
+
+	BenchmarkRunIDFlag = &cli.StringFlag{
+		Name:    BenchmarkRunIDFlagName,
+		Usage:   "Custom benchmark run ID (auto-generated if not provided)",
+		EnvVars: prefixEnvVars("BENCHMARK_RUN_ID"),
+	}
 )
 
 // Flags contains the list of configuration options available to the binary.
@@ -90,6 +97,7 @@ var RunFlags = []cli.Flag{
 	ProxyPortFlag,
 	EnableS3Flag,
 	S3BucketFlag,
+	BenchmarkRunIDFlag,
 }
 
 func init() {

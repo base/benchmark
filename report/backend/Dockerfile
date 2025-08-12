@@ -1,40 +1,49 @@
-# Build stage
-FROM golang:1.21-alpine AS builder
+FROM ubuntu:22.04 AS base
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    make \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    libclang-dev \
+    ca-certificates \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Copy go mod files
-COPY go.mod go.sum ./
+# Install Go manually using curl
+RUN curl -fsSL https://go.dev/dl/go1.23.0.linux-amd64.tar.gz | tar -C /usr/local -xz
+ENV PATH="/usr/local/go/bin:$PATH"
 
-# Download dependencies
+COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o base-bench-api ./cmd/main.go
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
+FROM ubuntu:22.04 AS runtime
 
-# Final stage
-FROM alpine:latest
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+WORKDIR /app
 
-WORKDIR /root/
+COPY --from=base /app/base-bench-api .
 
-# Copy the binary from builder stage
-COPY --from=builder /app/main .
-
-# Expose port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/v1/health || exit 1
 
-# Run the binary
-CMD ["./main"] 
+ENTRYPOINT ["./base-bench-api"] 

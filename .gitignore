@@ -1,6 +1,6 @@
 .DS_Store
 /.idea/
-/bin/
+**/bin/
 data-dir/
 output/
 .vercel

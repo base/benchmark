@@ -499,7 +499,36 @@ func (s *service) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to create output directory")
 	}
 
+	// Generate or use provided BenchmarkRunID for this session
+	var benchmarkRunID string
+	if s.config.BenchmarkRunID() != "" {
+		benchmarkRunID = s.config.BenchmarkRunID()
+		s.log.Info("Using provided BenchmarkRunID", "benchmarkRunID", benchmarkRunID)
+	} else {
+		// Use the first test run's ID as the benchmark run ID for this session
+		if len(testPlans) > 0 && len(testPlans[0].Runs) > 0 {
+			benchmarkRunID = testPlans[0].Runs[0].ID
+			s.log.Info("Using first test run ID as BenchmarkRunID", "benchmarkRunID", benchmarkRunID)
+		} else {
+			// Fallback to generating one if no test runs exist
+			benchmarkRunID, err = benchmark.GenerateRandomID()
+			if err != nil {
+				return errors.Wrap(err, "failed to generate BenchmarkRunID")
+			}
+			s.log.Info("Generated fallback BenchmarkRunID", "benchmarkRunID", benchmarkRunID)
+		}
+	}
+
 	metadata := benchmark.RunGroupFromTestPlans(testPlans)
+
+	// Apply BenchmarkRunID to all runs in metadata
+	for i := range metadata.Runs {
+		if metadata.Runs[i].TestConfig == nil {
+			metadata.Runs[i].TestConfig = make(map[string]interface{})
+		}
+		metadata.Runs[i].TestConfig[benchmark.BenchmarkRunTag] = benchmarkRunID
+	}
+
 	runIdx := 0
 
 	// create map of transaction payloads

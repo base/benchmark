@@ -112,6 +112,18 @@ func (s *S3Service) uploadFile(localPath, s3Key string) error {
 func (s *S3Service) SyncMetadata(newRun benchmark.Run) error {
 	s.log.Info("Syncing metadata with S3", "runID", newRun.ID, "bucket", s.bucketName)
 
+	// Ensure the new run has a BenchmarkRunID
+	if newRun.TestConfig == nil {
+		newRun.TestConfig = make(map[string]interface{})
+	}
+	benchmarkRunValue, exists := newRun.TestConfig[benchmark.BenchmarkRunTag]
+	if !exists || benchmarkRunValue == "" {
+		s.log.Warn("New run missing BenchmarkRunID, this should not happen", "runID", newRun.ID)
+		// Use the run's own ID as fallback
+		newRun.TestConfig[benchmark.BenchmarkRunTag] = newRun.ID
+		s.log.Info("Generated fallback BenchmarkRunID using run ID", "runID", newRun.ID, "benchmarkRunID", newRun.ID)
+	}
+
 	// Download existing metadata from S3
 	existingMetadata, err := s.downloadMetadata()
 	if err != nil && !isNoSuchKeyError(err) {

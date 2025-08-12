@@ -23,31 +23,34 @@ type Config interface {
 	ProxyPort() int
 	EnableS3() bool
 	S3Bucket() string
+	BenchmarkRunID() string
 }
 
 type config struct {
-	logConfig     oplog.CLIConfig
-	configPath    string
-	dataDir       string
-	outputDir     string
-	clientOptions ClientOptions
-	txFuzzBinary  string
-	proxyPort     int
-	enableS3      bool
-	s3Bucket      string
+	logConfig      oplog.CLIConfig
+	configPath     string
+	dataDir        string
+	outputDir      string
+	clientOptions  ClientOptions
+	txFuzzBinary   string
+	proxyPort      int
+	enableS3       bool
+	s3Bucket       string
+	benchmarkRunID string
 }
 
 func NewConfig(ctx *cli.Context) Config {
 	return &config{
-		logConfig:     oplog.ReadCLIConfig(ctx),
-		configPath:    ctx.String(appFlags.ConfigFlagName),
-		dataDir:       ctx.String(appFlags.RootDirFlagName),
-		outputDir:     ctx.String(appFlags.OutputDirFlagName),
-		txFuzzBinary:  ctx.String(appFlags.TxFuzzBinFlagName),
-		proxyPort:     ctx.Int(appFlags.ProxyPortFlagName),
-		enableS3:      ctx.Bool(appFlags.EnableS3FlagName),
-		s3Bucket:      ctx.String(appFlags.S3BucketFlagName),
-		clientOptions: ReadClientOptions(ctx),
+		logConfig:      oplog.ReadCLIConfig(ctx),
+		configPath:     ctx.String(appFlags.ConfigFlagName),
+		dataDir:        ctx.String(appFlags.RootDirFlagName),
+		outputDir:      ctx.String(appFlags.OutputDirFlagName),
+		txFuzzBinary:   ctx.String(appFlags.TxFuzzBinFlagName),
+		proxyPort:      ctx.Int(appFlags.ProxyPortFlagName),
+		enableS3:       ctx.Bool(appFlags.EnableS3FlagName),
+		s3Bucket:       ctx.String(appFlags.S3BucketFlagName),
+		benchmarkRunID: ctx.String(appFlags.BenchmarkRunIDFlagName),
+		clientOptions:  ReadClientOptions(ctx),
 	}
 }
 
@@ -106,4 +109,8 @@ func (c *config) EnableS3() bool {
 
 func (c *config) S3Bucket() string {
 	return c.s3Bucket
+}
+
+func (c *config) BenchmarkRunID() string {
+	return c.benchmarkRunID
 }
