@@ -112,13 +112,26 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 	var dataDirPath string
 	isSnapshot := snapshot != nil && snapshot.Command != ""
 	if isSnapshot {
-		// if we have a snapshot, restore it if needed or reuse from a previous test
-		snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to ensure snapshot")
-		}
+		// Create a test-specific data directory
+		dataDirPath = path.Join(testDir, "data")
 
-		dataDirPath = snapshotDir
+		// Get the initial snapshot path for this node type
+		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
+
+		if initialSnapshotPath != "" {
+			// Copy from initial snapshot to test-specific directory
+			err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to copy from initial snapshot")
+			}
+		} else {
+			// Fallback to old behavior if no initial snapshot exists
+			snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to ensure snapshot")
+			}
+			dataDirPath = snapshotDir
+		}
 	} else {
 		// if no snapshot, just create a new datadir
 		dataDirPath = path.Join(testDir, "data")
@@ -331,9 +344,42 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.RunResult, error) {
+func (s *service) setupInitialSnapshots(testPlans []benchmark.TestPlan) error {
+	// Collect all unique initial snapshots across all test plans
+	initialSnapshotsMap := make(map[string]benchmark.SnapshotDefinition)
+
+	for _, testPlan := range testPlans {
+		for _, snapshot := range testPlan.InitialSnapshots {
+			// Use node_type as the key to avoid duplicates
+			initialSnapshotsMap[snapshot.NodeType] = snapshot
+		}
+	}
+
+	// Setup each unique initial snapshot
+	for nodeType, snapshot := range initialSnapshotsMap {
+		s.log.Info("Setting up initial snapshot from remote source", "node_type", nodeType, "command", snapshot.Command)
+		_, err := s.dataDirState.EnsureInitialSnapshot(snapshot)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to setup initial snapshot for node type %s", nodeType))
+		}
+		s.log.Info("Initial snapshot setup completed", "node_type", nodeType)
+	}
+
+	return nil
+}
+
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshots []benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
+
+	// Find the appropriate snapshot for this node type
+	var snapshotConfig *benchmark.SnapshotDefinition
+	for _, s := range snapshots {
+		if s.NodeType == params.NodeType {
+			snapshotConfig = &s
+			break
+		}
+	}
 
 	// get genesis block
 	genesis, err := s.getGenesisForSnapshotConfig(snapshotConfig)
@@ -519,6 +565,12 @@ func (s *service) Run(ctx context.Context) error {
 		}
 	}
 
+	// Setup initial snapshots for all test plans before running any tests
+	err = s.setupInitialSnapshots(testPlans)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup initial snapshots")
+	}
+
 	metadata := benchmark.RunGroupFromTestPlans(testPlans)
 
 	// Apply BenchmarkRunID to all runs in metadata
@@ -557,7 +609,7 @@ outerLoop:
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID])
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.InitialSnapshots, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID])
 			if err != nil {
 				log.Error("Failed to run test", "err", err)
 				metricSummary = &benchmark.RunResult{
