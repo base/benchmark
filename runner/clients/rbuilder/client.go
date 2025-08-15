@@ -27,9 +27,9 @@ type RbuilderClient struct {
 
 	// stdout io.WriteCloser
 	// stderr io.WriteCloser
+	// ports    portmanager.PortManager
 
 	elClient types.ExecutionClient
-	ports    portmanager.PortManager
 
 	metricsCollector metrics.Collector
 }

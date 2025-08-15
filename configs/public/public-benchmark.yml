@@ -1,83 +1,161 @@
 name: Public Benchmark Suite
 description: |
-  Public Benchmark Suite - Standard benchmark collection for public performance comparison and community benchmarking with client performance transparency.
+  This benchmark shows a cross section of different workloads across different clients.
 
-  This comprehensive benchmark suite includes transfer-only performance testing, EC pairing stress tests, EC multiplication testing, and storage write performance testing. Designed to provide standardized metrics for public comparison between execution clients across various workload types.
-
-  Use Case: Community benchmarking, client performance transparency, standardized performance measurement across multiple operation types, and validation of client behavior under various stress conditions.
+  These workloads do not run on snapshots because they run on GitHub Actions, so this is a lower bound on performance.
 
 payloads:
-  - name: Transfer-only
-    id: transfer-only
-    type: transfer-only
-  - name: EC Pairing Precompile
-    id: ecpairing
-    type: contract
-    calls_per_block: 1
-    function_signature: ecpairing(uint256,bytes)
-    gas_per_tx: 10000000
-    contract_bytecode: Precompile
-  - name: EC Mul Precompile
-    id: ecmul
-    type: contract
-    calls_per_block: 1
-    function_signature: ecmul(uint256,bytes)
-    gas_per_tx: 10000000
-    contract_bytecode: Precompile
-  - name: SStore Performance
-    id: sstore
-    type: contract
-    calls_per_block: 1
-    function_signature: sstore(uint256,bytes)
-    gas_per_tx: 10000000
-    contract_bytecode: Precompile
+  - name: Simulator
+    id: base-mainnet-simulation
+    type: simulator
+    account_loaded: 12.382
+    account_deleted: 0.0127
+    accounts_updated: 4.6117
+    accounts_created: 0.16
+    storage_loaded: 49.405
+    storage_deleted: 0.4651
+    storage_updated: 9.439
+    storage_created: 2
+    code_size_loaded: 662473.15
+    num_contracts_loaded: 4.330
+    avg_gas_used: 35000000
+    calls_per_block: 100
+    opcodes:
+      EXP: 626.30
+      KECCAK256: 29.21
+    precompiles:
+      bls12381MapG2: 0.6981
+      ecrecover: 0.0733
+      bls12381G1Add: 0.0244
+      bls12381G1MultiExp: 0.0218
+  - name: storage create (full block)
+    id: storage-create-full-block
+    type: simulator
+    storage_created: 100
+  - name: storage update (full block)
+    id: storage-update-full-block
+    type: simulator
+    storage_updated: 100
+  - name: ecrecover (full block)
+    id: ecrecover-full-block
+    type: simulator
+    precompiles:
+      ecrecover: 100
+  - name: sha256hash (full block)
+    id: sha256hash-full-block
+    type: simulator
+    precompiles:
+      sha256hash: 100
+  - name: ripemd160hash (full block)
+    id: ripemd160hash-full-block
+    type: simulator
+    precompiles:
+      ripemd160hash: 100
+  - name: bigModExp (full block)
+    id: bigModExp-full-block
+    type: simulator
+    precompiles:
+      bigModExp: 100
+  - name: bn256Add (full block)
+    id: bn256Add-full-block
+    type: simulator
+    precompiles:
+      bn256Add: 100
+  - name: bn256ScalarMul (full block)
+    id: bn256ScalarMul-full-block
+    type: simulator
+    precompiles:
+      bn256ScalarMul: 100
+  - name: bn256Pairing (full block)
+    id: bn256Pairing-full-block
+    type: simulator
+    precompiles:
+      bn256Pairing: 100
+  - name: blake2F (full block)
+    id: blake2F-full-block
+    type: simulator
+    precompiles:
+      blake2F: 100
+  - name: bls12381G1Add (full block)
+    id: bls12381G1Add-full-block
+    type: simulator
+    precompiles:
+      bls12381G1Add: 100
+  - name: bls12381G1MultiExp (full block)
+    id: bls12381G1MultiExp-full-block
+    type: simulator
+    precompiles:
+      bls12381G1MultiExp: 100
+  - name: bls12381G2Add (full block)
+    id: bls12381G2Add-full-block
+    type: simulator
+    precompiles:
+      bls12381G2Add: 100
+  - name: bls12381G2MultiExp (full block)
+    id: bls12381G2MultiExp-full-block
+    type: simulator
+    precompiles:
+      bls12381G2MultiExp: 100
+  - name: bls12381Pairing (full block)
+    id: bls12381Pairing-full-block
+    type: simulator
+    precompiles:
+      bls12381Pairing: 100
+  - name: bls12381MapG1 (full block)
+    id: bls12381MapG1-full-block
+    type: simulator
+    precompiles:
+      bls12381MapG1: 100
+  - name: bls12381MapG2 (full block)
+    id: bls12381MapG2-full-block
+    type: simulator
+    precompiles:
+      bls12381MapG2: 100
+  - name: p256Verify (full block)
+    id: p256Verify-full-block
+    type: simulator
+    precompiles:
+      p256Verify: 100
 
 benchmarks:
-  - variables:
+  - metrics:
+      warning:
+        sequencer/latency/get_payload: 1000000000
+        validator/latency/new_payload: 1000000000
+      error:
+        sequencer/latency/get_payload: 1500000000
+        validator/latency/new_payload: 1500000000
+    variables:
       - type: payload
-        value: transfer-only
+        values:
+          - base-mainnet-simulation
+          - storage-create-full-block
+          - storage-update-full-block
+          - ecrecover-full-block
+          - sha256hash-full-block
+          - ripemd160hash-full-block
+          - bigModExp-full-block
+          - bn256Add-full-block
+          - bn256ScalarMul-full-block
+          - bn256Pairing-full-block
+          - blake2F-full-block
+          - bls12381G1Add-full-block
+          - bls12381G1MultiExp-full-block
+          - bls12381G2Add-full-block
+          - bls12381G2MultiExp-full-block
+          - bls12381Pairing-full-block
+          - bls12381MapG1-full-block
+          - bls12381MapG2-full-block
+          - p256Verify-full-block
       - type: node_type
         values:
-          - geth
           - reth
+          - geth
       - type: num_blocks
-        value: 10
+        value: 20
       - type: gas_limit
         values:
-          - 15000000
-          - 30000000
-          - 60000000
-          - 90000000
-  - variables:
-      - type: node_type
-        values:
-          - geth
-          - reth
-      - type: num_blocks
-        value: 5
-      - type: gas_limit
-        value: 505000000
-      - type: payload
-        value: ecpairing
-  - variables:
-      - type: payload
-        value: ecmul
-      - type: node_type
-        values:
-          - geth
-          - reth
-      - type: num_blocks
-        value: 5
-      - type: gas_limit
-        value: 1005000000
-  - variables:
-      - type: payload
-        value: sstore
-      - type: node_type
-        values:
-          - geth
-          - reth
-      - type: num_blocks
-        value: 5
-      - type: gas_limit
-        value: 1005000000
+          - 25000000
+          # - 50000000
+          # - 75000000
+          # - 100000000
