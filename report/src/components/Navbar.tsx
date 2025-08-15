@@ -10,6 +10,7 @@ import { useCallback, useMemo } from "react";
 import { uniqBy } from "lodash";
 import {} from "react-router-dom";
 import Select from "./Select";
+import ApiStatus from "./ApiStatus";
 
 interface ProvidedProps {
   urlPrefix?: string;
@@ -104,6 +105,9 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
           </Select>
         </div>
       )}
+      <div className="ml-auto">
+        <ApiStatus />
+      </div>
     </nav>
   );
 };

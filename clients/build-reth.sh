@@ -40,11 +40,11 @@ git checkout "$RETH_VERSION"
 
 # Build the binary using cargo
 echo "Building reth with cargo..."
-cargo build --release --bin reth
+cargo build --bin op-reth --profile maxperf --manifest-path crates/optimism/bin/Cargo.toml
 
 # Copy binary to output directory
 echo "Copying binary to output directory..."
 mkdir -p "../../$OUTPUT_DIR"
-cp target/release/reth "../../$OUTPUT_DIR/"
+cp target/maxperf/op-reth "../../$OUTPUT_DIR/"
 
 echo "reth binary built successfully and placed in $OUTPUT_DIR/reth" 

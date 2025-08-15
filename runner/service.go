@@ -19,6 +19,7 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 
+	"github.com/base/base-bench/runner/aws"
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/metrics"
@@ -41,21 +42,35 @@ type service struct {
 	dataDirState benchmark.SnapshotManager
 	metadataPath string
 
-	config  config.Config
-	version string
-	log     log.Logger
+	config    config.Config
+	version   string
+	log       log.Logger
+	s3Service *aws.S3Service
 }
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
 	metadataPath := path.Join(cfg.OutputDir(), "metadata.json")
 
-	return &service{
+	s := &service{
 		metadataPath: metadataPath,
 		dataDirState: benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
 		config:       cfg,
 		version:      version,
 		log:          log,
 	}
+
+	// Initialize S3 service if enabled
+	if cfg.EnableS3() && cfg.S3Bucket() != "" {
+		s3Service, err := aws.NewS3Service(cfg.S3Bucket(), log)
+		if err != nil {
+			log.Warn("Failed to initialize S3 service", "error", err)
+		} else {
+			s.s3Service = s3Service
+			log.Info("S3 service initialized", "bucket", cfg.S3Bucket())
+		}
+	}
+
+	return s
 }
 
 func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
@@ -97,13 +112,26 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 	var dataDirPath string
 	isSnapshot := snapshot != nil && snapshot.Command != ""
 	if isSnapshot {
-		// if we have a snapshot, restore it if needed or reuse from a previous test
-		snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to ensure snapshot")
-		}
+		// Create a test-specific data directory
+		dataDirPath = path.Join(testDir, "data")
 
-		dataDirPath = snapshotDir
+		// Get the initial snapshot path for this node type
+		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
+
+		if initialSnapshotPath != "" {
+			// Copy from initial snapshot to test-specific directory
+			err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to copy from initial snapshot")
+			}
+		} else {
+			// Fallback to old behavior if no initial snapshot exists
+			snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to ensure snapshot")
+			}
+			dataDirPath = snapshotDir
+		}
 	} else {
 		// if no snapshot, just create a new datadir
 		dataDirPath = path.Join(testDir, "data")
@@ -316,9 +344,42 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.RunResult, error) {
+func (s *service) setupInitialSnapshots(testPlans []benchmark.TestPlan) error {
+	// Collect all unique initial snapshots across all test plans
+	initialSnapshotsMap := make(map[string]benchmark.SnapshotDefinition)
+
+	for _, testPlan := range testPlans {
+		for _, snapshot := range testPlan.InitialSnapshots {
+			// Use node_type as the key to avoid duplicates
+			initialSnapshotsMap[snapshot.NodeType] = snapshot
+		}
+	}
+
+	// Setup each unique initial snapshot
+	for nodeType, snapshot := range initialSnapshotsMap {
+		s.log.Info("Setting up initial snapshot from remote source", "node_type", nodeType, "command", snapshot.Command)
+		_, err := s.dataDirState.EnsureInitialSnapshot(snapshot)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to setup initial snapshot for node type %s", nodeType))
+		}
+		s.log.Info("Initial snapshot setup completed", "node_type", nodeType)
+	}
+
+	return nil
+}
+
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshots []benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
+
+	// Find the appropriate snapshot for this node type
+	var snapshotConfig *benchmark.SnapshotDefinition
+	for _, s := range snapshots {
+		if s.NodeType == params.NodeType {
+			snapshotConfig = &s
+			break
+		}
+	}
 
 	// get genesis block
 	genesis, err := s.getGenesisForSnapshotConfig(snapshotConfig)
@@ -484,7 +545,42 @@ func (s *service) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to create output directory")
 	}
 
+	// Generate or use provided BenchmarkRunID for this session
+	var benchmarkRunID string
+	if s.config.BenchmarkRunID() != "" {
+		benchmarkRunID = s.config.BenchmarkRunID()
+		s.log.Info("Using provided BenchmarkRunID", "benchmarkRunID", benchmarkRunID)
+	} else {
+		// Use the first test run's ID as the benchmark run ID for this session
+		if len(testPlans) > 0 && len(testPlans[0].Runs) > 0 {
+			benchmarkRunID = testPlans[0].Runs[0].ID
+			s.log.Info("Using first test run ID as BenchmarkRunID", "benchmarkRunID", benchmarkRunID)
+		} else {
+			// Fallback to generating one if no test runs exist
+			benchmarkRunID, err = benchmark.GenerateRandomID()
+			if err != nil {
+				return errors.Wrap(err, "failed to generate BenchmarkRunID")
+			}
+			s.log.Info("Generated fallback BenchmarkRunID", "benchmarkRunID", benchmarkRunID)
+		}
+	}
+
+	// Setup initial snapshots for all test plans before running any tests
+	err = s.setupInitialSnapshots(testPlans)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup initial snapshots")
+	}
+
 	metadata := benchmark.RunGroupFromTestPlans(testPlans)
+
+	// Apply BenchmarkRunID to all runs in metadata
+	for i := range metadata.Runs {
+		if metadata.Runs[i].TestConfig == nil {
+			metadata.Runs[i].TestConfig = make(map[string]interface{})
+		}
+		metadata.Runs[i].TestConfig[benchmark.BenchmarkRunTag] = benchmarkRunID
+	}
+
 	runIdx := 0
 
 	// create map of transaction payloads
@@ -513,7 +609,7 @@ outerLoop:
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID])
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.InitialSnapshots, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID])
 			if err != nil {
 				log.Error("Failed to run test", "err", err)
 				metricSummary = &benchmark.RunResult{
@@ -526,10 +622,34 @@ outerLoop:
 			}
 			metadata.AddResult(runIdx, *metricSummary)
 
+			// Upload to S3 if enabled and test was successful
+			if s.s3Service != nil && metricSummary.Success {
+				s.log.Info("Uploading test results to S3", "runID", c.ID)
+				bucketPath, err := s.s3Service.UploadRunResults(outputDir, c.ID, c.OutputDir)
+				if err != nil {
+					s.log.Warn("Failed to upload test results to S3", "runID", c.ID, "error", err)
+				} else {
+					// Update metadata with bucket path
+					if runIdx < len(metadata.Runs) {
+						metadata.Runs[runIdx].BucketPath = bucketPath
+					}
+					s.log.Info("Successfully uploaded test results to S3", "runID", c.ID, "bucketPath", bucketPath)
+				}
+			}
+
 			err = s.writeTestMetadata(metadata)
 			if err != nil {
 				return errors.Wrap(err, "failed to write test metadata")
 			}
+
+			// Sync metadata with S3 if enabled
+			if s.s3Service != nil && runIdx < len(metadata.Runs) {
+				err = s.s3Service.SyncMetadata(metadata.Runs[runIdx])
+				if err != nil {
+					s.log.Warn("Failed to sync metadata with S3", "runID", c.ID, "error", err)
+				}
+			}
+
 			runIdx++
 
 			select {

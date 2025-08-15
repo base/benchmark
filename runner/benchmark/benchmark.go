@@ -1,6 +1,8 @@
 package benchmark
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/pkg/errors"
 )
 
 // TestRun is a single run of a benchmark. Each config should result in multiple test runs.
@@ -87,6 +90,15 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 }
 
 const MAX_GAS_LIMIT = math.MaxUint64
+
+// GenerateRandomID generates a random ID for BenchmarkRun (similar to importer)
+func GenerateRandomID() (string, error) {
+	bytes := make([]byte, 8)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", errors.Wrap(err, "failed to generate random ID")
+	}
+	return hex.EncodeToString(bytes), nil
+}
 
 var cachedGenesis atomic.Pointer[core.Genesis]
 
