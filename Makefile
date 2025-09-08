@@ -60,12 +60,12 @@ build-backend:
 
 .PHONY: run-backend
 run-backend:
-	./bin/base-bench-api --enable-s3=true --s3-bucket ${BASE_BENCH_API_S3_BUCKET}
-
-.PHONY: run-backend
-run-backend:
 	./bin/base-bench-api --s3-bucket ${BASE_BENCH_API_S3_BUCKET}
+
+.PHONY: run-frontend
+run-frontend:
+	cd report && yarn dev
 
 .PHONY: run-backfill
 run-backfill:
-	./bin/base-bench backfill-benchmark-run-id --enable-s3=true --s3-bucket ${BASE_BENCH_API_S3_BUCKET} metadata.json
+	./bin/base-bench backfill-benchmark-run-id --s3-bucket ${BASE_BENCH_API_S3_BUCKET} metadata.json
