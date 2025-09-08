@@ -9,7 +9,7 @@ require (
 	github.com/charmbracelet/huh v0.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/ethereum-optimism/optimism v1.13.3
-	github.com/ethereum/go-ethereum v1.15.11
+	github.com/ethereum/go-ethereum v1.16.0
 	github.com/holiman/uint256 v1.3.2
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/common v0.62.0

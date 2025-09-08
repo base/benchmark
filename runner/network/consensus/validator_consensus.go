@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/base/base-bench/runner/metrics"
+	"github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -42,14 +43,14 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 	f.headBlockHash = payload.BlockHash
 	duration := time.Since(startTime)
 	f.log.Info("Validated payload", "payload_index", payload.Number, "duration", duration)
-	blockMetrics.AddExecutionMetric(metrics.NewPayloadLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(types.NewPayloadLatencyMetric, duration)
 
 	// fetch gas used from the payload
 	gasUsed := payload.GasUsed
 	gasPerSecond := float64(gasUsed) / duration.Seconds()
 
-	blockMetrics.AddExecutionMetric(metrics.GasPerBlockMetric, float64(gasUsed))
-	blockMetrics.AddExecutionMetric(metrics.GasPerSecondMetric, gasPerSecond)
+	blockMetrics.AddExecutionMetric(types.GasPerBlockMetric, float64(gasUsed))
+	blockMetrics.AddExecutionMetric(types.GasPerSecondMetric, gasPerSecond)
 
 	startTime = time.Now()
 	_, err = f.updateForkChoice(ctx, nil)
@@ -57,16 +58,17 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 		return err
 	}
 	duration = time.Since(startTime)
-	blockMetrics.AddExecutionMetric(metrics.UpdateForkChoiceLatencyMetric, duration)
+	blockMetrics.AddExecutionMetric(types.UpdateForkChoiceLatencyMetric, duration)
 
 	return nil
 }
 
 // Start starts the fake consensus client.
-func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.MetricsCollector, firstTestBlock uint64) error {
+func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.Collector, firstTestBlock uint64) error {
 	f.log.Info("Starting sync benchmark", "num_payloads", len(payloads))
+	m := metrics.NewBlockMetrics()
 	for i := 0; i < len(payloads); i++ {
-		m := metrics.NewBlockMetrics(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock))))
+		m.SetBlockNumber(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock))))
 		f.log.Info("Proposing payload", "payload_index", i)
 		err := f.propose(ctx, &payloads[i], m)
 		if err != nil {

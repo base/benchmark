@@ -7,6 +7,7 @@ import (
 	"path"
 
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
@@ -32,17 +33,18 @@ type NetworkBenchmark struct {
 	sequencerOptions *config.InternalClientOptions
 	validatorOptions *config.InternalClientOptions
 
-	collectedSequencerMetrics *benchmark.SequencerKeyMetrics
-	collectedValidatorMetrics *benchmark.ValidatorKeyMetrics
+	collectedSequencerMetrics *benchtypes.SequencerKeyMetrics
+	collectedValidatorMetrics *benchtypes.ValidatorKeyMetrics
 
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
 
 	transactionPayload payload.Definition
+	ports              portmanager.PortManager
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
-func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:                log,
 		sequencerOptions:   sequencerOptions,
@@ -50,6 +52,7 @@ func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequence
 		testConfig:         config,
 		proofConfig:        proofConfig,
 		transactionPayload: transactionPayload,
+		ports:              ports,
 	}, nil
 }
 
@@ -80,7 +83,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 }
 
 func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, error) {
-	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.sequencerOptions)
+	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.sequencerOptions, nb.ports)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to setup sequencer node: %w", err)
 	}
@@ -97,14 +100,14 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	}()
 
 	// Create metrics collector and writer
-	metricsCollector := metrics.NewMetricsCollector(nb.log, sequencerClient.Client(), nb.testConfig.Params.NodeType, sequencerClient.MetricsPort())
+	metricsCollector := sequencerClient.MetricsCollector()
 	metricsWriter := metrics.NewFileMetricsWriter(nb.sequencerOptions.MetricsPath)
 
 	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		sequencerMetrics := metricsCollector.GetMetrics()
 		if sequencerMetrics != nil {
-			nb.collectedSequencerMetrics = metrics.BlockMetricsToSequencerSummary(sequencerMetrics)
+			nb.collectedSequencerMetrics = benchtypes.BlockMetricsToSequencerSummary(sequencerMetrics)
 			if err := metricsWriter.Write(sequencerMetrics); err != nil {
 				nb.log.Error("Failed to write sequencer metrics", "error", err)
 			}
@@ -116,7 +119,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 }
 
 func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain) error {
-	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions)
+	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions, nb.ports)
 	if err != nil {
 		return fmt.Errorf("failed to setup validator node: %w", err)
 	}
@@ -132,14 +135,14 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 	}()
 
 	// Create metrics collector and writer
-	metricsCollector := metrics.NewMetricsCollector(nb.log, validatorClient.Client(), nb.testConfig.Params.NodeType, validatorClient.MetricsPort())
+	metricsCollector := validatorClient.MetricsCollector()
 	metricsWriter := metrics.NewFileMetricsWriter(nb.validatorOptions.MetricsPath)
 
 	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		validatorMetrics := metricsCollector.GetMetrics()
 		if validatorMetrics != nil {
-			nb.collectedValidatorMetrics = metrics.BlockMetricsToValidatorSummary(validatorMetrics)
+			nb.collectedValidatorMetrics = benchtypes.BlockMetricsToValidatorSummary(validatorMetrics)
 			if err := metricsWriter.Write(validatorMetrics); err != nil {
 				nb.log.Error("Failed to write validator metrics", "error", err)
 			}
@@ -163,7 +166,7 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 	}, nil
 }
 
-func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, options *config.InternalClientOptions) (types.ExecutionClient, error) {
+func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager) (types.ExecutionClient, error) {
 	if options == nil {
 		return nil, errors.New("client options cannot be nil")
 	}
@@ -174,12 +177,14 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 		nodeType = clients.Geth
 	case "reth":
 		nodeType = clients.Reth
+	case "rbuilder":
+		nodeType = clients.Rbuilder
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", params.NodeType)
 	}
 
 	clientLogger := l.With("nodeType", params.NodeType)
-	client := clients.NewClient(nodeType, clientLogger, options)
+	client := clients.NewClient(nodeType, clientLogger, options, portManager)
 
 	logPath := path.Join(options.TestDirPath, ExecutionLayerLogFileName)
 	fileWriter, err := os.OpenFile(logPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)

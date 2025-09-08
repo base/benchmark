@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
@@ -18,9 +17,11 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
 
+	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/clients/common"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/metrics"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
@@ -34,16 +35,39 @@ type RethClient struct {
 	authClient client.RPC
 	process    *exec.Cmd
 
+	ports       portmanager.PortManager
+	metricsPort uint64
+	rpcPort     uint64
+	authRPCPort uint64
+
 	stdout io.WriteCloser
 	stderr io.WriteCloser
+
+	binPath          string
+	metricsCollector metrics.Collector
 }
 
 // NewRethClient creates a new client for reth.
-func NewRethClient(logger log.Logger, options *config.InternalClientOptions) types.ExecutionClient {
+func NewRethClient(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager) types.ExecutionClient {
 	return &RethClient{
 		logger:  logger,
 		options: options,
+		ports:   ports,
+		binPath: options.RethBin,
 	}
+}
+
+func NewRethClientWithBin(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager, binPath string) types.ExecutionClient {
+	return &RethClient{
+		logger:  logger,
+		options: options,
+		ports:   ports,
+		binPath: binPath,
+	}
+}
+
+func (r *RethClient) MetricsCollector() metrics.Collector {
+	return r.metricsCollector
 }
 
 // Run runs the reth client with the given runtime config.
@@ -54,14 +78,20 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--chain", r.options.ChainCfgPath)
 	args = append(args, "--datadir", r.options.DataDirPath)
 
+	r.rpcPort = r.ports.AcquirePort("reth", portmanager.ELPortPurpose)
+	r.authRPCPort = r.ports.AcquirePort("reth", portmanager.AuthELPortPurpose)
+	r.metricsPort = r.ports.AcquirePort("reth", portmanager.ELMetricsPortPurpose)
+
 	// todo: make this dynamic eventually
 	args = append(args, "--http")
-	args = append(args, "--http.port", strconv.Itoa(r.options.RethHttpPort))
+	args = append(args, "--http.port", fmt.Sprintf("%d", r.rpcPort))
 	args = append(args, "--http.api", "eth,net,web3,miner")
-	args = append(args, "--authrpc.port", strconv.Itoa(r.options.RethAuthRpcPort))
+	args = append(args, "--authrpc.port", fmt.Sprintf("%d", r.authRPCPort))
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
-	args = append(args, "--metrics", strconv.Itoa(r.options.RethMetricsPort))
+	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
 	args = append(args, "-vvv")
+
+	args = append(args, cfg.Args...)
 
 	// increase mempool size
 	args = append(args, "--txpool.pending-max-count", "100000000")
@@ -112,7 +142,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	r.logger.Debug("starting reth", "args", strings.Join(args, " "))
 
-	r.process = exec.Command(r.options.RethBin, args...)
+	r.process = exec.Command(r.binPath, args...)
 	r.process.Stdout = r.stdout
 	r.process.Stderr = r.stderr
 	err = r.process.Start()
@@ -120,7 +150,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 		return err
 	}
 
-	r.clientURL = fmt.Sprintf("http://127.0.0.1:%d", r.options.RethHttpPort)
+	r.clientURL = fmt.Sprintf("http://127.0.0.1:%d", r.rpcPort)
 	rpcClient, err := rpc.DialOptions(ctx, r.clientURL, rpc.WithHTTPClient(&http.Client{
 		Timeout: 30 * time.Second,
 	}))
@@ -129,13 +159,14 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	}
 
 	r.client = ethclient.NewClient(rpcClient)
+	r.metricsCollector = newMetricsCollector(r.logger, r.client, int(r.metricsPort))
 
 	err = common.WaitForRPC(ctx, r.client)
 	if err != nil {
 		return errors.Wrap(err, "geth rpc failed to start")
 	}
 
-	l2Node, err := client.NewRPC(ctx, r.logger, fmt.Sprintf("http://127.0.0.1:%d", r.options.RethAuthRpcPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(240*time.Second))
+	l2Node, err := client.NewRPC(ctx, r.logger, fmt.Sprintf("http://127.0.0.1:%d", r.authRPCPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(240*time.Second))
 	if err != nil {
 		return err
 	}
@@ -165,6 +196,11 @@ func (r *RethClient) Stop() {
 	_ = r.stdout.Close()
 	_ = r.stderr.Close()
 
+	// Release the ports
+	r.ports.ReleasePort(r.rpcPort)
+	r.ports.ReleasePort(r.authRPCPort)
+	r.ports.ReleasePort(r.metricsPort)
+
 	r.stdout = nil
 	r.stderr = nil
 	r.process = nil
@@ -186,5 +222,5 @@ func (r *RethClient) AuthClient() client.RPC {
 }
 
 func (r *RethClient) MetricsPort() int {
-	return r.options.RethMetricsPort
+	return int(r.metricsPort)
 }

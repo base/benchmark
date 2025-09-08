@@ -4,26 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"time"
 
-	"github.com/base/base-bench/runner/benchmark"
-	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/log"
+	io_prometheus_client "github.com/prometheus/client_model/go"
 )
 
-const (
-	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
-	NewPayloadLatencyMetric       = "latency/new_payload"
-	GetPayloadLatencyMetric       = "latency/get_payload"
-	SendTxsLatencyMetric          = "latency/send_txs"
-	GasPerBlockMetric             = "gas/per_block"
-	GasPerSecondMetric            = "gas/per_second"
-	TransactionsPerBlockMetric    = "transactions/per_block"
-)
-
-type MetricsCollector interface {
+type Collector interface {
 	Collect(ctx context.Context, metrics *BlockMetrics) error
 	GetMetrics() []BlockMetrics
 }
@@ -34,14 +23,105 @@ type BlockMetrics struct {
 	ExecutionMetrics map[string]interface{}
 }
 
-func NewBlockMetrics(blockNumber uint64) *BlockMetrics {
+func NewBlockMetrics() *BlockMetrics {
 	return &BlockMetrics{
-		BlockNumber:      blockNumber,
+		BlockNumber:      0,
 		ExecutionMetrics: make(map[string]interface{}),
 		Timestamp:        time.Now(),
 	}
 }
 
+func (m *BlockMetrics) SetBlockNumber(blockNumber uint64) {
+	m.BlockNumber = blockNumber
+}
+
+func (m *BlockMetrics) Copy() *BlockMetrics {
+	newMetrics := make(map[string]interface{})
+	maps.Copy(newMetrics, m.ExecutionMetrics)
+	return &BlockMetrics{
+		BlockNumber:      m.BlockNumber,
+		ExecutionMetrics: newMetrics,
+		Timestamp:        m.Timestamp,
+	}
+}
+
+func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_client.Metric) error {
+	if value.Histogram != nil {
+		avgName := name + "_avg"
+		// get the average change in sum divided by the average change in count
+		prevSum := 0.0
+		prevValue, ok := m.ExecutionMetrics[name].(*io_prometheus_client.Metric)
+		if !ok {
+			prevValue = nil
+		}
+		if prevValue != nil {
+			if prevValue.Histogram.SampleSum != nil {
+				prevSum = *prevValue.Histogram.SampleSum
+			}
+		}
+		sum := 0.0
+		if value.Histogram.SampleSum != nil {
+			sum = *value.Histogram.SampleSum
+		}
+		prevCount := 0.0
+		if prevValue != nil {
+			if prevValue.Histogram.SampleCount != nil {
+				prevCount = float64(*prevValue.Histogram.SampleCount)
+			}
+		}
+		count := 0.0
+		if value.Histogram.SampleCount != nil {
+			count = float64(*value.Histogram.SampleCount)
+		}
+		if count == 0 {
+			count = 1
+		}
+		averageChange := (sum - prevSum) / (count - prevCount)
+		m.ExecutionMetrics[name] = value
+		m.ExecutionMetrics[avgName] = averageChange
+	} else if value.Gauge != nil {
+		m.ExecutionMetrics[name] = *value.Gauge.Value
+	} else if value.Counter != nil {
+		m.ExecutionMetrics[name] = *value.Counter.Value
+	} else if value.Summary != nil {
+		avgName := name + "_avg"
+		// get the average change in sum divided by the average change in count
+		prevSum := 0.0
+
+		prevValue, ok := m.ExecutionMetrics[name].(*io_prometheus_client.Metric)
+		if !ok {
+			prevValue = nil
+		}
+		if prevValue != nil {
+			if prevValue.Summary.SampleSum != nil {
+				prevSum = *prevValue.Summary.SampleSum
+			}
+		}
+		sum := 0.0
+		if value.Summary.SampleSum != nil {
+			sum = *value.Summary.SampleSum
+		}
+		prevCount := 0.0
+		if prevValue != nil {
+			if prevValue.Summary.SampleCount != nil {
+				prevCount = float64(*prevValue.Summary.SampleCount)
+			}
+		}
+		count := 0.0
+		if value.Summary.SampleCount != nil {
+			count = float64(*value.Summary.SampleCount)
+		}
+		if count == 0 {
+			count = 1
+		}
+		averageChange := (sum - prevSum) / (count - prevCount)
+		m.ExecutionMetrics[name] = value
+		m.ExecutionMetrics[avgName] = averageChange
+	} else {
+		return fmt.Errorf("invalid metric type for %s: %#v", name, value)
+	}
+	return nil
+}
 func (m *BlockMetrics) AddExecutionMetric(name string, value interface{}) {
 	m.ExecutionMetrics[name] = value
 }
@@ -78,63 +158,6 @@ func (m *BlockMetrics) GetMetricFloat(name string) (float64, bool) {
 	return 0, false
 }
 
-func getAverage(metrics []BlockMetrics, metricName string) float64 {
-	var total float64
-	var count int
-	for _, metric := range metrics {
-		if value, ok := metric.GetMetricFloat(metricName); ok {
-			total += value
-			count++
-		}
-	}
-	if count == 0 {
-		return 0
-	}
-	return total / float64(count)
-}
-
-func BlockMetricsToValidatorSummary(metrics []BlockMetrics) *benchmark.ValidatorKeyMetrics {
-	averageNewPayloadLatency := getAverage(metrics, NewPayloadLatencyMetric)
-	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
-
-	return &benchmark.ValidatorKeyMetrics{
-		AverageNewPayloadLatency: averageNewPayloadLatency,
-		CommonKeyMetrics: benchmark.CommonKeyMetrics{
-			AverageGasPerSecond: averageGasPerSecond,
-		},
-	}
-}
-
-func BlockMetricsToSequencerSummary(metrics []BlockMetrics) *benchmark.SequencerKeyMetrics {
-	averageUpdateForkChoiceLatency := getAverage(metrics, UpdateForkChoiceLatencyMetric)
-	averageSendTxsLatency := getAverage(metrics, SendTxsLatencyMetric)
-	averageGetPayloadLatency := getAverage(metrics, GetPayloadLatencyMetric)
-	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
-
-	return &benchmark.SequencerKeyMetrics{
-		AverageFCULatency:        averageUpdateForkChoiceLatency,
-		AverageSendTxsLatency:    averageSendTxsLatency,
-		AverageGetPayloadLatency: averageGetPayloadLatency,
-		CommonKeyMetrics: benchmark.CommonKeyMetrics{
-			AverageGasPerSecond: averageGasPerSecond,
-		},
-	}
-}
-
-func NewMetricsCollector(
-	log log.Logger,
-	client *ethclient.Client,
-	clientName string,
-	metricsPort int) MetricsCollector {
-	switch clientName {
-	case "geth":
-		return NewGethMetricsCollector(log, client, metricsPort)
-	case "reth":
-		return NewRethMetricsCollector(log, client, metricsPort)
-	}
-	panic(fmt.Sprintf("unknown client: %s", clientName))
-}
-
 type MetricsWriter interface {
 	Write(metrics []BlockMetrics) error
 }
@@ -152,6 +175,7 @@ func NewFileMetricsWriter(baseDir string) *FileMetricsWriter {
 const MetricsFileName = "metrics.json"
 
 func (w *FileMetricsWriter) Write(metrics []BlockMetrics) error {
+	fmt.Println("Writing metrics to", w.BaseDir)
 	filename := path.Join(w.BaseDir, MetricsFileName)
 
 	data, err := json.MarshalIndent(metrics, "", "  ")

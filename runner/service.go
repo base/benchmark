@@ -21,6 +21,7 @@ import (
 
 	"github.com/base/base-bench/runner/aws"
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
@@ -40,6 +41,7 @@ type service struct {
 	// tracks the state of the datadirs for each test
 	// this is used to avoid copying the datadirs for each test
 	dataDirState benchmark.SnapshotManager
+	portState    portmanager.PortManager
 	metadataPath string
 
 	config    config.Config
@@ -53,6 +55,7 @@ func NewService(version string, cfg config.Config, log log.Logger) Service {
 
 	s := &service{
 		metadataPath: metadataPath,
+		portState:    portmanager.NewPortManager(),
 		dataDirState: benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
 		config:       cfg,
 		version:      version,
@@ -441,7 +444,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	}
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
