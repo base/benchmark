@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	RethBin     = "reth-bin"
-	RbuilderBin = "rbuilder-bin"
-	GethBin     = "geth-bin"
+	RethBin       = "reth-bin"
+	RbuilderBin   = "rbuilder-bin"
+	GethBin       = "geth-bin"
+	RethTriedbBin = "reth-triedb-bin"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -31,6 +32,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "Rbuilder binary path",
 			Value:   "rbuilder",
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "RBUILDER_BIN"),
+		},
+		&cli.StringFlag{
+			Name:    RethTriedbBin,
+			Usage:   "Reth-TrieDB binary path",
+			Value:   "reth-triedb",
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "RETH_TRIEDB_BIN"),
 		},
 	}
 }

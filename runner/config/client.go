@@ -7,6 +7,7 @@ import (
 	gethoptions "github.com/base/base-bench/runner/clients/geth/options"
 	rbuilderoptions "github.com/base/base-bench/runner/clients/rbuilder/options"
 	rethoptions "github.com/base/base-bench/runner/clients/reth/options"
+	rethtriedboptions "github.com/base/base-bench/runner/clients/rethtriedb/options"
 	"github.com/base/base-bench/runner/flags"
 )
 
@@ -16,6 +17,7 @@ type ClientOptions struct {
 	rethoptions.RethOptions
 	gethoptions.GethOptions
 	rbuilderoptions.RbuilderOptions
+	rethtriedboptions.RethTriedbOptions
 	PortOverrides PortOverrides
 }
 
@@ -57,6 +59,9 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 		},
 		RbuilderOptions: rbuilderoptions.RbuilderOptions{
 			RbuilderBin: ctx.String(flags.RbuilderBin),
+		},
+		RethTriedbOptions: rethtriedboptions.RethTriedbOptions{
+			RethTriedbBin: ctx.String(flags.RethTriedbBin),
 		},
 	}
 

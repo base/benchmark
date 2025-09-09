@@ -48,5 +48,9 @@ build-geth:
 build-rbuilder:
 	cd clients && ./build-rbuilder.sh
 
+.PHONY: build-reth-triedb
+build-reth-triedb:
+	cd clients && ./build-reth-triedb.sh
+
 .PHONY: build-binaries
-build-binaries: build-reth build-geth build-rbuilder
+build-binaries: build-reth build-geth build-rbuilder build-reth-triedb

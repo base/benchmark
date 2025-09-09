@@ -20,6 +20,8 @@ func NewClient(client Client, logger log.Logger, options *config.InternalClientO
 		return geth.NewGethClient(logger, options, portManager)
 	case Rbuilder:
 		return rbuilder.NewRbuilderClient(logger, options, portManager)
+	case RethTrieDB:
+		return reth.NewRethClientWithBin(logger, options, portManager, options.RethTriedbBin)
 	default:
 		panic("unknown client")
 	}
@@ -32,4 +34,5 @@ const (
 	Reth Client = iota
 	Geth
 	Rbuilder
+	RethTrieDB
 )
