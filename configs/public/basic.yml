@@ -17,9 +17,8 @@ benchmarks:
         value: transfer-only
       - type: node_type
         values:
-          #- reth
           - reth
-          #- reth-triedb
+          - geth
       - type: num_blocks
         value: 10
       - type: gas_limit
