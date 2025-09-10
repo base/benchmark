@@ -7,6 +7,7 @@ import StatusBadge from "./StatusBadge";
 import StatusSummary from "./StatusSummary";
 import ConfigurationTags from "./ConfigurationTags";
 import Tooltip from "./Tooltip";
+import MachineInfo from "./MachineInfo";
 import clsx from "clsx";
 
 interface ProvidedProps {
@@ -209,6 +210,12 @@ const RunList = ({
 
             {isExpanded && (
               <div className="mt-4">
+                {/* Machine Information Section */}
+                {section.runs.length > 0 && section.runs[0].machineInfo && (
+                  <div className="mb-6">
+                    <MachineInfo machineInfo={section.runs[0].machineInfo} />
+                  </div>
+                )}  
                 <table className="min-w-full">
                   <thead className="bg-slate-50">
                     <tr>

@@ -1,4 +1,5 @@
 import { BenchmarkRun } from "../types";
+import MachineInfo from "./MachineInfo";
 
 interface ProvidedProps {
   benchmarkRuns: BenchmarkRun[];
@@ -21,6 +22,7 @@ const BenchmarkRunDetails = ({ benchmarkRuns }: ProvidedProps) => {
       <p className="text-sm text-slate-700 max-w-2xl">
         {benchmarkRuns[0].testDescription}
       </p>
+      <MachineInfo machineInfo={benchmarkRuns[0].machineInfo} />
     </div>
   );
 };

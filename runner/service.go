@@ -574,7 +574,18 @@ func (s *service) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to setup initial snapshots")
 	}
 
-	metadata := benchmark.RunGroupFromTestPlans(testPlans)
+	// Create machine info from config
+	var machineInfo *benchmark.MachineInfo
+	if s.config.MachineType() != "" || s.config.MachineProvider() != "" || s.config.MachineRegion() != "" || s.config.FileSystem() != "" {
+		machineInfo = &benchmark.MachineInfo{
+			Type:       s.config.MachineType(),
+			Provider:   s.config.MachineProvider(),
+			Region:     s.config.MachineRegion(),
+			FileSystem: s.config.FileSystem(),
+		}
+	}
+
+	metadata := benchmark.RunGroupFromTestPlans(testPlans, machineInfo)
 
 	// Apply BenchmarkRunID to all runs in metadata
 	for i := range metadata.Runs {

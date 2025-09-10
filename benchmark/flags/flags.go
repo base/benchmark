@@ -84,6 +84,31 @@ var (
 		Usage:   "Custom benchmark run ID (auto-generated if not provided)",
 		EnvVars: prefixEnvVars("BENCHMARK_RUN_ID"),
 	}
+
+	MachineTypeFlag = &cli.StringFlag{
+		Name:    "machine-type",
+		Usage:   "Machine type (e.g., i4i.32xlarge)",
+		EnvVars: prefixEnvVars("MACHINE_TYPE"),
+	}
+
+	MachineProviderFlag = &cli.StringFlag{
+		Name:    "machine-provider",
+		Usage:   "Cloud provider (aws or gcp)",
+		EnvVars: prefixEnvVars("MACHINE_PROVIDER"),
+	}
+
+	MachineRegionFlag = &cli.StringFlag{
+		Name:    "machine-region",
+		Usage:   "Machine region",
+		EnvVars: prefixEnvVars("MACHINE_REGION"),
+	}
+
+	FileSystemFlag = &cli.StringFlag{
+		Name:    "file-system",
+		Usage:   "File system type",
+		Value:   "ext4",
+		EnvVars: prefixEnvVars("FILE_SYSTEM"),
+	}
 )
 
 // Flags contains the list of configuration options available to the binary.
@@ -98,6 +123,10 @@ var RunFlags = []cli.Flag{
 	EnableS3Flag,
 	S3BucketFlag,
 	BenchmarkRunIDFlag,
+	MachineTypeFlag,
+	MachineProviderFlag,
+	MachineRegionFlag,
+	FileSystemFlag,
 }
 
 func init() {

@@ -13,6 +13,14 @@ type RunResult struct {
 	ValidatorMetrics types.ValidatorKeyMetrics `json:"validatorMetrics"`
 }
 
+// MachineInfo contains information about the machine running the benchmark
+type MachineInfo struct {
+	Type       string `json:"type,omitempty"`       // e.g., i4i.32xlarge
+	Provider   string `json:"provider,omitempty"`   // aws or gcp
+	Region     string `json:"region,omitempty"`     // e.g., us-east-1
+	FileSystem string `json:"fileSystem,omitempty"` // e.g., ext4
+}
+
 // Run is the output JSON metadata for a benchmark run.
 type Run struct {
 	ID              string                 `json:"id"`
@@ -25,6 +33,7 @@ type Run struct {
 	Result          *RunResult             `json:"result"`
 	Thresholds      *ThresholdConfig       `json:"thresholds"`
 	CreatedAt       *time.Time             `json:"createdAt"`
+	MachineInfo     *MachineInfo           `json:"machineInfo,omitempty"`
 }
 
 // RunGroup is a group of runs that is meant to be compared.
@@ -45,7 +54,7 @@ const (
 	BenchmarkRunTag = "BenchmarkRun"
 )
 
-func RunGroupFromTestPlans(testPlans []TestPlan) RunGroup {
+func RunGroupFromTestPlans(testPlans []TestPlan, machineInfo *MachineInfo) RunGroup {
 	now := time.Now()
 	metadata := RunGroup{
 		Runs: make([]Run, 0),
@@ -62,6 +71,7 @@ func RunGroupFromTestPlans(testPlans []TestPlan) RunGroup {
 				OutputDir:       params.OutputDir,
 				Thresholds:      testPlan.Thresholds,
 				CreatedAt:       &now,
+				MachineInfo:     machineInfo,
 			})
 		}
 	}
