@@ -7,7 +7,7 @@ if [ -f "versions.env" ]; then
     source versions.env
 else
     # Default values
-    RETH_TRIEDB_REPO="${RETH_TRIEDB_REPO:-https://github.com/base/reth-triedb/}"
+    RETH_TRIEDB_REPO="${RETH_TRIEDB_REPO:-https://github.com/base/reth-triedb/pull/17}"
     RETH_TRIEDB_VERSION="${RETH_TRIEDB_VERSION:-main}"
     BUILD_DIR="${BUILD_DIR:-./build}"
     OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
@@ -40,19 +40,19 @@ git checkout "$RETH_TRIEDB_VERSION"
 
 # Build the binary using cargo
 echo "Building reth-triedb with cargo..."
-cargo build --release --bin reth || cargo build --release --bin reth-triedb
+cargo build --release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
 
 # Copy binary to output directory
 echo "Copying binary to output directory..."
 mkdir -p "../../$OUTPUT_DIR"
 
 # Prefer a binary named reth-triedb if the repo provides it; otherwise copy reth and rename
-if [ -f target/release/reth-triedb ]; then
-    cp target/release/reth-triedb "../../$OUTPUT_DIR/reth-triedb"
+if [ -f target/release/op-reth ]; then
+    cp target/release/op-reth "../../$OUTPUT_DIR/reth-triedb"
 elif [ -f target/release/reth ]; then
-    cp target/release/reth "../../$OUTPUT_DIR/reth-triedb"
+    cp target/release/op-reth "../../$OUTPUT_DIR/reth-triedb"
 else
-    echo "Error: Built binary not found (expected target/release/reth or target/release/reth-triedb)" >&2
+    echo "Error: Built binary not found (expected target/release/op-reth or target/release/reth-triedb)" >&2
     exit 1
 fi
 

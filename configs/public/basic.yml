@@ -17,7 +17,7 @@ benchmarks:
         value: transfer-only
       - type: node_type
         values:
-          - reth
+          #- reth
           - reth
           #- reth-triedb
       - type: num_blocks
