@@ -58,10 +58,10 @@ func NewConfig(ctx *cli.Context) Config {
 		enableS3:        ctx.Bool(appFlags.EnableS3FlagName),
 		s3Bucket:        ctx.String(appFlags.S3BucketFlagName),
 		benchmarkRunID:  ctx.String(appFlags.BenchmarkRunIDFlagName),
-		machineType:     ctx.String("machine-type"),
-		machineProvider: ctx.String("machine-provider"),
-		machineRegion:   ctx.String("machine-region"),
-		fileSystem:      ctx.String("file-system"),
+		machineType:     ctx.String(appFlags.MachineTypeFlagName),
+		machineProvider: ctx.String(appFlags.MachineProviderFlagName),
+		machineRegion:   ctx.String(appFlags.MachineRegionFlagName),
+		fileSystem:      ctx.String(appFlags.FileSystemFlagName),
 		clientOptions:   ReadClientOptions(ctx),
 	}
 }

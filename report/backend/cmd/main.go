@@ -4,7 +4,9 @@ import (
 	"context"
 	"net/http"
 	"os"
+	"os/signal"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"benchmark-report-api/internal/config"
@@ -100,7 +102,57 @@ type ServerService struct {
 
 func (s *ServerService) Start(ctx context.Context) error {
 	s.logger.Info("Server starting", "addr", s.server.Addr)
-	return s.server.ListenAndServe()
+
+	// Create a channel to listen for OS signals (Ctrl+C, SIGTERM)
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigChan) // Clean up signal notification
+
+	// Start server in a goroutine
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+	}()
+
+	// Wait for either a signal or server error
+	select {
+	case err := <-serverErr:
+		s.logger.Error("Server failed to start", "error", err)
+		return err
+	case sig := <-sigChan:
+		s.logger.Info("Received shutdown signal", "signal", sig)
+
+		// Create a context with timeout for graceful shutdown
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		s.logger.Info("Shutting down server gracefully...")
+		if err := s.server.Shutdown(shutdownCtx); err != nil {
+			s.logger.Error("Server forced to shutdown", "error", err)
+			return err
+		}
+
+		s.logger.Info("Server shutdown complete")
+		s.stopped.Store(true)
+		return nil
+	case <-ctx.Done():
+		s.logger.Info("Context cancelled, shutting down server")
+
+		// Create a context with timeout for graceful shutdown
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+
+		if err := s.server.Shutdown(shutdownCtx); err != nil {
+			s.logger.Error("Server forced to shutdown", "error", err)
+			return err
+		}
+
+		s.logger.Info("Server shutdown complete")
+		s.stopped.Store(true)
+		return ctx.Err()
+	}
 }
 
 func (s *ServerService) Stop(ctx context.Context) error {

@@ -12,3 +12,10 @@ contracts/abi/
 benchmark/benchmark
 
 .env
+
+# Node
+coverage/
+!**/__fixtures__/coverage
+node_modules
+yarn-debug.log*
+yarn-error.log*

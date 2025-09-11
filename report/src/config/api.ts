@@ -9,19 +9,32 @@ export interface ApiConfig {
   };
 }
 
+// Runtime configuration interface for type safety
+interface RuntimeConfig {
+  API_BASE_URL?: string;
+}
+
+// Extend Window interface to include runtime config
+declare global {
+  interface Window {
+    __RUNTIME_CONFIG__?: RuntimeConfig;
+  }
+}
+
 // Get API base URL from environment or default to localhost
 const getApiBaseUrl = (): string => {
   // Check for environment variable (useful for build-time configuration)
   if (typeof window !== 'undefined') {
     // Client-side: check for runtime configuration
-    const runtimeConfig = (window as any).__RUNTIME_CONFIG__;
+    const runtimeConfig = window.__RUNTIME_CONFIG__;
     if (runtimeConfig?.API_BASE_URL) {
       return runtimeConfig.API_BASE_URL;
     }
   }
 
   // Fallback to environment variable or default
-  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  const viteEnv = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
+  return viteEnv.VITE_API_BASE_URL || 'http://localhost:8080';
 };
 
 export const apiConfig: ApiConfig = {

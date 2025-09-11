@@ -33,7 +33,7 @@ func MetricsHandler(s3Service *services.S3Service, l log.Logger) gin.HandlerFunc
 			return
 		}
 
-		c.Header("Cache-Control", "public, max-age=604800") // 7 days
+		c.Header("Cache-Control", "public, max-age=43200") // 12 hours
 		c.Header("Content-Type", "application/json")
 		c.Data(http.StatusOK, "application/json", data)
 	}

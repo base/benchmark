@@ -45,6 +45,13 @@ type BenchmarkResult struct {
 	ValidatorMetrics ValidatorMetrics `json:"validatorMetrics"`
 }
 
+type MachineInfo struct {
+	Type       string `json:"type"`
+	Provider   string `json:"provider"`
+	Region     string `json:"region"`
+	FileSystem string `json:"fileSystem"`
+}
+
 // BenchmarkRun represents a single benchmark run
 type BenchmarkRun struct {
 	ID              string              `json:"id"`
@@ -57,6 +64,7 @@ type BenchmarkRun struct {
 	Thresholds      interface{}         `json:"thresholds"`
 	CreatedAt       *time.Time          `json:"createdAt"`
 	BucketPath      string              `json:"bucketPath,omitempty"`
+	MachineInfo     MachineInfo         `json:"machineInfo,omitempty"`
 }
 
 // S3Service handles interactions with AWS S3

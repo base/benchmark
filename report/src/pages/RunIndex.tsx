@@ -128,6 +128,8 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
             filterOptions={filterOptions}
             filterSelections={filterSelections}
             updateFilterSelection={updateFilterSelection}
+            allRuns={testRunsWithStatus}
+            testName={benchmarkRuns.runs[0]?.testName || "Benchmark"}
           />
         </div>
         <RunList

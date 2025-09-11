@@ -8,6 +8,8 @@ import StatusSummary from "./StatusSummary";
 import ConfigurationTags from "./ConfigurationTags";
 import Tooltip from "./Tooltip";
 import MachineInfo from "./MachineInfo";
+import { downloadRunInfo, downloadRunInfoCSV } from "../utils/downloadUtils";
+import FloatingDropdown from "./FloatingDropdown";
 import clsx from "clsx";
 
 interface ProvidedProps {
@@ -170,6 +172,71 @@ const RunList = ({
     return <MetricValue value={value} unit={unit} />;
   };
 
+  // Download button component
+  const DownloadButton = ({ runs, gasConfigName }: { runs: BenchmarkRunWithStatus[], gasConfigName: string }) => {
+    const [isOpen, setIsOpen] = useState(false);
+
+    const handleDownloadJSON = () => {
+      downloadRunInfo(runs, gasConfigName);
+      setIsOpen(false);
+    };
+
+    const handleDownloadCSV = () => {
+      downloadRunInfoCSV(runs, gasConfigName);
+      setIsOpen(false);
+    };
+
+    const trigger = (
+      <button
+        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-150"
+        aria-label="Download run information"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+        Download
+        <svg className={clsx("w-4 h-4 transition-transform duration-150", isOpen && "rotate-180")} fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+        </svg>
+      </button>
+    );
+
+    const content = (
+      <>
+        <button
+          onClick={handleDownloadJSON}
+          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Download as JSON
+        </button>
+        <button
+          onClick={handleDownloadCSV}
+          className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 flex items-center gap-2"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          Download as CSV
+        </button>
+      </>
+    );
+
+    return (
+      <FloatingDropdown
+        trigger={trigger}
+        isOpen={isOpen}
+        onToggle={() => setIsOpen(!isOpen)}
+        onClose={() => setIsOpen(false)}
+        placement="bottom-right"
+      >
+        {content}
+      </FloatingDropdown>
+    );
+  };
+
   return (
     <div className="p-6 overflow-x-auto flex-grow border-slate-200">
       {groupedSections.map((section) => {
@@ -183,37 +250,52 @@ const RunList = ({
 
         return (
           <div key={section.key} className="mb-4">
-            <button
-              className="flex items-center gap-4 w-full text-left p-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-              onClick={() => toggleSection(section.key)}
-            >
-              <span className="inline-flex items-center justify-center w-6 h-6 text-slate-700">
-                <svg
-                  className={clsx(
-                    "w-6 h-6 transition-transform duration-150",
-                    isExpanded ? "" : "-rotate-90",
-                  )}
-                  fill="currentColor"
-                >
-                  <path d="m6 9 6 6 6-6" />
-                </svg>
-              </span>
-              <div className="flex-1">
-                <div className="flex items-center gap-4">
-                  <span className="text-xl font-medium text-slate-900">
-                    {formatValue(gasPerSecond, "gas/s")}
-                  </span>
-                  <StatusSummary statusCounts={statusCounts} />
+            <div className="flex items-center gap-4 w-full">
+              <button
+                className="flex items-center gap-4 flex-1 text-left p-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                onClick={() => toggleSection(section.key)}
+              >
+                <span className="inline-flex items-center justify-center w-6 h-6 text-slate-700">
+                  <svg
+                    className={clsx(
+                      "w-6 h-6 transition-transform duration-150",
+                      isExpanded ? "" : "-rotate-90",
+                    )}
+                    fill="currentColor"
+                  >
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-4">
+                    <span className="text-xl font-medium text-slate-900">
+                      {formatValue(gasPerSecond, "gas/s")}
+                    </span>
+                    <StatusSummary statusCounts={statusCounts} />
+                  </div>
                 </div>
+              </button>
+              <div className="flex-shrink-0">
+                <DownloadButton 
+                  runs={section.runs} 
+                  gasConfigName={`${formatValue(gasPerSecond, "gas/s")} (${section.testName})`}
+                />
               </div>
-            </button>
+            </div>
 
             {isExpanded && (
               <div className="mt-4">
                 {/* Machine Information Section */}
-                {section.runs.length > 0 && section.runs[0].machineInfo && (
+                {section.runs.length > 0 && (
                   <div className="mb-6">
-                    <MachineInfo machineInfo={section.runs[0].machineInfo} />
+                    {section.runs[0].machineInfo ? (
+                      <MachineInfo machineInfo={section.runs[0].machineInfo} />
+                    ) : (
+                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                        <h3 className="text-sm font-semibold text-slate-700 mb-2">Machine Information</h3>
+                        <p className="text-sm text-slate-500">Machine information not available for this benchmark run.</p>
+                      </div>
+                    )}
                   </div>
                 )}  
                 <table className="min-w-full">

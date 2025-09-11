@@ -23,6 +23,10 @@ const (
 	TxFuzzBinFlagName      = "tx-fuzz-bin"
 	ProxyPortFlagName      = "proxy-port"
 	BenchmarkRunIDFlagName = "benchmark-run-id"
+	MachineTypeFlagName     = "machine-type"
+	MachineProviderFlagName = "machine-provider"
+	MachineRegionFlagName   = "machine-region"
+	FileSystemFlagName      = "file-system"
 )
 
 // TxFuzz defaults

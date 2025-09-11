@@ -76,6 +76,11 @@ func NewService(version string, cfg config.Config, log log.Logger) Service {
 	return s
 }
 
+func (s *service) fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
@@ -121,14 +126,19 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 		// Get the initial snapshot path for this node type
 		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
 
-		if initialSnapshotPath != "" {
+		if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
 			// Copy from initial snapshot to test-specific directory
 			err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to copy from initial snapshot")
 			}
+			s.log.Info("Copied from initial snapshot", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath)
 		} else {
-			// Fallback to old behavior if no initial snapshot exists
+			// Fallback to direct snapshot creation
+			if initialSnapshotPath != "" {
+				s.log.Warn("Initial snapshot path registered but doesn't exist, falling back to direct snapshot creation",
+					"path", initialSnapshotPath, "nodeType", params.NodeType)
+			}
 			snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to ensure snapshot")
@@ -191,14 +201,6 @@ type TestRunMetadata struct {
 
 func (s *service) exportOutput(testName string, returnedError error, testDirs *config.InternalClientOptions, testOutputDir string, nodeType string) error {
 	// package up logs from the EL client and write them to the output dir
-	// outputDir/
-	//  ├── <testName>
-	//  │   ├── result-<node_type>.json
-	//  │   ├── logs-<node_type>.gz
-	//  │   ├── metrics-<node_type>.json
-
-	// create output directory
-
 	// copy metrics.json to output dir
 	metricsPath := path.Join(testDirs.MetricsPath, metrics.MetricsFileName)
 	metricsOutputPath := path.Join(testOutputDir, fmt.Sprintf("metrics-%s.json", nodeType))
@@ -576,6 +578,12 @@ func (s *service) Run(ctx context.Context) error {
 
 	// Create machine info from config
 	var machineInfo *benchmark.MachineInfo
+	s.log.Info("Machine info config values",
+		"type", s.config.MachineType(),
+		"provider", s.config.MachineProvider(),
+		"region", s.config.MachineRegion(),
+		"fileSystem", s.config.FileSystem())
+
 	if s.config.MachineType() != "" || s.config.MachineProvider() != "" || s.config.MachineRegion() != "" || s.config.FileSystem() != "" {
 		machineInfo = &benchmark.MachineInfo{
 			Type:       s.config.MachineType(),
@@ -583,6 +591,9 @@ func (s *service) Run(ctx context.Context) error {
 			Region:     s.config.MachineRegion(),
 			FileSystem: s.config.FileSystem(),
 		}
+		s.log.Info("Created machine info", "machineInfo", machineInfo)
+	} else {
+		s.log.Warn("No machine info available - all config values are empty")
 	}
 
 	metadata := benchmark.RunGroupFromTestPlans(testPlans, machineInfo)

@@ -58,6 +58,10 @@ build-binaries: build-reth build-geth build-rbuilder
 build-backend:
 	cd report/backend && env GO111MODULE=on GOOS=$(TARGETOS) GOARCH=$(TARGETARCH) CGO_ENABLED=0 go build -v $(LDFLAGS) -o ../../bin/base-bench-api cmd/main.go
 
+.PHONY: build-frontend
+build-frontend:
+	cd report && yarn build
+
 .PHONY: run-backend
 run-backend:
 	./bin/base-bench-api --s3-bucket ${BASE_BENCH_API_S3_BUCKET}

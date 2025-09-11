@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "IS_LOCAL=true vite",
     "build": "vite build",
     "preview": "vite preview",
     "start": "vite build && vite preview",
@@ -45,5 +45,6 @@
     "vite": "^5.1.4",
     "vite-plugin-static-copy": "^2.3.1",
     "vitest": "^3.1.2"
-  }
+  },
+  "packageManager": "yarn@4.9.4"
 }

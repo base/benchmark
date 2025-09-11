@@ -15,6 +15,7 @@ import (
 type SnapshotDefinition struct {
 	NodeType          string  `yaml:"node_type"`
 	Command           string  `yaml:"command"`
+	Destination       *string `yaml:"destination"`
 	GenesisFile       *string `yaml:"genesis_file"`
 	SuperchainChainID *uint64 `yaml:"superchain_chain_id"`
 	ForceClean        *bool   `yaml:"force_clean"`
@@ -33,12 +34,13 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 	}
 
 	// get absolute path of outputDir
-	currentDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path of outputDir: %w", err)
+	if !filepath.IsAbs(outputDir) {
+		currentDir, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path of outputDir: %w", err)
+		}
+		outputDir = path.Join(currentDir, outputDir)
 	}
-
-	outputDir = path.Join(currentDir, outputDir)
 
 	var cmdBin string
 	var args []string
@@ -131,17 +133,31 @@ func NewSnapshotManager(snapshotsDir string) SnapshotManager {
 func (b *benchmarkDatadirState) EnsureInitialSnapshot(definition SnapshotDefinition) (string, error) {
 	// Check if we already have this initial snapshot
 	if path, exists := b.initialSnapshots[definition.NodeType]; exists {
-		return path, nil
+		// Validate that the existing snapshot still exists
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+		// If it doesn't exist, remove and recreate the snapshot
+		delete(b.initialSnapshots, definition.NodeType)
 	}
 
-	// Create the initial snapshot path
-	hashCommand := sha256.New().Sum([]byte(definition.Command))
-	initialSnapshotPath := filepath.Join(b.snapshotsDir, fmt.Sprintf("initial_%s_%x", definition.NodeType, hashCommand[:12]))
+	// Use the destination path if provided, otherwise fall back to hashed path
+	var initialSnapshotPath string
+	if definition.Destination != nil && *definition.Destination != "" {
+		initialSnapshotPath = *definition.Destination
+	} else {
+		return "", fmt.Errorf("destination path is required for initial snapshots")
+	}
 
 	// Create the initial snapshot
 	err := definition.CreateSnapshot(definition.NodeType, initialSnapshotPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to create initial snapshot: %w", err)
+	}
+
+	// Validate that the snapshot was actually created
+	if _, err := os.Stat(initialSnapshotPath); err != nil {
+		return "", fmt.Errorf("initial snapshot was not created successfully at path %s: %w", initialSnapshotPath, err)
 	}
 
 	b.initialSnapshots[definition.NodeType] = initialSnapshotPath
@@ -156,6 +172,13 @@ func (b *benchmarkDatadirState) GetInitialSnapshotPath(nodeType string) string {
 }
 
 func (b *benchmarkDatadirState) CopyFromInitialSnapshot(initialSnapshotPath, testSnapshotPath string) error {
+	// Validate that the initial snapshot path exists
+	if _, err := os.Stat(initialSnapshotPath); os.IsNotExist(err) {
+		return fmt.Errorf("initial snapshot path does not exist: %s", initialSnapshotPath)
+	} else if err != nil {
+		return fmt.Errorf("failed to check initial snapshot path: %w", err)
+	}
+
 	// Remove existing test snapshot directory if it exists
 	if _, err := os.Stat(testSnapshotPath); err == nil {
 		if err := os.RemoveAll(testSnapshotPath); err != nil {
@@ -163,18 +186,41 @@ func (b *benchmarkDatadirState) CopyFromInitialSnapshot(initialSnapshotPath, tes
 		}
 	}
 
-	// Create parent directory for test snapshot
-	if err := os.MkdirAll(filepath.Dir(testSnapshotPath), 0755); err != nil {
-		return fmt.Errorf("failed to create test snapshot parent directory: %w", err)
+	// Create the test snapshot directory
+	if err := os.MkdirAll(testSnapshotPath, 0755); err != nil {
+		return fmt.Errorf("failed to create test snapshot directory: %w", err)
 	}
 
-	// Use rsync to copy the initial snapshot to the test location
-	cmd := exec.Command("rsync", "-a", initialSnapshotPath+"/", testSnapshotPath+"/")
+	// Fallback to optimized rsync
+	if err := b.copyWithOptimizedRsync(initialSnapshotPath, testSnapshotPath); err == nil {
+		return nil
+	}
+
+	// Final fallback to standard rsync
+	return b.copyWithStandardRsync(initialSnapshotPath, testSnapshotPath)
+}
+
+// copyWithOptimizedRsync uses rsync with optimized flags for better performance
+func (b *benchmarkDatadirState) copyWithOptimizedRsync(src, dst string) error {
+	cmd := exec.Command("rsync", "-aHAX", "--numeric-ids", "--inplace", "--no-whole-file", "--info=progress2", src+"/", dst+"/")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to copy initial snapshot using rsync: %w", err)
+		return fmt.Errorf("failed to copy with optimized rsync: %w", err)
+	}
+
+	return nil
+}
+
+// copyWithStandardRsync uses the original rsync approach as final fallback
+func (b *benchmarkDatadirState) copyWithStandardRsync(src, dst string) error {
+	cmd := exec.Command("rsync", "-a", src+"/", dst+"/")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to copy with standard rsync: %w", err)
 	}
 
 	return nil

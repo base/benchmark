@@ -21,7 +21,7 @@ func MetadataHandler(s3Service *services.S3Service, l log.Logger) gin.HandlerFun
 			return
 		}
 
-		c.Header("Cache-Control", "public, max-age=86400") // 1 day
+		c.Header("Cache-Control", "public, max-age=43200") // 12 hours
 		c.JSON(http.StatusOK, metadata)
 	}
 }
