@@ -35,7 +35,6 @@ type Run struct {
 	Thresholds      *ThresholdConfig       `json:"thresholds"`
 	CreatedAt       *time.Time             `json:"createdAt"`
 	MachineInfo     *MachineInfo           `json:"machineInfo"`
-	ClientVersion   string                 `json:"clientVersion,omitempty"`
 }
 
 // RunGroup is a group of runs that is meant to be compared.

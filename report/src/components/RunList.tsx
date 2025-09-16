@@ -353,7 +353,7 @@ const RunList = ({
                         <td className="px-4 py-2 text-sm text-slate-900">
                           <ConfigurationTags 
                             testConfig={run.testConfig} 
-                            clientVersion={run.clientVersion || run.result?.clientVersion}
+                            clientVersion={run.result?.clientVersion}
                           />
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">

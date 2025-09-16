@@ -69,7 +69,6 @@ export interface BenchmarkRun {
   createdAt: string;
   testConfig: Record<string, string | number>;
   machineInfo?: MachineInfo;
-  clientVersion?: string;
   thresholds?: {
     warning?: Record<string, number>;
     error?: Record<string, number>;

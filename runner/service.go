@@ -819,11 +819,6 @@ outerLoop:
 			}
 			metadata.AddResult(runIdx, *metricSummary)
 
-			// Add client version to metadata if available
-			if metricSummary.ClientVersion != "" {
-				metadata.Runs[runIdx].ClientVersion = metricSummary.ClientVersion
-			}
-
 			// Upload to S3 if enabled and test was successful
 			if s.s3Service != nil && metricSummary.Success {
 				s.log.Info("Uploading test results to S3", "runID", c.ID)
