@@ -25,4 +25,6 @@ type ExecutionClient interface {
 	AuthClient() client.RPC
 	MetricsPort() int
 	MetricsCollector() metrics.Collector
+	GetVersion(ctx context.Context) (string, error)
+	SetHead(ctx context.Context, blockNumber uint64) error
 }

@@ -10,6 +10,13 @@ import (
 	"strings"
 )
 
+const (
+	// SnapshotMethodChainCopy performs a full copy of the snapshot data (default behavior)
+	SnapshotMethodChainCopy = "chain_copy"
+	// SnapshotMethodHeadRollback uses debug.setHead to rollback to a specific block
+	SnapshotMethodHeadRollback = "head_rollback"
+)
+
 // SnapshotDefinition is the user-facing YAML configuration for specifying
 // a snapshot to be restored before running a benchmark.
 type SnapshotDefinition struct {
@@ -19,6 +26,16 @@ type SnapshotDefinition struct {
 	GenesisFile       *string `yaml:"genesis_file"`
 	SuperchainChainID *uint64 `yaml:"superchain_chain_id"`
 	ForceClean        *bool   `yaml:"force_clean"`
+	SnapshotMethod    *string `yaml:"snapshot_method"` // "chain_copy" (default) or "head_rollback"
+	RollbackBlock     *uint64 `yaml:"rollback_block"`  // Block number to rollback to (only used with head_rollback)
+}
+
+// GetSnapshotMethod returns the snapshot method, defaulting to chain_copy if not specified
+func (s SnapshotDefinition) GetSnapshotMethod() string {
+	if s.SnapshotMethod == nil || *s.SnapshotMethod == "" {
+		return SnapshotMethodChainCopy
+	}
+	return *s.SnapshotMethod
 }
 
 // CreateSnapshot copies the snapshot to the output directory for the given
@@ -73,6 +90,10 @@ type SnapshotManager interface {
 	// Returns empty string if no initial snapshot exists for the node type.
 	GetInitialSnapshotPath(nodeType string) string
 
+	// GetInitialSnapshotHeadBlock returns the head block number of the initial snapshot for the given node type.
+	// Returns 0 if no head block is recorded for the node type.
+	GetInitialSnapshotHeadBlock(nodeType string) uint64
+
 	// CopyFromInitialSnapshot copies data from an initial snapshot to a test-specific directory.
 	// This is used for per-test snapshots that need to be isolated from each other.
 	CopyFromInitialSnapshot(initialSnapshotPath, testSnapshotPath string) error
@@ -117,6 +138,9 @@ type benchmarkDatadirState struct {
 	// initialSnapshots tracks the paths to initial snapshots by node type
 	initialSnapshots map[string]string
 
+	// snapshotHeadBlocks tracks the head block number of initial snapshots by node type
+	snapshotHeadBlocks map[string]uint64
+
 	// snapshotsDir is the directory where all the snapshots are stored. Each
 	// file will have the format <nodeType>_<role>_<hash_command>.
 	snapshotsDir string
@@ -124,9 +148,10 @@ type benchmarkDatadirState struct {
 
 func NewSnapshotManager(snapshotsDir string) SnapshotManager {
 	return &benchmarkDatadirState{
-		currentDataDirs:  make(map[snapshotStoragePath]string),
-		initialSnapshots: make(map[string]string),
-		snapshotsDir:     snapshotsDir,
+		currentDataDirs:    make(map[snapshotStoragePath]string),
+		initialSnapshots:   make(map[string]string),
+		snapshotHeadBlocks: make(map[string]uint64),
+		snapshotsDir:       snapshotsDir,
 	}
 }
 
@@ -169,6 +194,13 @@ func (b *benchmarkDatadirState) GetInitialSnapshotPath(nodeType string) string {
 		return path
 	}
 	return ""
+}
+
+func (b *benchmarkDatadirState) GetInitialSnapshotHeadBlock(nodeType string) uint64 {
+	if headBlock, exists := b.snapshotHeadBlocks[nodeType]; exists {
+		return headBlock
+	}
+	return 0
 }
 
 func (b *benchmarkDatadirState) CopyFromInitialSnapshot(initialSnapshotPath, testSnapshotPath string) error {

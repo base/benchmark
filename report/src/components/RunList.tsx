@@ -351,7 +351,10 @@ const RunList = ({
                         className="transition-colors duration-150"
                       >
                         <td className="px-4 py-2 text-sm text-slate-900">
-                          <ConfigurationTags testConfig={run.testConfig} />
+                          <ConfigurationTags 
+                            testConfig={run.testConfig} 
+                            clientVersion={run.clientVersion || run.result?.clientVersion}
+                          />
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
                           <StatusBadge

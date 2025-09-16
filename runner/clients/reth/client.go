@@ -224,3 +224,41 @@ func (r *RethClient) AuthClient() client.RPC {
 func (r *RethClient) MetricsPort() int {
 	return int(r.metricsPort)
 }
+
+// GetVersion returns the version of the Reth client
+func (r *RethClient) GetVersion(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, r.binPath, "--version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get reth version")
+	}
+
+	// Parse version from output - reth version output usually has format like:
+	// reth 0.1.0-alpha.11
+	version := strings.TrimSpace(string(output))
+	if version != "" {
+		return version, nil
+	}
+
+	return "unknown", nil
+}
+
+// SetHead resets the blockchain to a specific block using debug.setHead
+func (r *RethClient) SetHead(ctx context.Context, blockNumber uint64) error {
+	if r.client == nil {
+		return errors.New("client not initialized")
+	}
+
+	// Convert block number to hex string
+	blockHex := fmt.Sprintf("0x%x", blockNumber)
+
+	// Call debug.setHead via RPC
+	var result interface{}
+	err := r.client.Client().CallContext(ctx, &result, "debug_setHead", blockHex)
+	if err != nil {
+		return errors.Wrap(err, "failed to call debug_setHead")
+	}
+
+	r.logger.Info("Successfully reset blockchain head", "blockNumber", blockNumber, "blockHex", blockHex)
+	return nil
+}

@@ -43,6 +43,7 @@ type BenchmarkResult struct {
 	Complete         bool             `json:"complete"`
 	SequencerMetrics SequencerMetrics `json:"sequencerMetrics"`
 	ValidatorMetrics ValidatorMetrics `json:"validatorMetrics"`
+	ClientVersion    string           `json:"clientVersion,omitempty"`
 }
 
 type MachineInfo struct {
@@ -65,6 +66,7 @@ type BenchmarkRun struct {
 	CreatedAt       *time.Time          `json:"createdAt"`
 	BucketPath      string              `json:"bucketPath,omitempty"`
 	MachineInfo     MachineInfo         `json:"machineInfo,omitempty"`
+	ClientVersion   string              `json:"clientVersion,omitempty"`
 }
 
 // S3Service handles interactions with AWS S3

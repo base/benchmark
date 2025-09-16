@@ -127,12 +127,24 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
 
 		if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
-			// Copy from initial snapshot to test-specific directory
-			err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to copy from initial snapshot")
+			// Check snapshot method
+			snapshotMethod := snapshot.GetSnapshotMethod()
+
+			if snapshotMethod == benchmark.SnapshotMethodHeadRollback {
+				// For head_rollback, copy the snapshot but mark it for rollback later
+				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to copy from initial snapshot for head rollback")
+				}
+				s.log.Info("Copied from initial snapshot for head rollback", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath, "method", snapshotMethod)
+			} else {
+				// Default chain_copy behavior
+				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to copy from initial snapshot")
+				}
+				s.log.Info("Copied from initial snapshot", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath)
 			}
-			s.log.Info("Copied from initial snapshot", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath)
 		} else {
 			// Fallback to direct snapshot creation
 			if initialSnapshotPath != "" {
@@ -373,6 +385,155 @@ func (s *service) setupInitialSnapshots(testPlans []benchmark.TestPlan) error {
 	return nil
 }
 
+func (s *service) detectSnapshotHeadBlocks(testPlans []benchmark.TestPlan) error {
+	// Collect all unique snapshots that use head_rollback method
+	snapshotsToDetect := make(map[string]benchmark.SnapshotDefinition)
+
+	for _, testPlan := range testPlans {
+		for _, snapshot := range testPlan.InitialSnapshots {
+			if snapshot.GetSnapshotMethod() == benchmark.SnapshotMethodHeadRollback && snapshot.RollbackBlock == nil {
+				// Only detect head block if rollback_block is not specified
+				snapshotsToDetect[snapshot.NodeType] = snapshot
+			}
+		}
+	}
+
+	if len(snapshotsToDetect) == 0 {
+		return nil // No head block detection needed
+	}
+
+	s.log.Info("Detecting head blocks for snapshots", "count", len(snapshotsToDetect))
+
+	// Detect head block for each snapshot that needs it
+	for nodeType, snapshot := range snapshotsToDetect {
+		headBlock, err := s.detectHeadBlockForSnapshot(nodeType, snapshot)
+		if err != nil {
+			s.log.Warn("Failed to detect head block for snapshot", "nodeType", nodeType, "error", err)
+			continue
+		}
+
+		s.log.Info("Detected head block for snapshot", "nodeType", nodeType, "headBlock", headBlock)
+		// Store the detected head block back into the snapshot manager
+		// We'll need to update the test plans to use this detected block
+		s.updateTestPlansWithDetectedHeadBlock(testPlans, nodeType, headBlock)
+	}
+
+	return nil
+}
+
+func (s *service) detectHeadBlockForSnapshot(nodeType string, snapshot benchmark.SnapshotDefinition) (uint64, error) {
+	// Get the snapshot path
+	snapshotPath := s.dataDirState.GetInitialSnapshotPath(nodeType)
+	if snapshotPath == "" {
+		return 0, fmt.Errorf("no initial snapshot path found for node type %s", nodeType)
+	}
+
+	// Create a temporary working directory for head block detection
+	tempDir, err := os.MkdirTemp(s.config.DataDir(), fmt.Sprintf("head-detect-%s-*", nodeType))
+	if err != nil {
+		return 0, fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Copy the snapshot to the temp directory
+	tempSnapshotPath := path.Join(tempDir, "data")
+	err = s.dataDirState.CopyFromInitialSnapshot(snapshotPath, tempSnapshotPath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to copy snapshot for head detection: %w", err)
+	}
+
+	// Create a temporary client configuration to detect the head block
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+
+	// Setup temporary client options
+	clientOptions := s.config.ClientOptions()
+	// Set SkipInit for geth since we're using a snapshot
+	clientOptions.GethOptions.SkipInit = true
+
+	tempOptions := &config.InternalClientOptions{
+		ClientOptions: clientOptions,
+		DataDirPath:   tempSnapshotPath,
+		TestDirPath:   tempDir,
+	}
+
+	// Set the appropriate binary path based on node type
+	switch nodeType {
+	case "geth":
+		tempOptions.GethBin = s.config.ClientOptions().GethBin
+	case "reth":
+		tempOptions.RethBin = s.config.ClientOptions().RethBin
+	case "rbuilder":
+		tempOptions.RbuilderBin = s.config.ClientOptions().RbuilderBin
+	}
+
+	// Create JWT secret for the temporary client
+	var jwtSecret [32]byte
+	_, err = rand.Read(jwtSecret[:])
+	if err != nil {
+		return 0, fmt.Errorf("failed to generate jwt secret: %w", err)
+	}
+
+	jwtSecretPath := path.Join(tempDir, "jwt_secret")
+	jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create jwt secret file: %w", err)
+	}
+
+	_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
+	if err != nil {
+		jwtSecretFile.Close()
+		return 0, fmt.Errorf("failed to write jwt secret: %w", err)
+	}
+	jwtSecretFile.Close()
+
+	tempOptions.JWTSecretPath = jwtSecretPath
+	tempOptions.JWTSecret = hex.EncodeToString(jwtSecret[:])
+
+	// Create a minimal genesis for the temp client
+	genesis := benchmark.DefaultDevnetGenesis()
+	chainCfgPath := path.Join(tempDir, "chain.json")
+	chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create chain config file: %w", err)
+	}
+
+	err = json.NewEncoder(chainCfgFile).Encode(genesis)
+	chainCfgFile.Close()
+	if err != nil {
+		return 0, fmt.Errorf("failed to write chain config: %w", err)
+	}
+
+	tempOptions.ChainCfgPath = chainCfgPath
+
+	// Start the temporary client to query head block
+	tempClient, _, err := network.SetupNodeForHeadDetection(ctx, s.log, nodeType, tempOptions, s.portState)
+	if err != nil {
+		return 0, fmt.Errorf("failed to setup temporary client for head detection: %w", err)
+	}
+	defer tempClient.Stop()
+
+	// Query the head block
+	currentHeader, err := tempClient.Client().HeaderByNumber(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query head block: %w", err)
+	}
+
+	return currentHeader.Number.Uint64(), nil
+}
+
+func (s *service) updateTestPlansWithDetectedHeadBlock(testPlans []benchmark.TestPlan, nodeType string, headBlock uint64) {
+	for i := range testPlans {
+		for j := range testPlans[i].InitialSnapshots {
+			snapshot := &testPlans[i].InitialSnapshots[j]
+			if snapshot.NodeType == nodeType && snapshot.GetSnapshotMethod() == benchmark.SnapshotMethodHeadRollback && snapshot.RollbackBlock == nil {
+				snapshot.RollbackBlock = &headBlock
+				s.log.Info("Updated snapshot with detected head block", "nodeType", nodeType, "headBlock", headBlock)
+			}
+		}
+	}
+}
+
 func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshots []benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
@@ -449,6 +610,11 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
+	}
+
+	// Set snapshot config for head rollback if needed
+	if snapshotConfig != nil {
+		benchmark.SetSnapshotConfig(*snapshotConfig)
 	}
 	err = benchmark.Run(ctx)
 	if err != nil {
@@ -576,6 +742,12 @@ func (s *service) Run(ctx context.Context) error {
 		return errors.Wrap(err, "failed to setup initial snapshots")
 	}
 
+	// Detect head blocks for snapshots that use head_rollback method
+	err = s.detectSnapshotHeadBlocks(testPlans)
+	if err != nil {
+		return errors.Wrap(err, "failed to detect snapshot head blocks")
+	}
+
 	// Create machine info from config
 	var machineInfo *benchmark.MachineInfo
 	s.log.Info("Machine info config values",
@@ -646,6 +818,11 @@ outerLoop:
 				numSuccess++
 			}
 			metadata.AddResult(runIdx, *metricSummary)
+
+			// Add client version to metadata if available
+			if metricSummary.ClientVersion != "" {
+				metadata.Runs[runIdx].ClientVersion = metricSummary.ClientVersion
+			}
 
 			// Upload to S3 if enabled and test was successful
 			if s.s3Service != nil && metricSummary.Success {
