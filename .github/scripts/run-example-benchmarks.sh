@@ -20,7 +20,7 @@ for config in "${BENCHMARK_CONFIGS[@]}"; do
     echo "Running $config"
     # each config will add on to the same output directory
     go run benchmark/cmd/main.go \
-        --log.level info \
+        --log.level debug \
         run \
         --config $config \
         --root-dir $TEMP_DIR/data-dir \
