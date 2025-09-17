@@ -15,6 +15,8 @@ const (
 	SnapshotMethodChainCopy = "chain_copy"
 	// SnapshotMethodHeadRollback uses debug.setHead to rollback to a specific block
 	SnapshotMethodHeadRollback = "head_rollback"
+	// SnapshotMethodReuseExisting continues using the same snapshot without modifications
+	SnapshotMethodReuseExisting = "reuse_existing"
 )
 
 // SnapshotDefinition is the user-facing YAML configuration for specifying
@@ -26,7 +28,7 @@ type SnapshotDefinition struct {
 	GenesisFile       *string `yaml:"genesis_file"`
 	SuperchainChainID *uint64 `yaml:"superchain_chain_id"`
 	ForceClean        *bool   `yaml:"force_clean"`
-	SnapshotMethod    *string `yaml:"snapshot_method"` // "chain_copy" (default) or "head_rollback"
+	SnapshotMethod    *string `yaml:"snapshot_method"` // "chain_copy" (default), "head_rollback", or "reuse_existing"
 	RollbackBlock     *uint64 `yaml:"rollback_block"`  // Block number to rollback to (only used with head_rollback)
 }
 

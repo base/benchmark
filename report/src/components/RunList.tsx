@@ -273,6 +273,13 @@ const RunList = ({
                     </span>
                     <StatusSummary statusCounts={statusCounts} />
                   </div>
+                  {section.runs[0]?.testDescription && (
+                    <div className="mt-1">
+                      <span className="text-sm text-slate-600">
+                        {section.runs[0].testDescription}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </button>
               <div className="flex-shrink-0">

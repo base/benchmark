@@ -111,7 +111,6 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 		return nil, errors.Wrap(err, "failed to open chain config file")
 	}
 
-	// write chain cfg
 	err = json.NewEncoder(chainCfgFile).Encode(genesis)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to write chain config")
@@ -120,17 +119,17 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 	var dataDirPath string
 	isSnapshot := snapshot != nil && snapshot.Command != ""
 	if isSnapshot {
-		// Create a test-specific data directory
 		dataDirPath = path.Join(testDir, "data")
 
-		// Get the initial snapshot path for this node type
 		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
 
 		if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
-			// Check snapshot method
 			snapshotMethod := snapshot.GetSnapshotMethod()
 
-			if snapshotMethod == benchmark.SnapshotMethodHeadRollback {
+			if snapshotMethod == benchmark.SnapshotMethodReuseExisting {
+				dataDirPath = initialSnapshotPath
+				s.log.Info("Reusing existing snapshot", "snapshotPath", initialSnapshotPath, "method", snapshotMethod)
+			} else if snapshotMethod == benchmark.SnapshotMethodHeadRollback {
 				// For head_rollback, copy the snapshot but mark it for rollback later
 				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
 				if err != nil {

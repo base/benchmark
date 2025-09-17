@@ -233,13 +233,24 @@ func (r *RethClient) GetVersion(ctx context.Context) (string, error) {
 		return "", errors.Wrap(err, "failed to get reth version")
 	}
 
-	// Parse version from output - reth version output usually has format like:
-	// reth 0.1.0-alpha.11
-	version := strings.TrimSpace(string(output))
-	if version != "" {
-		return version, nil
+	// Parse version from output - reth version output has format like:
+	// reth-optimism-cli Version: 1.7.0 Commit SHA: 9d56da53ec0ad60e229456a0c70b338501d923a5 Build Timestamp: 2025-09-15T17:10:10.935613753Z Build Features: jemalloc Build Profile: maxperf
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.Contains(line, "Version:") {
+			// Extract just the version number after "Version:"
+			parts := strings.Split(line, "Version:")
+			if len(parts) >= 2 {
+				versionPart := strings.TrimSpace(parts[1])
+				// Get just the version number (before any space)
+				versionFields := strings.Fields(versionPart)
+				if len(versionFields) > 0 {
+					return versionFields[0], nil
+				}
+			}
+		}
 	}
-
 	return "unknown", nil
 }
 

@@ -245,14 +245,6 @@ func (g *GethClient) GetVersion(ctx context.Context) (string, error) {
 		}
 	}
 
-	// Fallback: return first non-empty line if version format is different
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line != "" && line != "Geth" {
-			return line, nil
-		}
-	}
-
 	return "unknown", nil
 }
 
