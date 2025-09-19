@@ -97,7 +97,11 @@ func (s *S3Service) uploadFile(localPath, s3Key string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to open file")
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			s.log.Warn("Failed to close file", "file", localPath, "error", err)
+		}
+	}()
 
 	_, err = s.client.PutObject(&s3.PutObjectInput{
 		Bucket: aws.String(s.bucketName),
@@ -167,7 +171,11 @@ func (s *S3Service) downloadMetadata() (*benchmark.RunGroup, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer result.Body.Close()
+	defer func() {
+		if err := result.Body.Close(); err != nil {
+			s.log.Warn("Failed to close S3 response body", "error", err)
+		}
+	}()
 
 	data, err := io.ReadAll(result.Body)
 	if err != nil {

@@ -126,17 +126,18 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 		if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
 			snapshotMethod := snapshot.GetSnapshotMethod()
 
-			if snapshotMethod == benchmark.SnapshotMethodReuseExisting {
+			switch snapshotMethod {
+			case benchmark.SnapshotMethodReuseExisting:
 				dataDirPath = initialSnapshotPath
 				s.log.Info("Reusing existing snapshot", "snapshotPath", initialSnapshotPath, "method", snapshotMethod)
-			} else if snapshotMethod == benchmark.SnapshotMethodHeadRollback {
+			case benchmark.SnapshotMethodHeadRollback:
 				// For head_rollback, copy the snapshot but mark it for rollback later
 				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
 				if err != nil {
 					return nil, errors.Wrap(err, "failed to copy from initial snapshot for head rollback")
 				}
 				s.log.Info("Copied from initial snapshot for head rollback", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath, "method", snapshotMethod)
-			} else {
+			default:
 				// Default chain_copy behavior
 				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
 				if err != nil {
@@ -432,7 +433,11 @@ func (s *service) detectHeadBlockForSnapshot(nodeType string, snapshot benchmark
 	if err != nil {
 		return 0, fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err := os.RemoveAll(tempDir); err != nil {
+			s.log.Warn("Failed to remove temp directory", "path", tempDir, "error", err)
+		}
+	}()
 
 	// Copy the snapshot to the temp directory
 	tempSnapshotPath := path.Join(tempDir, "data")
@@ -448,7 +453,7 @@ func (s *service) detectHeadBlockForSnapshot(nodeType string, snapshot benchmark
 	// Setup temporary client options
 	clientOptions := s.config.ClientOptions()
 	// Set SkipInit for geth since we're using a snapshot
-	clientOptions.GethOptions.SkipInit = true
+	clientOptions.SkipInit = true
 
 	tempOptions := &config.InternalClientOptions{
 		ClientOptions: clientOptions,
@@ -481,10 +486,14 @@ func (s *service) detectHeadBlockForSnapshot(nodeType string, snapshot benchmark
 
 	_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
 	if err != nil {
-		jwtSecretFile.Close()
+		if closeErr := jwtSecretFile.Close(); closeErr != nil {
+			s.log.Warn("Failed to close jwt secret file after write error", "error", closeErr)
+		}
 		return 0, fmt.Errorf("failed to write jwt secret: %w", err)
 	}
-	jwtSecretFile.Close()
+	if err := jwtSecretFile.Close(); err != nil {
+		return 0, fmt.Errorf("failed to close jwt secret file: %w", err)
+	}
 
 	tempOptions.JWTSecretPath = jwtSecretPath
 	tempOptions.JWTSecret = hex.EncodeToString(jwtSecret[:])
@@ -498,7 +507,9 @@ func (s *service) detectHeadBlockForSnapshot(nodeType string, snapshot benchmark
 	}
 
 	err = json.NewEncoder(chainCfgFile).Encode(genesis)
-	chainCfgFile.Close()
+	if closeErr := chainCfgFile.Close(); closeErr != nil {
+		s.log.Warn("Failed to close chain config file", "error", closeErr)
+	}
 	if err != nil {
 		return 0, fmt.Errorf("failed to write chain config: %w", err)
 	}
