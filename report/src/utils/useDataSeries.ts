@@ -6,11 +6,13 @@ import { apiUrls } from "../config/api";
 // Generic fetcher function for API calls
 const apiFetcher = async <T>(url: string): Promise<T> => {
   const response = await fetch(url);
-  
+
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `API request failed: ${response.status} ${response.statusText}`,
+    );
   }
-  
+
   return await response.json();
 };
 
@@ -59,10 +61,8 @@ export const useMultipleDataSeries = (
 
       // Check cache first
       const cacheKey = metricsKey(runId, outputDir, role);
-      const cachedData = cache.get(cacheKey) as
-        | State<MetricData[]>
-        | undefined;
-      
+      const cachedData = cache.get(cacheKey) as State<MetricData[]> | undefined;
+
       if (cachedData?.data) {
         return cachedData.data;
       }
@@ -73,15 +73,19 @@ export const useMultipleDataSeries = (
       });
 
       if (!data) {
-        throw new Error(`Failed to fetch data for ${runId}/${outputDir}/${role}`);
+        throw new Error(
+          `Failed to fetch data for ${runId}/${outputDir}/${role}`,
+        );
       }
-      
+
       return data;
     },
     [cache, mutate],
   );
 
-  const multiFetcher = async (urlsToFetch: [runId: string, outputDir: string, role: string][]) => {
+  const multiFetcher = async (
+    urlsToFetch: [runId: string, outputDir: string, role: string][],
+  ) => {
     // Fetch all metrics in parallel
     const promises = urlsToFetch.map((url) => {
       const [runId, outputDir, role] = url;
@@ -106,7 +110,9 @@ export const useMultipleDataSeries = (
 export const useApiHealth = () => {
   const fetcher = useCallback(async () => {
     const url = apiUrls.health();
-    return apiFetcher<{ status: string; timestamp: string; service: string }>(url);
+    return apiFetcher<{ status: string; timestamp: string; service: string }>(
+      url,
+    );
   }, []);
 
   return useSWR("api-health", fetcher, {

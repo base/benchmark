@@ -12,12 +12,12 @@ export default defineConfig(({ mode }) => {
   const processEnvVars = {
     API_BASE_URL: env.API_BASE_URL,
     VITE_API_BASE_URL: env.API_BASE_URL,
-  }
+  };
 
   // Parse allowed hosts from environment variable (comma-separated list)
-  const allowedHosts = env.VITE_ALLOWED_HOSTS 
-    ? env.VITE_ALLOWED_HOSTS.split(',').map(host => host.trim())
-    : ['localhost'];
+  const allowedHosts = env.VITE_ALLOWED_HOSTS
+    ? env.VITE_ALLOWED_HOSTS.split(",").map((host) => host.trim())
+    : ["localhost"];
 
   return {
     server: {
@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Define process.env to avoid undefined errors
-      'process.env': JSON.stringify(processEnvVars),
+      "process.env": JSON.stringify(processEnvVars),
       // Also define global process if needed
       process: JSON.stringify({
         env: processEnvVars,
@@ -51,14 +51,15 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      isLocal && viteStaticCopy({
-        targets: [
-          {
-            src: "../output/**/*",
-            dest: "output",
-          },
-        ],
-      }),
-    ]
-  }
+      isLocal &&
+        viteStaticCopy({
+          targets: [
+            {
+              src: "../output/**/*",
+              dest: "output",
+            },
+          ],
+        }),
+    ],
+  };
 });

@@ -44,7 +44,9 @@ function RunComparison() {
   const dataQueryKey = useMemo(() => {
     return selection.map((query) => {
       // Find the run that matches this outputDir to get the runId
-      const run = benchmarkRuns.runs.find(r => r.outputDir === query.outputDir);
+      const run = benchmarkRuns.runs.find(
+        (r) => r.outputDir === query.outputDir,
+      );
       const runId = run?.id || query.outputDir; // Fallback to outputDir if no ID found
       return [runId, query.outputDir, query.role] as [string, string, string];
     });

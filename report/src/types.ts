@@ -53,9 +53,9 @@ export interface ChartConfig {
 }
 
 export interface MachineInfo {
-  type?: string;       // e.g., i4i.32xlarge
-  provider?: string;   // aws or gcp
-  region?: string;     // e.g., us-east-1
+  type?: string; // e.g., i4i.32xlarge
+  provider?: string; // aws or gcp
+  region?: string; // e.g., us-east-1
   fileSystem?: string; // e.g., ext4
 }
 

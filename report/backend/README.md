@@ -44,36 +44,42 @@ benchmark/report/backend/
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `8080` |
-| `S3_BUCKET` | AWS S3 bucket name | **Required** |
-| `AWS_REGION` | AWS region | `us-east-1` |
-| `AWS_ACCESS_KEY_ID` | AWS access key | From AWS credentials |
-| `AWS_SECRET_ACCESS_KEY` | AWS secret key | From AWS credentials |
-| `CACHE_TTL` | Cache time-to-live | `5m` |
-| `ENABLE_CACHE` | Enable/disable caching | `true` |
-| `ALLOWED_ORIGINS` | CORS allowed origins (comma-separated) | `*` |
-| `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
+| Variable                | Description                              | Default              |
+| ----------------------- | ---------------------------------------- | -------------------- |
+| `PORT`                  | Server port                              | `8080`               |
+| `S3_BUCKET`             | AWS S3 bucket name                       | **Required**         |
+| `AWS_REGION`            | AWS region                               | `us-east-1`          |
+| `AWS_ACCESS_KEY_ID`     | AWS access key                           | From AWS credentials |
+| `AWS_SECRET_ACCESS_KEY` | AWS secret key                           | From AWS credentials |
+| `CACHE_TTL`             | Cache time-to-live                       | `5m`                 |
+| `ENABLE_CACHE`          | Enable/disable caching                   | `true`               |
+| `ALLOWED_ORIGINS`       | CORS allowed origins (comma-separated)   | `*`                  |
+| `LOG_LEVEL`             | Logging level (debug, info, warn, error) | `info`               |
 
 ## API Endpoints
 
 ### Health Check
+
 ```
 GET /api/v1/health
 ```
+
 Returns the service health status.
 
 ### Metadata
+
 ```
 GET /api/v1/metadata
 ```
+
 Returns benchmark run metadata from S3.
 
 ### Metrics
+
 ```
 GET /api/v1/metrics/:runId/:outputDir/:nodeType
 ```
+
 Returns metrics data for a specific benchmark run and node type.
 
 ## Development
@@ -87,6 +93,7 @@ Returns metrics data for a specific benchmark run and node type.
 ### Quick Start
 
 1. **Set up environment variables:**
+
    ```bash
    export S3_BUCKET=your-bucket-name
    export AWS_REGION=us-east-1

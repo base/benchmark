@@ -22,9 +22,7 @@ const ConfigurationTags = ({
           <span className="mr-1.5 text-blue-500 font-normal">
             Client Version:
           </span>
-          <span className="font-mono">
-            {clientVersion}
-          </span>
+          <span className="font-mono">{clientVersion}</span>
         </span>
       )}
       {Object.entries(testConfig || {})

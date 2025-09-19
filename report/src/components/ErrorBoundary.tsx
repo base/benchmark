@@ -41,7 +41,8 @@ class ErrorBoundary extends Component<Props, State> {
               Something went wrong
             </h1>
             <p className="text-slate-600 mb-4">
-              There was an error loading the benchmark data. This could be due to:
+              There was an error loading the benchmark data. This could be due
+              to:
             </p>
             <ul className="text-sm text-slate-500 text-left mb-6 space-y-1">
               <li>• API service is unavailable</li>
@@ -56,7 +57,9 @@ class ErrorBoundary extends Component<Props, State> {
                 Reload Page
               </button>
               <button
-                onClick={() => this.setState({ hasError: false, error: undefined })}
+                onClick={() =>
+                  this.setState({ hasError: false, error: undefined })
+                }
                 className="w-full px-4 py-2 bg-slate-200 text-slate-700 rounded-md hover:bg-slate-300 transition-colors"
               >
                 Try Again

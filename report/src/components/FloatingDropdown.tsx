@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import clsx from 'clsx';
+import React, { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
+import clsx from "clsx";
 
 interface FloatingDropdownProps {
   trigger: React.ReactNode;
@@ -10,7 +10,7 @@ interface FloatingDropdownProps {
   onClose: () => void;
   className?: string;
   dropdownClassName?: string;
-  placement?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  placement?: "bottom-right" | "bottom-left" | "top-right" | "top-left";
 }
 
 interface Position {
@@ -25,9 +25,9 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
   isOpen,
   onToggle,
   onClose,
-  className = '',
-  dropdownClassName = '',
-  placement = 'bottom-right',
+  className = "",
+  dropdownClassName = "",
+  placement = "bottom-right",
 }) => {
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -49,13 +49,13 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
 
     // Calculate horizontal position
     switch (placement) {
-      case 'bottom-right':
-      case 'top-right':
+      case "bottom-right":
+      case "top-right":
         left = triggerRect.right - 200; // Assume dropdown width of 200px
         if (left < 10) left = 10; // Minimum margin from left edge
         break;
-      case 'bottom-left':
-      case 'top-left':
+      case "bottom-left":
+      case "top-left":
         left = triggerRect.left;
         if (left + 200 > viewport.width - 10) {
           left = viewport.width - 210; // Minimum margin from right edge
@@ -65,8 +65,8 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
 
     // Calculate vertical position
     switch (placement) {
-      case 'bottom-right':
-      case 'bottom-left': {
+      case "bottom-right":
+      case "bottom-left": {
         top = triggerRect.bottom + 8;
         // Check if dropdown would go below viewport
         const spaceBelow = viewport.height - top - 20; // 20px margin
@@ -79,8 +79,8 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
         }
         break;
       }
-      case 'top-right':
-      case 'top-left': {
+      case "top-right":
+      case "top-left": {
         top = triggerRect.top - 8;
         maxHeight = triggerRect.top - 20;
         if (maxHeight < 100) {
@@ -99,16 +99,16 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
   useEffect(() => {
     if (isOpen) {
       calculatePosition();
-      
+
       const handleResize = () => calculatePosition();
       const handleScroll = () => calculatePosition();
-      
-      window.addEventListener('resize', handleResize);
-      window.addEventListener('scroll', handleScroll, true);
-      
+
+      window.addEventListener("resize", handleResize);
+      window.addEventListener("scroll", handleScroll, true);
+
       return () => {
-        window.removeEventListener('resize', handleResize);
-        window.removeEventListener('scroll', handleScroll, true);
+        window.removeEventListener("resize", handleResize);
+        window.removeEventListener("scroll", handleScroll, true);
       };
     }
   }, [isOpen, calculatePosition]);
@@ -117,34 +117,35 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      
+
       if (
         triggerRef.current?.contains(target) ||
         dropdownRef.current?.contains(target)
       ) {
         return;
       }
-      
+
       onClose();
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
+      return () =>
+        document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [isOpen, onClose]);
 
   // Handle escape key
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => document.removeEventListener('keydown', handleEscape);
+      document.addEventListener("keydown", handleEscape);
+      return () => document.removeEventListener("keydown", handleEscape);
     }
   }, [isOpen, onClose]);
 
@@ -152,9 +153,9 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
     <div
       ref={dropdownRef}
       className={clsx(
-        'fixed z-50 bg-white border border-slate-200 rounded-md shadow-lg',
-        'min-w-48 overflow-hidden',
-        dropdownClassName
+        "fixed z-50 bg-white border border-slate-200 rounded-md shadow-lg",
+        "min-w-48 overflow-hidden",
+        dropdownClassName,
       )}
       style={{
         top: position.top,
@@ -162,21 +163,24 @@ const FloatingDropdown: React.FC<FloatingDropdownProps> = ({
         maxHeight: position.maxHeight ? `${position.maxHeight}px` : undefined,
       }}
     >
-      <div className="py-1 overflow-y-auto max-h-full">
-        {children}
-      </div>
+      <div className="py-1 overflow-y-auto max-h-full">{children}</div>
     </div>
   ) : null;
 
   return (
     <>
-      <div ref={triggerRef} className={clsx('relative', className)}>
-        <div onClick={onToggle} role="button" tabIndex={0} onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}>
+      <div ref={triggerRef} className={clsx("relative", className)}>
+        <div
+          onClick={onToggle}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggle();
+            }
+          }}
+        >
           {trigger}
         </div>
       </div>

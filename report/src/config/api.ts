@@ -24,7 +24,7 @@ declare global {
 // Get API base URL from environment or default to localhost
 const getApiBaseUrl = (): string => {
   // Check for environment variable (useful for build-time configuration)
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     // Client-side: check for runtime configuration
     const runtimeConfig = window.__RUNTIME_CONFIG__;
     if (runtimeConfig?.API_BASE_URL) {
@@ -33,31 +33,33 @@ const getApiBaseUrl = (): string => {
   }
 
   // Fallback to environment variable or default
-  const viteEnv = (import.meta as unknown as { env: Record<string, string | undefined> }).env;
-  return viteEnv.VITE_API_BASE_URL || 'http://localhost:8080';
+  const viteEnv = (
+    import.meta as unknown as { env: Record<string, string | undefined> }
+  ).env;
+  return viteEnv.VITE_API_BASE_URL || "http://localhost:8080";
 };
 
 export const apiConfig: ApiConfig = {
   baseUrl: getApiBaseUrl(),
   endpoints: {
-    metadata: '/api/v1/metadata',
-    metrics: (runId: string, outputDir: string, nodeType: string) => 
+    metadata: "/api/v1/metadata",
+    metrics: (runId: string, outputDir: string, nodeType: string) =>
       `/api/v1/metrics/${encodeURIComponent(runId)}/${encodeURIComponent(outputDir)}/${encodeURIComponent(nodeType)}`,
-    health: '/api/v1/health',
+    health: "/api/v1/health",
   },
 };
 
 // Helper function to build full URLs
 export const buildApiUrl = (endpoint: string): string => {
-  const baseUrl = apiConfig.baseUrl.replace(/\/$/, ''); // Remove trailing slash
-  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const baseUrl = apiConfig.baseUrl.replace(/\/$/, ""); // Remove trailing slash
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   return `${baseUrl}${cleanEndpoint}`;
 };
 
 // Type-safe API URL builders
 export const apiUrls = {
   metadata: () => buildApiUrl(apiConfig.endpoints.metadata),
-  metrics: (runId: string, outputDir: string, nodeType: string) => 
+  metrics: (runId: string, outputDir: string, nodeType: string) =>
     buildApiUrl(apiConfig.endpoints.metrics(runId, outputDir, nodeType)),
   health: () => buildApiUrl(apiConfig.endpoints.health),
-} as const; 
+} as const;
