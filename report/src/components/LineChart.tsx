@@ -426,7 +426,7 @@ const LineChart: React.FC<LineChartProps> = ({
 
           // Add error threshold line (red)
           if (thresholds.error && thresholds.error[metricKey] !== undefined) {
-            let errorY = y(thresholds.error[metricKey]);
+            const errorY = y(thresholds.error[metricKey]);
             svg
               .append("line")
               .attr("class", "threshold-line error")

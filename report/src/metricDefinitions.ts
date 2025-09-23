@@ -196,18 +196,18 @@ export const CHART_CONFIG: Record<string, ChartConfig> = {
     type: "line",
     title: "Validator Storage Load Latency",
     description: "Shows the 90th percentile latency for storage slot loads",
-    unit: "s"
+    unit: "s",
   },
   reth_sync_state_provider_total_code_fetch_latency: {
     type: "line",
     title: "Validator Code Load Latency",
     description: "Shows the 90th percentile latency for code loads",
-    unit: "s"
+    unit: "s",
   },
   reth_sync_state_provider_total_account_fetch_latency: {
     type: "line",
     title: "Validator Account Load Latency",
     description: "Shows the 90th percentile latency for account loads",
-    unit: "s"
-  }
+    unit: "s",
+  },
 };
