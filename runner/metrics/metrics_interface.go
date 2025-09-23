@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"math"
 	"os"
 	"path"
 	"time"
@@ -73,16 +74,24 @@ func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_
 		if value.Histogram.SampleCount != nil {
 			count = float64(*value.Histogram.SampleCount)
 		}
-		if count == 0 {
-			count = 1
+		deltaCount := count - prevCount
+		if deltaCount != 0 {
+			averageChange := (sum - prevSum) / deltaCount
+
+			if !math.IsNaN(averageChange) {
+				m.ExecutionMetrics[avgName] = averageChange
+			}
 		}
-		averageChange := (sum - prevSum) / (count - prevCount)
-		m.ExecutionMetrics[name] = value
-		m.ExecutionMetrics[avgName] = averageChange
 	} else if value.Gauge != nil {
-		m.ExecutionMetrics[name] = *value.Gauge.Value
+		if value.Gauge.Value != nil && !math.IsNaN(*value.Gauge.Value) {
+			m.ExecutionMetrics[name] = *value.Gauge.Value
+		}
+		// NaN values and nil values are silently omitted
 	} else if value.Counter != nil {
-		m.ExecutionMetrics[name] = *value.Counter.Value
+		if value.Counter.Value != nil && !math.IsNaN(*value.Counter.Value) {
+			m.ExecutionMetrics[name] = *value.Counter.Value
+		}
+		// NaN values and nil values are silently omitted
 	} else if value.Summary != nil {
 		avgName := name + "_avg"
 		// get the average change in sum divided by the average change in count
@@ -111,12 +120,14 @@ func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_
 		if value.Summary.SampleCount != nil {
 			count = float64(*value.Summary.SampleCount)
 		}
-		if count == 0 {
-			count = 1
+		denom := count - prevCount
+		if denom != 0 {
+			averageChange := (sum - prevSum) / denom
+			if !math.IsNaN(averageChange) {
+				m.ExecutionMetrics[avgName] = averageChange
+			}
 		}
-		averageChange := (sum - prevSum) / (count - prevCount)
-		m.ExecutionMetrics[name] = value
-		m.ExecutionMetrics[avgName] = averageChange
+
 	} else {
 		return fmt.Errorf("invalid metric type for %s: %#v", name, value)
 	}
