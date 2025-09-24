@@ -48,7 +48,6 @@ func (m *BlockMetrics) Copy() *BlockMetrics {
 
 func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_client.Metric) error {
 	if value.Histogram != nil {
-		avgName := name + "_avg"
 		// get the average change in sum divided by the average change in count
 		prevSum := 0.0
 		prevValue, ok := m.ExecutionMetrics[name].(*io_prometheus_client.Metric)
@@ -79,7 +78,7 @@ func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_
 			averageChange := (sum - prevSum) / deltaCount
 
 			if !math.IsNaN(averageChange) {
-				m.ExecutionMetrics[avgName] = averageChange
+				m.ExecutionMetrics[name] = averageChange
 			}
 		}
 	} else if value.Gauge != nil {
@@ -93,7 +92,6 @@ func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_
 		}
 		// NaN values and nil values are silently omitted
 	} else if value.Summary != nil {
-		avgName := name + "_avg"
 		// get the average change in sum divided by the average change in count
 		prevSum := 0.0
 
@@ -124,7 +122,7 @@ func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_
 		if denom != 0 {
 			averageChange := (sum - prevSum) / denom
 			if !math.IsNaN(averageChange) {
-				m.ExecutionMetrics[avgName] = averageChange
+				m.ExecutionMetrics[name] = averageChange
 			}
 		}
 
