@@ -66,7 +66,7 @@ func TestBlockMetrics_UpdatePrometheusMetric_NaNHandling(t *testing.T) {
 			description:    "Valid counter values should be added to ExecutionMetrics",
 		},
 		{
-			name:       "histogram with NaN average should omit _avg metric",
+			name:       "histogram with NaN average should omit metric",
 			metricName: "test_histogram",
 			metric: &io_prometheus_client.Metric{
 				Histogram: &io_prometheus_client.Histogram{
@@ -74,12 +74,12 @@ func TestBlockMetrics_UpdatePrometheusMetric_NaNHandling(t *testing.T) {
 					SampleCount: uint64Ptr(10),
 				},
 			},
-			expectedMetric: "test_histogram_avg",
+			expectedMetric: "test_histogram",
 			shouldContain:  false,
-			description:    "Histogram with NaN sum should not create _avg metric",
+			description:    "Histogram with NaN sum should not create metric",
 		},
 		{
-			name:       "summary with NaN average should omit _avg metric",
+			name:       "summary with NaN average should omit metric",
 			metricName: "test_summary",
 			metric: &io_prometheus_client.Metric{
 				Summary: &io_prometheus_client.Summary{
@@ -87,9 +87,9 @@ func TestBlockMetrics_UpdatePrometheusMetric_NaNHandling(t *testing.T) {
 					SampleCount: uint64Ptr(5),
 				},
 			},
-			expectedMetric: "test_summary_avg",
+			expectedMetric: "test_summary",
 			shouldContain:  false,
-			description:    "Summary with NaN sum should not create _avg metric",
+			description:    "Summary with NaN sum should not create metric",
 		},
 	}
 
@@ -140,9 +140,9 @@ func TestBlockMetrics_UpdatePrometheusMetric_HistogramAverage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should have calculated average: (150-100)/(15-10) = 50/5 = 10
-	avgValue, exists := m.ExecutionMetrics["test_histogram_avg"]
-	require.True(t, exists, "Average metric should be created")
-	require.Equal(t, 10.0, avgValue, "Average should be calculated correctly")
+	avgValue, exists := m.ExecutionMetrics["test_histogram"]
+	require.True(t, exists, "Metric should be created")
+	require.Equal(t, 10.0, avgValue, "Metric should be calculated correctly")
 }
 
 func TestBlockMetrics_UpdatePrometheusMetric_SummaryAverage(t *testing.T) {
@@ -175,34 +175,36 @@ func TestBlockMetrics_UpdatePrometheusMetric_SummaryAverage(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should have calculated average: (300-200)/(25-20) = 100/5 = 20
-	avgValue, exists := m.ExecutionMetrics["test_summary_avg"]
-	require.True(t, exists, "Average metric should be created")
-	require.Equal(t, 20.0, avgValue, "Average should be calculated correctly")
+	avgValue, exists := m.ExecutionMetrics["test_summary"]
+	require.True(t, exists, "Metric should be created")
+	require.Equal(t, 20.0, avgValue, "Metric should be calculated correctly")
 }
 
 func TestBlockMetrics_UpdatePrometheusMetric_ZeroDenominator(t *testing.T) {
 	m := NewBlockMetrics()
 
 	// Store a baseline metric
-	m.ExecutionMetrics["test_histogram"] = &io_prometheus_client.Metric{
-		Histogram: &io_prometheus_client.Histogram{
-			SampleSum:   floatPtr(100.0),
-			SampleCount: uint64Ptr(10),
-		},
-	}
 
-	// Update with same count (zero denominator)
 	err := m.UpdatePrometheusMetric("test_histogram", &io_prometheus_client.Metric{
 		Histogram: &io_prometheus_client.Histogram{
-			SampleSum:   floatPtr(120.0),
-			SampleCount: uint64Ptr(10), // Same count = zero denominator
+			SampleSum:   floatPtr(100.0),
+			SampleCount: uint64Ptr(0), // Same count = zero denominator
 		},
 	})
 	require.NoError(t, err)
 
-	// Should not create _avg metric when denominator is zero
-	_, exists := m.ExecutionMetrics["test_histogram_avg"]
-	require.False(t, exists, "Average metric should not be created with zero denominator")
+	// Update with same count (zero denominator)
+	err = m.UpdatePrometheusMetric("test_histogram", &io_prometheus_client.Metric{
+		Histogram: &io_prometheus_client.Histogram{
+			SampleSum:   floatPtr(120.0),
+			SampleCount: uint64Ptr(0), // Same count = zero denominator
+		},
+	})
+	require.NoError(t, err)
+
+	// Should not create metric when denominator is zero
+	_, exists := m.ExecutionMetrics["test_histogram"]
+	require.False(t, exists, "Metric should not be created with zero denominator")
 }
 
 func TestBlockMetrics_UpdatePrometheusMetric_InvalidMetricType(t *testing.T) {
