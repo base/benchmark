@@ -251,7 +251,7 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 	for i := uint64(0); i < accountChunks; i++ {
 		accountChunkTx, err := simulator.InitializeAddressChunk(t.transactor)
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize storage chunk")
+			return errors.Wrap(err, "failed to initialize account chunk")
 		}
 		t.contractBackend.incrementNonce()
 
@@ -329,7 +329,7 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 	for i := uint64(0); i < accountChunks; i++ {
 		accountChunkTx, err := simulator.InitializeAddressChunk(t.transactor)
 		if err != nil {
-			return errors.Wrap(err, "failed to initialize storage chunk")
+			return errors.Wrap(err, "failed to initialize account chunk")
 		}
 		t.contractBackend.incrementNonce()
 
