@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/base/base-bench/benchmark/config"
+	"github.com/base/base-bench/runner/aws"
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
@@ -66,7 +67,7 @@ func (s *Service) downloadFile(fileURL, localPath string) error {
 }
 
 // downloadOutputFiles downloads all output files for a run from a base URL
-func (s *Service) downloadOutputFiles(baseURL, runOutputDir string) error {
+func (s *Service) downloadOutputFiles(baseURL, runID, runOutputDir string) error {
 	// List of expected files in output directories
 	expectedFiles := []string{
 		"logs-validator.gz",
@@ -77,8 +78,9 @@ func (s *Service) downloadOutputFiles(baseURL, runOutputDir string) error {
 		"metrics-sequencer.json",
 	}
 
-	localOutputDir := filepath.Join(s.config.OutputDir(), runOutputDir)
-	s.log.Info("Downloading output files", "runOutputDir", runOutputDir, "localPath", localOutputDir)
+	// Structure output as output/<runId>/<outputDir>/
+	localOutputDir := filepath.Join(s.config.OutputDir(), runID, runOutputDir)
+	s.log.Info("Downloading output files", "runID", runID, "runOutputDir", runOutputDir, "localPath", localOutputDir)
 
 	downloadedCount := 0
 	for _, fileName := range expectedFiles {
@@ -98,6 +100,60 @@ func (s *Service) downloadOutputFiles(baseURL, runOutputDir string) error {
 
 	s.log.Info("Downloaded output files", "runOutputDir", runOutputDir, "downloaded", downloadedCount, "total", len(expectedFiles))
 	return nil
+}
+
+// LoadSourceMetadataFromS3 loads metadata from S3 and downloads associated output files
+func (s *Service) LoadSourceMetadataFromS3() (*benchmark.RunGroup, error) {
+	s.log.Info("Loading source metadata from S3", "bucket", s.config.S3Bucket(), "directory", s.config.S3Directory())
+
+	// Initialize S3 service
+	s3Service, err := aws.NewS3Service(s.config.S3Bucket(), s.log)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to initialize S3 service")
+	}
+
+	// Create temporary file for metadata download
+	tempMetadataFile := filepath.Join(s.config.OutputDir(), ".temp_metadata.json")
+	defer func() {
+		if err := os.Remove(tempMetadataFile); err != nil && !os.IsNotExist(err) {
+			s.log.Warn("Failed to remove temporary metadata file", "file", tempMetadataFile, "error", err)
+		}
+	}()
+
+	// Download metadata from S3
+	err = s3Service.DownloadMetadata(s.config.S3Directory(), tempMetadataFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to download metadata from S3")
+	}
+
+	// Load metadata from temporary file
+	file, err := os.Open(tempMetadataFile)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to open downloaded metadata file")
+	}
+	defer func() { _ = file.Close() }()
+
+	var metadata benchmark.RunGroup
+	if err := json.NewDecoder(file).Decode(&metadata); err != nil {
+		return nil, errors.Wrap(err, "failed to decode metadata JSON from S3")
+	}
+
+	s.log.Info("Loaded metadata from S3", "runs", len(metadata.Runs))
+
+	// Download output files for each run
+	for _, run := range metadata.Runs {
+		if run.OutputDir != "" {
+			// Structure output as output/<runId>/<outputDir>/
+			localOutputDir := filepath.Join(s.config.OutputDir(), run.ID, run.OutputDir)
+			err := s3Service.DownloadRunOutputFiles(run.ID, run.OutputDir, s.config.S3Directory(), localOutputDir)
+			if err != nil {
+				s.log.Warn("Failed to download output files for run", "runID", run.ID, "outputDir", run.OutputDir, "error", err)
+				// Continue with other runs even if one fails
+			}
+		}
+	}
+
+	return &metadata, nil
 }
 
 // LoadSourceMetadata loads metadata from a file or URL
@@ -152,7 +208,7 @@ func (s *Service) LoadSourceMetadata(source string) (*benchmark.RunGroup, error)
 		s.log.Info("Downloading output files for all runs", "baseURL", baseURL)
 		for _, run := range metadata.Runs {
 			if run.OutputDir != "" {
-				err := s.downloadOutputFiles(baseURL, run.OutputDir)
+				err := s.downloadOutputFiles(baseURL, run.ID, run.OutputDir)
 				if err != nil {
 					s.log.Warn("Failed to download output files for run", "runID", run.ID, "outputDir", run.OutputDir, "error", err)
 					// Continue with other runs even if one fails

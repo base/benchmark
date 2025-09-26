@@ -1,29 +1,16 @@
 import useSWR, { State, useSWRConfig } from "swr";
 import { BenchmarkRuns, MetricData } from "../types";
 import { useCallback } from "react";
-import { apiUrls } from "../config/api";
+import { getDataService } from "../services/dataService";
 
-// Generic fetcher function for API calls
-const apiFetcher = async <T>(url: string): Promise<T> => {
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(
-      `API request failed: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  return await response.json();
-};
-
-// Fetch metrics data from S3 backend
+// Fetch metrics data using the configured data service
 export const fetchMetrics = async (
   runId: string,
   outputDir: string,
   nodeType: string,
 ): Promise<MetricData[]> => {
-  const url = apiUrls.metrics(runId, outputDir, nodeType);
-  return apiFetcher<MetricData[]>(url);
+  const dataService = getDataService();
+  return await dataService.getMetrics(runId, outputDir, nodeType);
 };
 
 // Generate cache key for metrics
@@ -31,11 +18,11 @@ const metricsKey = (runId: string, outputDir: string, nodeType: string) => {
   return `metrics-${runId}-${outputDir}-${nodeType}`;
 };
 
-// Hook to fetch benchmark metadata from S3 backend
+// Hook to fetch benchmark metadata using the configured data service
 export const useTestMetadata = () => {
   const fetcher = useCallback(async (): Promise<BenchmarkRuns> => {
-    const url = apiUrls.metadata();
-    return apiFetcher<BenchmarkRuns>(url);
+    const dataService = getDataService();
+    return await dataService.getMetadata();
   }, []);
 
   return useSWR("benchmark-metadata", fetcher, {
@@ -106,18 +93,3 @@ export const useMultipleDataSeries = (
   });
 };
 
-// Hook to check API health (useful for monitoring)
-export const useApiHealth = () => {
-  const fetcher = useCallback(async () => {
-    const url = apiUrls.health();
-    return apiFetcher<{ status: string; timestamp: string; service: string }>(
-      url,
-    );
-  }, []);
-
-  return useSWR("api-health", fetcher, {
-    refreshInterval: 30000, // Check every 30 seconds
-    errorRetryCount: 2,
-    errorRetryInterval: 10000,
-  });
-};

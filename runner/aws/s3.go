@@ -358,3 +358,151 @@ func (s *S3Service) loadLocalMetadata(metadataPath string) (*benchmark.RunGroup,
 func isNoSuchKeyError(err error) bool {
 	return strings.Contains(err.Error(), "NoSuchKey")
 }
+
+// DownloadMetadata downloads metadata.json from S3 to local path
+func (s *S3Service) DownloadMetadata(s3Directory, localPath string) error {
+	// Construct S3 key - if directory is "." use root, otherwise use directory prefix
+	var s3Key string
+	if s3Directory == "." || s3Directory == "" {
+		s3Key = "metadata.json"
+	} else {
+		s3Key = fmt.Sprintf("%s/metadata.json", strings.TrimSuffix(s3Directory, "/"))
+	}
+
+	s.log.Info("Downloading metadata from S3", "bucket", s.bucketName, "key", s3Key, "localPath", localPath)
+
+	result, err := s.client.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(s3Key),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to download metadata from S3 key: %s", s3Key)
+	}
+	defer func() {
+		if err := result.Body.Close(); err != nil {
+			s.log.Warn("Failed to close S3 response body", "error", err)
+		}
+	}()
+
+	// Create local directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return errors.Wrap(err, "failed to create local directory")
+	}
+
+	// Create local file
+	file, err := os.Create(localPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to create local metadata file")
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			s.log.Warn("Failed to close local file", "file", localPath, "error", err)
+		}
+	}()
+
+	// Copy data from S3 to local file
+	_, err = io.Copy(file, result.Body)
+	if err != nil {
+		return errors.Wrap(err, "failed to copy metadata from S3")
+	}
+
+	s.log.Info("Successfully downloaded metadata", "localPath", localPath)
+	return nil
+}
+
+// DownloadRunOutputFiles downloads all output files for a specific run from S3
+func (s *S3Service) DownloadRunOutputFiles(runID, runOutputDir, s3Directory, localOutputDir string) error {
+	// Construct S3 key prefix for this run
+	var keyPrefix string
+	if s3Directory == "." || s3Directory == "" {
+		keyPrefix = fmt.Sprintf("%s/%s/", runID, runOutputDir)
+	} else {
+		keyPrefix = fmt.Sprintf("%s/%s/%s/", strings.TrimSuffix(s3Directory, "/"), runID, runOutputDir)
+	}
+
+	s.log.Info("Downloading run output files from S3", "runID", runID, "keyPrefix", keyPrefix, "localDir", localOutputDir)
+
+	// List objects with the key prefix
+	listInput := &s3.ListObjectsV2Input{
+		Bucket: aws.String(s.bucketName),
+		Prefix: aws.String(keyPrefix),
+	}
+
+	result, err := s.client.ListObjectsV2(listInput)
+	if err != nil {
+		return errors.Wrapf(err, "failed to list objects for run %s", runID)
+	}
+
+	if len(result.Contents) == 0 {
+		s.log.Warn("No objects found for run", "runID", runID, "keyPrefix", keyPrefix)
+		return nil
+	}
+
+	// Create local output directory
+	if err := os.MkdirAll(localOutputDir, 0755); err != nil {
+		return errors.Wrap(err, "failed to create local output directory")
+	}
+
+	downloadedCount := 0
+	for _, obj := range result.Contents {
+		// Get relative path by removing the key prefix
+		relPath := strings.TrimPrefix(*obj.Key, keyPrefix)
+		if relPath == "" {
+			continue // Skip if it's the directory itself
+		}
+
+		localFilePath := filepath.Join(localOutputDir, relPath)
+
+		// Download the file
+		err := s.downloadFileFromS3(*obj.Key, localFilePath)
+		if err != nil {
+			s.log.Warn("Failed to download file", "key", *obj.Key, "localPath", localFilePath, "error", err)
+		} else {
+			s.log.Debug("Downloaded file", "key", *obj.Key, "localPath", localFilePath)
+			downloadedCount++
+		}
+	}
+
+	s.log.Info("Downloaded run output files", "runID", runID, "downloaded", downloadedCount, "total", len(result.Contents))
+	return nil
+}
+
+// downloadFileFromS3 downloads a single file from S3 to local path
+func (s *S3Service) downloadFileFromS3(s3Key, localPath string) error {
+	result, err := s.client.GetObject(&s3.GetObjectInput{
+		Bucket: aws.String(s.bucketName),
+		Key:    aws.String(s3Key),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to download file from S3: %s", s3Key)
+	}
+	defer func() {
+		if err := result.Body.Close(); err != nil {
+			s.log.Warn("Failed to close S3 response body", "error", err)
+		}
+	}()
+
+	// Create local directory if it doesn't exist
+	if err := os.MkdirAll(filepath.Dir(localPath), 0755); err != nil {
+		return errors.Wrap(err, "failed to create local directory")
+	}
+
+	// Create local file
+	file, err := os.Create(localPath)
+	if err != nil {
+		return errors.Wrap(err, "failed to create local file")
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			s.log.Warn("Failed to close local file", "file", localPath, "error", err)
+		}
+	}()
+
+	// Copy data from S3 to local file
+	_, err = io.Copy(file, result.Body)
+	if err != nil {
+		return errors.Wrap(err, "failed to copy file from S3")
+	}
+
+	return nil
+}
