@@ -128,7 +128,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *Be
 		testParams[i] = TestRun{
 			ID:          id,
 			Params:      *params,
-			OutputDir:   fmt.Sprintf("%s-%d", id, i),
+			OutputDir:   fmt.Sprintf("%s/%s-%d", id, id, i),
 			Name:        params.Name,
 			Description: params.Description,
 			TestFile:    testFileName,
