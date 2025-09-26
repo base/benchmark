@@ -21,8 +21,6 @@ type Config interface {
 	OutputDir() string
 	TxFuzzBinary() string
 	ProxyPort() int
-	EnableS3() bool
-	S3Bucket() string
 	BenchmarkRunID() string
 	MachineType() string
 	MachineProvider() string
@@ -38,8 +36,6 @@ type config struct {
 	clientOptions   ClientOptions
 	txFuzzBinary    string
 	proxyPort       int
-	enableS3        bool
-	s3Bucket        string
 	benchmarkRunID  string
 	machineType     string
 	machineProvider string
@@ -55,8 +51,6 @@ func NewConfig(ctx *cli.Context) Config {
 		outputDir:       ctx.String(appFlags.OutputDirFlagName),
 		txFuzzBinary:    ctx.String(appFlags.TxFuzzBinFlagName),
 		proxyPort:       ctx.Int(appFlags.ProxyPortFlagName),
-		enableS3:        ctx.Bool(appFlags.EnableS3FlagName),
-		s3Bucket:        ctx.String(appFlags.S3BucketFlagName),
 		benchmarkRunID:  ctx.String(appFlags.BenchmarkRunIDFlagName),
 		machineType:     ctx.String(appFlags.MachineTypeFlagName),
 		machineProvider: ctx.String(appFlags.MachineProviderFlagName),
@@ -113,14 +107,6 @@ func (c *config) ClientOptions() ClientOptions {
 
 func (c *config) TxFuzzBinary() string {
 	return c.txFuzzBinary
-}
-
-func (c *config) EnableS3() bool {
-	return c.enableS3
-}
-
-func (c *config) S3Bucket() string {
-	return c.s3Bucket
 }
 
 func (c *config) BenchmarkRunID() string {

@@ -19,7 +19,6 @@ export const downloadRunInfo = (
       testName: run.testName,
       testDescription: run.testDescription,
       outputDir: run.outputDir,
-      bucketPath: run.bucketPath,
       createdAt: run.createdAt,
       status: run.status,
 
@@ -198,7 +197,6 @@ export const downloadAllRuns = (
         testName: run.testName,
         testDescription: run.testDescription,
         outputDir: run.outputDir,
-        bucketPath: run.bucketPath,
         createdAt: run.createdAt,
         status: run.status,
 

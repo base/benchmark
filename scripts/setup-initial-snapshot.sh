@@ -2,10 +2,21 @@
 
 set -e
 
-# setup-initial-snapshot.sh [--skip-if-nonempty] <node-type> <destination>
-# Copies a snapshot to the destination if it does not exist.
-
-# Usage: ./setup-initial-snapshot.sh <node-type> <destination>
+# setup-initial-snapshot.sh - Downloads and extracts Base network snapshots
+# 
+# Downloads the latest snapshot from Base's official snapshot servers and extracts
+# it to the specified destination directory. Supports both mainnet and testnet (sepolia).
+#
+# Requirements: curl, tar, zstd (for .tar.zst files)
+#
+# Usage: ./setup-initial-snapshot.sh --network <network> --node-type <node-type> --destination <destination> [--skip-if-nonempty]
+#
+# Networks: mainnet, sepolia (testnet)
+# Node types: geth (full snapshots), reth (archive snapshots)
+# 
+# Examples:
+#   ./setup-initial-snapshot.sh --network mainnet --node-type geth --destination ./geth-data
+#   ./setup-initial-snapshot.sh --network sepolia --node-type reth --destination ./reth-data --skip-if-nonempty
 
 POSITIONAL_ARGS=()
 for arg in "$@"; do
@@ -34,48 +45,133 @@ done
 set -- "${POSITIONAL_ARGS[@]}" # Restore positional parameters
 # Check if the correct number of arguments is provided
 
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 [--skip-if-nonempty] [--network <network>] [--node-type <node-type>] [--destination <destination>]"
-    exit 1
-fi
-
-if [ -z "$NETWORK" ]; then
-    echo "Network is required"
-    exit 1
-fi
-
-if [ -z "$NODE_TYPE" ]; then
-    echo "Node type is required"
-    exit 1
-fi
-
-if [ -z "$DESTINATION" ]; then
-    echo "Destination is required"
+if [ -z "$NETWORK" ] || [ -z "$NODE_TYPE" ] || [ -z "$DESTINATION" ]; then
+    echo "Error: Missing required parameters"
+    echo ""
+    echo "Usage: $0 --network <network> --node-type <node-type> --destination <destination> [--skip-if-nonempty]"
+    echo ""
+    echo "Required parameters:"
+    echo "  --network <network>        Network to download snapshot for (mainnet, sepolia)"
+    echo "  --node-type <node-type>    Node type (geth, reth)"
+    echo "  --destination <destination> Directory to extract snapshot to"
+    echo ""
+    echo "Optional parameters:"
+    echo "  --skip-if-nonempty        Skip download if destination already contains data"
+    echo ""
+    echo "Examples:"
+    echo "  $0 --network mainnet --node-type geth --destination ./geth-data"
+    echo "  $0 --network sepolia --node-type reth --destination ./reth-data --skip-if-nonempty"
     exit 1
 fi
 
 
 case $NODE_TYPE in
 reth)
-    echo "Copying reth snapshot to $DESTINATION"
+    echo "Downloading reth archive snapshot for $NETWORK to $DESTINATION"
 
-    mkdir -p "$DESTINATION"
-    ./agent_init --gbs-network=$NETWORK --gbs-config-name=base-reth-cbnode --gbs-directory=$DESTINATION
-    ;;
-geth)
-    echo "Copying geth snapshot to $DESTINATION"
-
-    CONFIG_NAME="base-full-cbnode"
-
-    if [[ $NETWORK == "sepolia-alpha" ]]; then
-        CONFIG_NAME="base-cbnode"
+    # Check if destination already has data
+    if [[ -f "$DESTINATION/db/mdbx.dat" ]] && [[ "$SKIP_IF_NONEMPTY" == "true" ]]; then
+        echo "Destination is not empty, skipping download."
+        exit 0
     fi
 
+    # Determine snapshot URL based on network
+    case $NETWORK in
+        mainnet)
+            SNAPSHOT_URL_BASE="https://mainnet-reth-archive-snapshots.base.org"
+            ;;
+        sepolia|sepolia-alpha|testnet)
+            SNAPSHOT_URL_BASE="https://sepolia-reth-archive-snapshots.base.org"
+            ;;
+        *)
+            echo "Unsupported network for reth: $NETWORK"
+            exit 1
+            ;;
+    esac
+
+    echo "Getting latest snapshot filename..."
+    LATEST_SNAPSHOT=$(curl -s "$SNAPSHOT_URL_BASE/latest")
+    if [[ -z "$LATEST_SNAPSHOT" ]]; then
+        echo "Failed to get latest snapshot filename"
+        exit 1
+    fi
+
+    echo "Latest snapshot: $LATEST_SNAPSHOT"
+    SNAPSHOT_URL="$SNAPSHOT_URL_BASE/$LATEST_SNAPSHOT"
+
+    # Create destination directory
     mkdir -p "$DESTINATION"
-    ./agent_init --gbs-network=$NETWORK --gbs-config-name=$CONFIG_NAME --gbs-directory=$DESTINATION
+    
+    echo "Downloading and extracting snapshot..."
+    
+    if [[ "$LATEST_SNAPSHOT" == *.tar.zst ]]; then
+        curl -L --progress-bar "$SNAPSHOT_URL" | zstd -d | tar -xf - -C "$DESTINATION" --strip-components=1
+    else
+        curl -L --progress-bar "$SNAPSHOT_URL" | tar -xzf - -C "$DESTINATION" --strip-components=1
+    fi
+    
+    if [[ $? -eq 0 ]]; then
+        echo "Successfully downloaded and extracted reth snapshot to $DESTINATION"
+    else
+        echo "Failed to download or extract snapshot"
+        exit 1
+    fi
+    ;;
+geth)
+    echo "Downloading geth full snapshot for $NETWORK to $DESTINATION"
+
+    # Check if destination already has data
+    if [[ -d "$DESTINATION/geth/chaindata" ]] && [[ "$SKIP_IF_NONEMPTY" == "true" ]]; then
+        echo "Destination is not empty, skipping download."
+        exit 0
+    fi
+
+    # Determine snapshot URL based on network
+    case $NETWORK in
+        mainnet)
+            SNAPSHOT_URL_BASE="https://mainnet-full-snapshots.base.org"
+            ;;
+        sepolia|sepolia-alpha|testnet)
+            SNAPSHOT_URL_BASE="https://sepolia-full-snapshots.base.org"
+            ;;
+        *)
+            echo "Unsupported network for geth: $NETWORK"
+            exit 1
+            ;;
+    esac
+
+    echo "Getting latest snapshot filename..."
+    LATEST_SNAPSHOT=$(curl -s "$SNAPSHOT_URL_BASE/latest")
+    if [[ -z "$LATEST_SNAPSHOT" ]]; then
+        echo "Failed to get latest snapshot filename"
+        exit 1
+    fi
+
+    echo "Latest snapshot: $LATEST_SNAPSHOT"
+    SNAPSHOT_URL="$SNAPSHOT_URL_BASE/$LATEST_SNAPSHOT"
+
+    # Create destination directory
+    mkdir -p "$DESTINATION"
+    
+    # Download and extract snapshot directly to destination
+    echo "Downloading and extracting snapshot..."
+    
+    if [[ "$LATEST_SNAPSHOT" == *.tar.zst ]]; then
+        curl -L --progress-bar "$SNAPSHOT_URL" | zstd -d | tar -xf - -C "$DESTINATION" --strip-components=1
+    else
+        curl -L --progress-bar "$SNAPSHOT_URL" | tar -xzf - -C "$DESTINATION" --strip-components=1
+    fi
+    
+    if [[ $? -eq 0 ]]; then
+        echo "Successfully downloaded and extracted geth snapshot to $DESTINATION"
+    else
+        echo "Failed to download or extract snapshot"
+        exit 1
+    fi
     ;;
 *)
     echo "Unknown node type: $NODE_TYPE"
+    echo "Supported node types: geth, reth"
     exit 1
     ;;
 esac

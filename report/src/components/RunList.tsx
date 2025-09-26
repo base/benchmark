@@ -194,7 +194,7 @@ const RunList = ({
 
     const trigger = (
       <button
-        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-md hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-150"
+        className="px-4 py-2 bg-slate-100 text-slate-900 rounded hover:bg-slate-200 transition-colors flex items-center gap-2 flex-shrink-0 ml-4"
         aria-label="Download run information"
       >
         <svg

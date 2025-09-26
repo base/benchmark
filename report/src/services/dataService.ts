@@ -16,25 +16,28 @@ export class DataService {
 
   async getMetadata(): Promise<BenchmarkRuns> {
     const response = await fetch(`${this.baseUrl}/output/metadata.json`);
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch metadata: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch metadata: ${response.status} ${response.statusText}`,
+      );
     }
-    
+
     return await response.json();
   }
 
-  async getMetrics(runId: string, outputDir: string, nodeType: string): Promise<MetricData[]> {
-    const metricsPath = `${this.baseUrl}/output/${runId}/${outputDir}/metrics-${nodeType}.json`;
+  async getMetrics(outputDir: string, nodeType: string): Promise<MetricData[]> {
+    const metricsPath = `${this.baseUrl}/output/${outputDir}/metrics-${nodeType}.json`;
     const response = await fetch(metricsPath);
-    
+
     if (!response.ok) {
-      throw new Error(`Failed to fetch metrics: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Failed to fetch metrics: ${response.status} ${response.statusText}`,
+      );
     }
-    
+
     return await response.json();
   }
-
 }
 
 // Configuration helper to determine base URL from environment
@@ -43,15 +46,25 @@ export function getDataSourceConfig(): DataServiceConfig {
   const getEnvVar = (key: string): string | undefined => {
     // Client-side: check for runtime configuration first
     if (typeof window !== "undefined") {
-      const runtimeConfig = (window as any).__RUNTIME_CONFIG__;
-      if (runtimeConfig?.[key]) {
-        return runtimeConfig[key];
+      const runtimeConfig = (window as unknown as Record<string, unknown>)
+        .__RUNTIME_CONFIG__;
+      if (
+        runtimeConfig &&
+        typeof runtimeConfig === "object" &&
+        key in runtimeConfig
+      ) {
+        const value = (runtimeConfig as Record<string, unknown>)[key];
+        return typeof value === "string" ? value : undefined;
       }
     }
-    
+
     // Fallback to Vite environment variable
-    const viteEnv = (import.meta as any).env;
-    return viteEnv[`VITE_${key}`];
+    const viteEnv = (import.meta as unknown as Record<string, unknown>).env;
+    if (viteEnv && typeof viteEnv === "object") {
+      const envVar = (viteEnv as Record<string, unknown>)[`VITE_${key}`];
+      return typeof envVar === "string" ? envVar : undefined;
+    }
+    return undefined;
   };
 
   // Determine base URL based on configuration

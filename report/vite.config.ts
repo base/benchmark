@@ -10,10 +10,9 @@ export default defineConfig(({ mode }) => {
   const isLocal = env.IS_LOCAL === "true";
 
   const processEnvVars = {
-    API_BASE_URL: env.API_BASE_URL,
-    VITE_API_BASE_URL: env.API_BASE_URL,
-    VITE_DATA_SOURCE: env.DATA_SOURCE || env.VITE_DATA_SOURCE,
-    VITE_STATIC_BASE_PATH: env.STATIC_BASE_PATH || env.VITE_STATIC_BASE_PATH,
+    API_BASE_URL: env.VITE_API_BASE_URL,
+    DATA_SOURCE: env.VITE_DATA_SOURCE,
+    STATIC_BASE_PATH: env.VITE_STATIC_BASE_PATH,
   };
 
   // Parse allowed hosts from environment variable (comma-separated list)

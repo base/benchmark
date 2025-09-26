@@ -9,8 +9,6 @@ import (
 	"github.com/base/base-bench/benchmark/config"
 	"github.com/base/base-bench/benchmark/flags"
 	"github.com/base/base-bench/runner"
-	"github.com/base/base-bench/runner/aws"
-	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/importer"
 	"github.com/urfave/cli/v2"
 
@@ -44,16 +42,9 @@ func main() {
 			Name:        "import-runs",
 			Flags:       cliapp.ProtectFlags(flags.ImportRunsFlags),
 			Action:      ImportMain(Version),
-			Usage:       "import runs from metadata file, URL, or S3",
-			Description: "Import benchmark runs from local metadata.json, remote URL, or S3 bucket into existing output metadata.json. Use --s3-bucket and --s3-directory to import from S3, or provide a file/URL as argument. Use --src-tag and --dest-tag to apply tags to runs, or use interactive mode.",
-			ArgsUsage:   "[metadata-file-or-url] (optional when using S3)",
-		},
-		{
-			Name:        "export-to-cloud",
-			Flags:       cliapp.ProtectFlags(flags.ExportFlags),
-			Action:      ExportMain(Version),
-			Usage:       "export output directory to S3",
-			Description: "Export the entire output directory to AWS S3 bucket and sync with remote metadata.json.",
+			Usage:       "import runs from metadata file, URL",
+			Description: "Import benchmark runs from local metadata.json, remote URL into existing output metadata.json. Use --src-tag and --dest-tag to apply tags to runs, or use interactive mode.",
+			ArgsUsage:   "[metadata-file-or-url]",
 		},
 	}
 	app.Flags = flags.Flags
@@ -95,19 +86,10 @@ func ImportMain(version string) cli.ActionFunc {
 
 		service := importer.NewService(cfg, l)
 
-		// Load source metadata - from S3 if bucket is specified, otherwise from file/URL
-		var srcMetadata *benchmark.RunGroup
-		var err error
-		if cfg.S3Bucket() != "" {
-			srcMetadata, err = service.LoadSourceMetadataFromS3()
-			if err != nil {
-				return fmt.Errorf("failed to load source metadata from S3: %w", err)
-			}
-		} else {
-			srcMetadata, err = service.LoadSourceMetadata(cfg.SourceFile())
-			if err != nil {
-				return fmt.Errorf("failed to load source metadata: %w", err)
-			}
+		// Load source metadata from file/URL
+		srcMetadata, err := service.LoadSourceMetadata(cfg.SourceFile())
+		if err != nil {
+			return fmt.Errorf("failed to load source metadata: %w", err)
 		}
 
 		// Load destination metadata
@@ -181,13 +163,8 @@ func ImportMain(version string) cli.ActionFunc {
 		fmt.Printf("   • Imported: %d runs\n", result.ImportedRuns)
 		fmt.Printf("   • Total runs: %d\n", result.TotalRuns)
 
-		// Show if we downloaded files from URL or S3
-		if cfg.S3Bucket() != "" {
-			fmt.Printf("   • Downloaded output files from S3 bucket: %s\n", cfg.S3Bucket())
-			if cfg.S3Directory() != "" && cfg.S3Directory() != "." {
-				fmt.Printf("   • S3 directory: %s\n", cfg.S3Directory())
-			}
-		} else if strings.HasPrefix(cfg.SourceFile(), "http://") || strings.HasPrefix(cfg.SourceFile(), "https://") {
+		// Show if we downloaded files from URL
+		if strings.HasPrefix(cfg.SourceFile(), "http://") || strings.HasPrefix(cfg.SourceFile(), "https://") {
 			fmt.Printf("   • Downloaded output files from URL\n")
 		}
 
@@ -204,36 +181,6 @@ func ImportMain(version string) cli.ActionFunc {
 			fmt.Printf("   • Strategy: Created new run group\n")
 			fmt.Printf("   • Imported runs differentiated by BenchmarkRun ID\n")
 		}
-
-		return nil
-	}
-}
-
-func ExportMain(version string) cli.ActionFunc {
-	return func(cliCtx *cli.Context) error {
-		cfg := config.NewExportCmdConfig(cliCtx)
-		if err := cfg.Check(); err != nil {
-			return fmt.Errorf("invalid CLI flags: %w", err)
-		}
-
-		l := oplog.NewLogger(oplog.AppOut(cliCtx), oplog.DefaultCLIConfig())
-		oplog.SetGlobalLogHandler(l.Handler())
-
-		// Initialize S3 service
-		s3Service, err := aws.NewS3Service(cfg.S3Bucket(), l)
-		if err != nil {
-			return fmt.Errorf("failed to initialize S3 service: %w", err)
-		}
-
-		// Export output directory to S3
-		err = s3Service.ExportOutputDirectory(cfg.OutputDir())
-		if err != nil {
-			return fmt.Errorf("failed to export output directory to S3: %w", err)
-		}
-
-		fmt.Printf("✅ Export completed successfully!\n")
-		fmt.Printf("   • Output directory: %s\n", cfg.OutputDir())
-		fmt.Printf("   • S3 bucket: %s\n", cfg.S3Bucket())
 
 		return nil
 	}

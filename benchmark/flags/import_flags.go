@@ -5,10 +5,9 @@ import (
 )
 
 const (
-	SrcTagFlagName      = "src-tag"
-	DestTagFlagName     = "dest-tag"
-	NoConfirmFlagName   = "no-confirm"
-	S3DirectoryFlagName = "s3-directory"
+	SrcTagFlagName    = "src-tag"
+	DestTagFlagName   = "dest-tag"
+	NoConfirmFlagName = "no-confirm"
 )
 
 var (
@@ -27,11 +26,6 @@ var (
 		Usage: "Skip confirmation prompts",
 		Value: false,
 	}
-
-	S3DirectoryFlag = &cli.StringFlag{
-		Name:  S3DirectoryFlagName,
-		Usage: "S3 directory/prefix to download from (use '.' for root directory)",
-	}
 )
 
 // ImportRunsFlags contains the list of flags for the import-runs command
@@ -40,6 +34,4 @@ var ImportRunsFlags = []cli.Flag{
 	SrcTagFlag,
 	DestTagFlag,
 	NoConfirmFlag,
-	S3BucketFlag,
-	S3DirectoryFlag,
 }

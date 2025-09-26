@@ -5,12 +5,11 @@ import { getDataService } from "../services/dataService";
 
 // Fetch metrics data using the configured data service
 export const fetchMetrics = async (
-  runId: string,
   outputDir: string,
   nodeType: string,
 ): Promise<MetricData[]> => {
   const dataService = getDataService();
-  return await dataService.getMetrics(runId, outputDir, nodeType);
+  return await dataService.getMetrics(outputDir, nodeType);
 };
 
 // Generate cache key for metrics
@@ -56,7 +55,7 @@ export const useMultipleDataSeries = (
 
       // Fetch from API and cache
       const data = await mutate(cacheKey, async () => {
-        return await fetchMetrics(runId, outputDir, role);
+        return await fetchMetrics(outputDir, role);
       });
 
       if (!data) {
@@ -92,4 +91,3 @@ export const useMultipleDataSeries = (
     errorRetryInterval: 5000,
   });
 };
-

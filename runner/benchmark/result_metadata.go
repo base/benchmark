@@ -27,7 +27,6 @@ type Run struct {
 	ID              string                 `json:"id"`
 	SourceFile      string                 `json:"sourceFile"`
 	OutputDir       string                 `json:"outputDir"`
-	BucketPath      string                 `json:"bucketPath,omitempty"`
 	TestName        string                 `json:"testName"`
 	TestDescription string                 `json:"testDescription"`
 	TestConfig      map[string]interface{} `json:"testConfig"`
