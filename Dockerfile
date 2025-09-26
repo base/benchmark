@@ -33,7 +33,7 @@ RUN git clone https://github.com/paradigmxyz/reth.git && \
     git clone https://github.com/ethereum-optimism/op-geth.git && \
     git clone https://github.com/base/benchmark.git
 
-RUN git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b && \
+RUN git -C reth checkout --force 9d56da53ec0ad60e229456a0c70b338501d923a5 && \
     git -C op-geth checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
 
 # Stage 2: Build reth

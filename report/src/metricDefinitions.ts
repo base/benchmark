@@ -155,41 +155,59 @@ export const CHART_CONFIG: Record<string, ChartConfig> = {
     description: "Indicates whether the RBuilder successfully built a block",
     unit: "count",
   },
-  reth_op_rbuilder_flashblock_count_avg: {
+  reth_op_rbuilder_flashblock_count: {
     type: "line",
     title: "Reth OP RBuilder Flashblock Count",
     description: "Shows the number of flashblocks built by RBuilder",
     unit: "count",
   },
-  reth_op_rbuilder_total_block_built_duration_avg: {
+  reth_op_rbuilder_total_block_built_duration: {
     type: "line",
     title: "Reth OP RBuilder Total Block Built Duration",
     description: "Shows the total time taken to build a block by RBuilder",
     unit: "s",
   },
-  reth_op_rbuilder_flashblock_build_duration_avg: {
+  reth_op_rbuilder_flashblock_build_duration: {
     type: "line",
     title: "Reth OP RBuilder Flashblock Build Duration",
     description: "Shows the time taken to build a flashblock by RBuilder",
     unit: "s",
   },
-  reth_op_rbuilder_state_root_calculation_duration_avg: {
+  reth_op_rbuilder_state_root_calculation_duration: {
     type: "line",
     title: "Reth OP RBuilder State Root Calculation Duration",
     description: "Shows the time taken to calculate the state root by RBuilder",
     unit: "s",
   },
-  reth_op_rbuilder_sequencer_tx_duration_avg: {
+  reth_op_rbuilder_sequencer_tx_duration: {
     type: "line",
     title: "Reth OP RBuilder Sequencer Tx Duration",
     description: "Shows the time taken for sequencer transactions in RBuilder",
     unit: "s",
   },
-  reth_op_rbuilder_payload_tx_simulation_duration_avg: {
+  reth_op_rbuilder_payload_tx_simulation_duration: {
     type: "line",
     title: "Reth OP RBuilder Payload Tx Simulation Duration",
     description:
       "Shows the time taken for payload transaction simulation in RBuilder",
+    unit: "s",
+  },
+  reth_sync_state_provider_total_storage_fetch_latency: {
+    type: "line",
+    title: "Validator Storage Load Latency",
+    description: "Shows the 90th percentile latency for storage slot loads",
+    unit: "s",
+  },
+  reth_sync_state_provider_total_code_fetch_latency: {
+    type: "line",
+    title: "Validator Code Load Latency",
+    description: "Shows the 90th percentile latency for code loads",
+    unit: "s",
+  },
+  reth_sync_state_provider_total_account_fetch_latency: {
+    type: "line",
+    title: "Validator Account Load Latency",
+    description: "Shows the 90th percentile latency for account loads",
     unit: "s",
   },
 };

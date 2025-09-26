@@ -60,6 +60,9 @@ jobs:
 
   basic-benchmarks:
     runs-on: ubuntu-latest
+    env:
+      RETH_VERSION: 9d56da53ec0ad60e229456a0c70b338501d923a5
+      GETH_VERSION: 4bc345b22fbee14d3162becd197373a9565b7c6d
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
@@ -88,7 +91,7 @@ jobs:
         id: cache-bin
         with:
           path: ${{ runner.temp }}/bin
-          key: ${{ runner.os }}-binaries
+          key: ${{ runner.os }}-binaries-reth-${{ env.RETH_VERSION }}-geth-${{ env.GETH_VERSION }}
 
       - name: Build Contracts
         run: |
@@ -100,7 +103,7 @@ jobs:
           mkdir -p ${{ runner.temp }}/bin
 
           git clone https://github.com/paradigmxyz/reth
-          git -C reth checkout --force fad870e3508adcc150faa4554111368e0e16f43b
+          git -C reth checkout --force ${{ env.RETH_VERSION }}
 
           pushd reth
           cargo build --features asm-keccak,jemalloc --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
@@ -109,7 +112,7 @@ jobs:
           chmod +x ${{ runner.temp }}/bin/reth
 
           git clone https://github.com/ethereum-optimism/op-geth
-          git -C op-geth checkout --force 4bc345b22fbee14d3162becd197373a9565b7c6d
+          git -C op-geth checkout --force ${{ env.GETH_VERSION }}
 
           pushd op-geth
           make geth

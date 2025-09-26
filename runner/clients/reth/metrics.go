@@ -39,8 +39,14 @@ func (r *metricsCollector) GetMetrics() []metrics.BlockMetrics {
 
 func (r *metricsCollector) GetMetricTypes() map[string]bool {
 	return map[string]bool{
-		"reth_sync_execution_execution_duration":         true,
-		"reth_sync_block_validation_state_root_duration": true,
+		"reth_sync_execution_execution_duration":               true,
+		"reth_sync_block_validation_state_root_duration":       true,
+		"reth_sync_state_provider_storage_fetch_latency":       true,
+		"reth_sync_state_provider_account_fetch_latency":       true,
+		"reth_sync_state_provider_code_fetch_latency":          true,
+		"reth_sync_state_provider_total_storage_fetch_latency": true,
+		"reth_sync_state_provider_total_account_fetch_latency": true,
+		"reth_sync_state_provider_total_code_fetch_latency":    true,
 	}
 }
 

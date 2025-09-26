@@ -89,6 +89,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--authrpc.port", fmt.Sprintf("%d", r.authRPCPort))
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
+	args = append(args, "--engine.state-provider-metrics")
 	args = append(args, "-vvv")
 
 	args = append(args, cfg.Args...)
@@ -163,7 +164,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	err = common.WaitForRPC(ctx, r.client)
 	if err != nil {
-		return errors.Wrap(err, "geth rpc failed to start")
+		return errors.Wrap(err, "reth rpc failed to start")
 	}
 
 	l2Node, err := client.NewRPC(ctx, r.logger, fmt.Sprintf("http://127.0.0.1:%d", r.authRPCPort), client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))), client.WithCallTimeout(240*time.Second))
