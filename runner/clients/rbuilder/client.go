@@ -89,3 +89,15 @@ func (r *RbuilderClient) AuthClient() client.RPC {
 func (r *RbuilderClient) MetricsPort() int {
 	return r.elClient.MetricsPort()
 }
+
+// GetVersion returns the version of the Rbuilder client
+func (r *RbuilderClient) GetVersion(ctx context.Context) (string, error) {
+	// Rbuilder is based on reth, so delegate to the underlying reth client
+	return r.elClient.GetVersion(ctx)
+}
+
+// SetHead resets the blockchain to a specific block using debug.setHead
+func (r *RbuilderClient) SetHead(ctx context.Context, blockNumber uint64) error {
+	// Rbuilder is based on reth, so delegate to the underlying reth client
+	return r.elClient.SetHead(ctx, blockNumber)
+}

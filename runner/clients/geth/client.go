@@ -225,3 +225,45 @@ func (g *GethClient) AuthClient() client.RPC {
 func (r *GethClient) MetricsPort() int {
 	return int(r.metricsPort)
 }
+
+// GetVersion returns the version of the Geth client
+func (g *GethClient) GetVersion(ctx context.Context) (string, error) {
+	cmd := exec.CommandContext(ctx, g.options.GethBin, "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get geth version")
+	}
+
+	// Parse version from output - geth version output usually has format like:
+	// Geth
+	// Version: 1.13.5-stable
+	// ...
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Version: ") {
+			return strings.TrimPrefix(line, "Version: "), nil
+		}
+	}
+
+	return "unknown", nil
+}
+
+// SetHead resets the blockchain to a specific block using debug.setHead
+func (g *GethClient) SetHead(ctx context.Context, blockNumber uint64) error {
+	if g.client == nil {
+		return errors.New("client not initialized")
+	}
+
+	// Convert block number to hex string
+	blockHex := fmt.Sprintf("0x%x", blockNumber)
+
+	// Call debug.setHead via RPC
+	var result interface{}
+	err := g.client.Client().CallContext(ctx, &result, "debug_setHead", blockHex)
+	if err != nil {
+		return errors.Wrap(err, "failed to call debug_setHead")
+	}
+
+	g.logger.Info("Successfully reset blockchain head", "blockNumber", blockNumber, "blockHex", blockHex)
+	return nil
+}

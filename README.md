@@ -31,6 +31,9 @@ git submodule update --init --recursive
 # Build the application
 make build
 
+# Build the binaries, geth, reth, rbuilder
+make build-binaries
+
 # Run the basic benchmark
 ./bin/base-bench run \
   --config ./configs/public/basic.yml \

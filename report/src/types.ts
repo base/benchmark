@@ -52,6 +52,13 @@ export interface ChartConfig {
     | "blocks"; // Add 'gas/s', ensure 's' is present
 }
 
+export interface MachineInfo {
+  type?: string; // e.g., i4i.32xlarge
+  provider?: string; // aws or gcp
+  region?: string; // e.g., us-east-1
+  fileSystem?: string; // e.g., ext4
+}
+
 export interface BenchmarkRun {
   id: string;
   sourceFile: string;
@@ -60,6 +67,7 @@ export interface BenchmarkRun {
   outputDir: string;
   createdAt: string;
   testConfig: Record<string, string | number>;
+  machineInfo?: MachineInfo;
   thresholds?: {
     warning?: Record<string, number>;
     error?: Record<string, number>;
@@ -67,6 +75,7 @@ export interface BenchmarkRun {
   result: {
     success: boolean;
     complete?: boolean;
+    clientVersion?: string;
     sequencerMetrics?: {
       gasPerSecond: number;
       forkChoiceUpdated: number;

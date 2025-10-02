@@ -3,15 +3,28 @@ import { camelToTitleCase } from "../utils/formatters";
 
 interface ConfigurationTagsProps {
   testConfig: Record<string, unknown>;
+  clientVersion?: string;
   className?: string;
 }
 
 const ConfigurationTags = ({
   testConfig,
+  clientVersion,
   className = "",
 }: ConfigurationTagsProps) => {
   return (
     <div className={`flex flex-wrap gap-2 ${className}`}>
+      {clientVersion && (
+        <span
+          title={`Client Version: ${clientVersion}`}
+          className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-700 ring-1 ring-inset ring-blue-500/10"
+        >
+          <span className="mr-1.5 text-blue-500 font-normal">
+            Client Version:
+          </span>
+          <span className="font-mono">{clientVersion}</span>
+        </span>
+      )}
       {Object.entries(testConfig || {})
         .filter(([k]) => k !== "BenchmarkRun" && k !== "GasLimit")
         .map(([key, value]) => (

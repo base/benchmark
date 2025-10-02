@@ -21,27 +21,42 @@ type Config interface {
 	OutputDir() string
 	TxFuzzBinary() string
 	ProxyPort() int
+	BenchmarkRunID() string
+	MachineType() string
+	MachineProvider() string
+	MachineRegion() string
+	FileSystem() string
 }
 
 type config struct {
-	logConfig     oplog.CLIConfig
-	configPath    string
-	dataDir       string
-	outputDir     string
-	clientOptions ClientOptions
-	txFuzzBinary  string
-	proxyPort     int
+	logConfig       oplog.CLIConfig
+	configPath      string
+	dataDir         string
+	outputDir       string
+	clientOptions   ClientOptions
+	txFuzzBinary    string
+	proxyPort       int
+	benchmarkRunID  string
+	machineType     string
+	machineProvider string
+	machineRegion   string
+	fileSystem      string
 }
 
 func NewConfig(ctx *cli.Context) Config {
 	return &config{
-		logConfig:     oplog.ReadCLIConfig(ctx),
-		configPath:    ctx.String(appFlags.ConfigFlagName),
-		dataDir:       ctx.String(appFlags.RootDirFlagName),
-		outputDir:     ctx.String(appFlags.OutputDirFlagName),
-		txFuzzBinary:  ctx.String(appFlags.TxFuzzBinFlagName),
-		proxyPort:     ctx.Int(appFlags.ProxyPortFlagName),
-		clientOptions: ReadClientOptions(ctx),
+		logConfig:       oplog.ReadCLIConfig(ctx),
+		configPath:      ctx.String(appFlags.ConfigFlagName),
+		dataDir:         ctx.String(appFlags.RootDirFlagName),
+		outputDir:       ctx.String(appFlags.OutputDirFlagName),
+		txFuzzBinary:    ctx.String(appFlags.TxFuzzBinFlagName),
+		proxyPort:       ctx.Int(appFlags.ProxyPortFlagName),
+		benchmarkRunID:  ctx.String(appFlags.BenchmarkRunIDFlagName),
+		machineType:     ctx.String(appFlags.MachineTypeFlagName),
+		machineProvider: ctx.String(appFlags.MachineProviderFlagName),
+		machineRegion:   ctx.String(appFlags.MachineRegionFlagName),
+		fileSystem:      ctx.String(appFlags.FileSystemFlagName),
+		clientOptions:   ReadClientOptions(ctx),
 	}
 }
 
@@ -92,4 +107,24 @@ func (c *config) ClientOptions() ClientOptions {
 
 func (c *config) TxFuzzBinary() string {
 	return c.txFuzzBinary
+}
+
+func (c *config) BenchmarkRunID() string {
+	return c.benchmarkRunID
+}
+
+func (c *config) MachineType() string {
+	return c.machineType
+}
+
+func (c *config) MachineProvider() string {
+	return c.machineProvider
+}
+
+func (c *config) MachineRegion() string {
+	return c.machineRegion
+}
+
+func (c *config) FileSystem() string {
+	return c.fileSystem
 }

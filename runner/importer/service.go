@@ -1,8 +1,6 @@
 package importer
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +14,7 @@ import (
 
 	"github.com/base/base-bench/benchmark/config"
 	"github.com/base/base-bench/runner/benchmark"
+	"github.com/base/base-bench/runner/utils"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
@@ -66,7 +65,7 @@ func (s *Service) downloadFile(fileURL, localPath string) error {
 }
 
 // downloadOutputFiles downloads all output files for a run from a base URL
-func (s *Service) downloadOutputFiles(baseURL, runOutputDir string) error {
+func (s *Service) downloadOutputFiles(baseURL, runID, runOutputDir string) error {
 	// List of expected files in output directories
 	expectedFiles := []string{
 		"logs-validator.gz",
@@ -77,8 +76,9 @@ func (s *Service) downloadOutputFiles(baseURL, runOutputDir string) error {
 		"metrics-sequencer.json",
 	}
 
-	localOutputDir := filepath.Join(s.config.OutputDir(), runOutputDir)
-	s.log.Info("Downloading output files", "runOutputDir", runOutputDir, "localPath", localOutputDir)
+	// Structure output as output/<runId>/<outputDir>/
+	localOutputDir := filepath.Join(s.config.OutputDir(), runID, runOutputDir)
+	s.log.Info("Downloading output files", "runID", runID, "runOutputDir", runOutputDir, "localPath", localOutputDir)
 
 	downloadedCount := 0
 	for _, fileName := range expectedFiles {
@@ -152,7 +152,7 @@ func (s *Service) LoadSourceMetadata(source string) (*benchmark.RunGroup, error)
 		s.log.Info("Downloading output files for all runs", "baseURL", baseURL)
 		for _, run := range metadata.Runs {
 			if run.OutputDir != "" {
-				err := s.downloadOutputFiles(baseURL, run.OutputDir)
+				err := s.downloadOutputFiles(baseURL, run.ID, run.OutputDir)
 				if err != nil {
 					s.log.Warn("Failed to download output files for run", "runID", run.ID, "outputDir", run.OutputDir, "error", err)
 					// Continue with other runs even if one fails
@@ -187,15 +187,6 @@ func (s *Service) LoadDestinationMetadata() (*benchmark.RunGroup, error) {
 
 	s.log.Info("Loaded destination metadata", "runs", len(metadata.Runs))
 	return &metadata, nil
-}
-
-// generateRandomID generates a random ID for BenchmarkRun
-func (s *Service) generateRandomID() (string, error) {
-	bytes := make([]byte, 8)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", errors.Wrap(err, "failed to generate random ID")
-	}
-	return hex.EncodeToString(bytes), nil
 }
 
 // getLastBenchmarkRunID gets the BenchmarkRun ID from the run with the latest CreatedAt timestamp
@@ -329,7 +320,7 @@ func (s *Service) applyBenchmarkRunStrategy(srcRuns []benchmark.Run, destMetadat
 		if benchmarkRunID == "" {
 			// If no existing runs or no BenchmarkRun ID found, generate a new one
 			var err error
-			benchmarkRunID, err = s.generateRandomID()
+			benchmarkRunID, err = utils.GenerateRandomID(8)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to generate BenchmarkRun ID")
 			}
@@ -340,7 +331,7 @@ func (s *Service) applyBenchmarkRunStrategy(srcRuns []benchmark.Run, destMetadat
 
 	case BenchmarkRunCreateNew:
 		var err error
-		benchmarkRunID, err = s.generateRandomID()
+		benchmarkRunID, err = utils.GenerateRandomID(8)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to generate new BenchmarkRun ID")
 		}

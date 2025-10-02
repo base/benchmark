@@ -19,6 +19,9 @@ LDFLAGSSTRING +=-X main.GitDate=$(GITDATE)
 LDFLAGSSTRING +=-X main.Version=$(VERSION)
 LDFLAGS := -ldflags "$(LDFLAGSSTRING)"
 
+# Include .env file if it exists
+-include .env
+
 # first so that make defaults to building the benchmark
 .PHONY: build
 build:
@@ -50,3 +53,11 @@ build-rbuilder:
 
 .PHONY: build-binaries
 build-binaries: build-reth build-geth build-rbuilder
+
+.PHONY: build-frontend
+build-frontend:
+	cd report && yarn build
+
+.PHONY: run-frontend
+run-frontend:
+	cd report && set -a && [ -f ../.env ] && . ../.env && set +a && yarn dev

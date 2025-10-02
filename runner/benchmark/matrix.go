@@ -12,10 +12,10 @@ type ThresholdConfig struct {
 
 // TestPlan represents a list of test runs to be executed.
 type TestPlan struct {
-	Runs         []TestRun
-	Snapshot     *SnapshotDefinition
-	ProofProgram *ProofProgramOptions
-	Thresholds   *ThresholdConfig
+	Runs             []TestRun
+	InitialSnapshots []SnapshotDefinition
+	ProofProgram     *ProofProgramOptions
+	Thresholds       *ThresholdConfig
 }
 
 func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *BenchmarkConfig) (*TestPlan, error) {
@@ -36,11 +36,22 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *Benchm
 	}
 
 	return &TestPlan{
-		Runs:         testRuns,
-		Snapshot:     c.Snapshot,
-		ProofProgram: proofProgram,
-		Thresholds:   c.Metrics,
+		Runs:             testRuns,
+		InitialSnapshots: c.InitialSnapshots,
+		ProofProgram:     proofProgram,
+		Thresholds:       c.Metrics,
 	}, nil
+}
+
+// GetInitialSnapshotForNodeType returns the initial snapshot definition for the given node type.
+// Returns nil if no initial snapshot is found for the node type.
+func (tp *TestPlan) GetInitialSnapshotForNodeType(nodeType string) *SnapshotDefinition {
+	for _, snapshot := range tp.InitialSnapshots {
+		if snapshot.NodeType == nodeType {
+			return &snapshot
+		}
+	}
+	return nil
 }
 
 // ResolveTestRunsFromMatrix constructs a new ParamsMatrix from a config.
@@ -117,7 +128,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *Be
 		testParams[i] = TestRun{
 			ID:          id,
 			Params:      *params,
-			OutputDir:   fmt.Sprintf("%s-%d", id, i),
+			OutputDir:   fmt.Sprintf("%s/%s-%d", id, id, i),
 			Name:        params.Name,
 			Description: params.Description,
 			TestFile:    testFileName,

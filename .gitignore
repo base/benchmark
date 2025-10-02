@@ -1,6 +1,6 @@
 .DS_Store
 /.idea/
-/bin/
+**/bin/
 data-dir/
 output/
 .vercel
@@ -10,3 +10,12 @@ contracts/cache/
 contracts/out/
 contracts/abi/
 benchmark/benchmark
+
+.env
+
+# Node
+coverage/
+!**/__fixtures__/coverage
+node_modules
+yarn-debug.log*
+yarn-error.log*
