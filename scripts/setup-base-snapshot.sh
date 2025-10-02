@@ -2,21 +2,21 @@
 
 set -e
 
-# setup-initial-snapshot.sh - Downloads and extracts Base network snapshots
+# setup-base-snapshot.sh - Downloads and extracts Base network snapshots
 # 
 # Downloads the latest snapshot from Base's official snapshot servers and extracts
 # it to the specified destination directory. Supports both mainnet and testnet (sepolia).
 #
 # Requirements: curl, tar, zstd (for .tar.zst files)
 #
-# Usage: ./setup-initial-snapshot.sh --network <network> --node-type <node-type> --destination <destination> [--skip-if-nonempty]
+# Usage: ./setup-base-snapshot.sh --network <network> --node-type <node-type> --destination <destination> [--skip-if-nonempty]
 #
 # Networks: mainnet, sepolia (testnet)
 # Node types: geth (full snapshots), reth (archive snapshots)
 # 
 # Examples:
-#   ./setup-initial-snapshot.sh --network mainnet --node-type geth --destination ./geth-data
-#   ./setup-initial-snapshot.sh --network sepolia --node-type reth --destination ./reth-data --skip-if-nonempty
+#   ./setup-base-snapshot.sh --network mainnet --node-type geth --destination ./geth-data
+#   ./setup-base-snapshot.sh --network sepolia --node-type reth --destination ./reth-data --skip-if-nonempty
 
 POSITIONAL_ARGS=()
 for arg in "$@"; do
