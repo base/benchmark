@@ -42,18 +42,6 @@ make build-binaries
   --geth-bin path_to_geth_bin \
   --output-dir ./output
 
-# Run the basic benchmark with S3
-./bin/base-bench run \
-  --config ./configs/public/basic.yml \
-  --root-dir ./data-dir \
-  --reth-bin path_to_reth_bin \
-  --geth-bin path_to_geth_bin \
-  --output-dir ./output \
-  --enable-s3=true --s3-bucket <bucket-name>
-
-# Upload the results to S3
-./bin/base-bench export-to-cloud --output-dir ./output --s3-bucket <bucket-name>
-
 # View the interactive dashboard
 cd report/
 npm i
@@ -146,10 +134,6 @@ OPTIONS:
    --geth-http-port value          HTTP port (default: 8545)
    --geth-auth-rpc-port value      Auth RPC port (default: 8551)
    --geth-metrics-port value       Metrics port (default: 8080)
-
-   # S3 Configuration
-   --enable-s3 value               Enable S3 (default: false)
-   --s3-bucket value               S3 bucket name (default: "base-benchmarking-results-dev")
 
    # General Options
    --proxy-port value              Proxy port (default: 8546)

@@ -61,7 +61,3 @@ build-frontend:
 .PHONY: run-frontend
 run-frontend:
 	cd report && set -a && [ -f ../.env ] && . ../.env && set +a && yarn dev
-
-.PHONY: run-backfill
-run-backfill:
-	./bin/base-bench backfill-benchmark-run-id --s3-bucket ${BASE_BENCH_API_S3_BUCKET} metadata.json
