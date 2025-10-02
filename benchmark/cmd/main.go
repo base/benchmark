@@ -42,8 +42,8 @@ func main() {
 			Name:        "import-runs",
 			Flags:       cliapp.ProtectFlags(flags.ImportRunsFlags),
 			Action:      ImportMain(Version),
-			Usage:       "import runs from metadata file, URL",
-			Description: "Import benchmark runs from local metadata.json, remote URL into existing output metadata.json. Use --src-tag and --dest-tag to apply tags to runs, or use interactive mode.",
+			Usage:       "import runs from metadata file or URL",
+			Description: "Import benchmark runs from local metadata.json or remote URL into existing output metadata.json. Use --src-tag and --dest-tag to apply tags to runs, or use interactive mode.",
 			ArgsUsage:   "[metadata-file-or-url]",
 		},
 	}
@@ -86,7 +86,7 @@ func ImportMain(version string) cli.ActionFunc {
 
 		service := importer.NewService(cfg, l)
 
-		// Load source metadata from file/URL
+		// Load source metadata
 		srcMetadata, err := service.LoadSourceMetadata(cfg.SourceFile())
 		if err != nil {
 			return fmt.Errorf("failed to load source metadata: %w", err)
