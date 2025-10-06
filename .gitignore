@@ -13,6 +13,10 @@ benchmark/benchmark
 
 .env
 
+# Large binaries and executables
+*.exe
+cmd.exe
+
 # Node
 coverage/
 !**/__fixtures__/coverage
