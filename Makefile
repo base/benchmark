@@ -41,23 +41,39 @@ test:
 
 .PHONY: build-reth
 build-reth:
+ifeq ($(OS),Windows_NT)
+	cd clients && powershell -ExecutionPolicy Bypass -File build-reth.ps1
+else
 	cd clients && ./build-reth.sh
+endif
 
 .PHONY: build-geth
 build-geth:
+ifeq ($(OS),Windows_NT)
+	cd clients && powershell -ExecutionPolicy Bypass -File build-geth.ps1
+else
 	cd clients && ./build-geth.sh
+endif
 
 .PHONY: build-rbuilder
 build-rbuilder:
+ifeq ($(OS),Windows_NT)
+	cd clients && powershell -ExecutionPolicy Bypass -File build-rbuilder.ps1
+else
 	cd clients && ./build-rbuilder.sh
+endif
 
 .PHONY: build-binaries
 build-binaries: build-reth build-geth build-rbuilder
 
 .PHONY: build-frontend
 build-frontend:
-	cd report && yarn build
+	cd report && npm run build
 
 .PHONY: run-frontend
 run-frontend:
-	cd report && set -a && [ -f ../.env ] && . ../.env && set +a && yarn dev
+ifeq ($(OS),Windows_NT)
+	cd report && npm run dev
+else
+	cd report && set -a && [ -f ../.env ] && . ../.env && set +a && npm run dev
+endif

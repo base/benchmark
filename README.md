@@ -19,32 +19,62 @@ Base Benchmark provides comprehensive testing capabilities:
 
 ## 📋 Quick Start
 
-[Install Forge](https://book.getfoundry.sh/getting-started/installation)
+### Prerequisites
+- [Git](https://git-scm.com/)
+- [Go 1.23+](https://golang.org/)
+- [Node.js 18+](https://nodejs.org/)
+- [Rust/Cargo](https://rustup.rs/) (for building client binaries)
+- [Forge](https://book.getfoundry.sh/getting-started/installation) (for contracts)
 
-Recursively clone github submodules:
+### Windows Setup
+```cmd
+# Run the automated setup script
+setup-windows.bat
 
-```bash
+# Or manually:
 git submodule update --init --recursive
+go mod tidy
+go build -o bin\base-bench.exe .\benchmark\cmd
+cd report && npm install --legacy-peer-deps && cd ..
 ```
 
+### Linux/macOS Setup
 ```bash
+# Recursively clone GitHub submodules
+git submodule update --init --recursive
+
 # Build the application
 make build
 
-# Build the binaries, geth, reth, rbuilder
+# Build the binaries: geth, reth, rbuilder
 make build-binaries
 
-# Run the basic benchmark
+# Install frontend dependencies
+cd report && npm install && cd ..
+```
+
+### Running Benchmarks
+```bash
+# Windows
+.\bin\base-bench.exe run ^
+  --config .\configs\public\basic.yml ^
+  --root-dir .\data-dir ^
+  --reth-bin path_to_reth_bin ^
+  --geth-bin path_to_geth_bin ^
+  --output-dir .\output
+
+# Linux/macOS
 ./bin/base-bench run \
   --config ./configs/public/basic.yml \
   --root-dir ./data-dir \
   --reth-bin path_to_reth_bin \
   --geth-bin path_to_geth_bin \
   --output-dir ./output
+```
 
-# View the interactive dashboard
+### View Results
+```bash
 cd report/
-npm i
 npm run dev
 ```
 

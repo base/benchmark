@@ -8,13 +8,13 @@ CHAIN_ID=13371337
 OP_PROGRAM_VERSION="v1.6.1-rc.1"
 
 # ensure running in op-program directory
-if [ ! -d "../op-program" ]; then
+if [ ! -f "build.sh" ]; then
     echo "Please run this script from the op-program directory."
     exit 1
 fi
 
 # clone OP repo
-if [ ! -d "op" ]; then
+if [ ! -d "optimism" ]; then
     git clone https://github.com/ethereum-optimism/optimism.git
     git -C optimism checkout op-program/$OP_PROGRAM_VERSION
     echo "Cloned OP repo at version op-program/$OP_PROGRAM_VERSION."

@@ -5,7 +5,6 @@ go 1.23.0
 toolchain go1.23.10
 
 require (
-	github.com/aws/aws-sdk-go v1.47.13
 	github.com/charmbracelet/huh v0.7.0
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/ethereum-optimism/optimism v1.13.3
@@ -82,7 +81,6 @@ require (
 	github.com/ipfs/go-datastore v0.6.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
