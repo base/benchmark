@@ -28,6 +28,7 @@ import (
 	"github.com/base/base-bench/runner/payload"
 	"github.com/base/base-bench/runner/utils"
 	"github.com/ethereum/go-ethereum/core"
+	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	ethparams "github.com/ethereum/go-ethereum/params"
 )
 
@@ -396,7 +397,17 @@ func (s *service) detectSnapshotHeadBlocks(testPlans []benchmark.TestPlan) error
 	for nodeType, snapshot := range snapshotsToDetect {
 		headBlock, err := s.detectHeadBlockForSnapshot(nodeType, snapshot)
 		if err != nil {
-			s.log.Warn("Failed to detect head block for snapshot", "nodeType", nodeType, "error", err)
+			s.log.Error("Failed to detect head block for snapshot", "nodeType", nodeType, "error", err)
+
+			// Fallback: try to use a reasonable default based on the snapshot
+			// This is a best-effort attempt to keep the benchmark running
+			fallbackBlock := s.getFallbackHeadBlock(nodeType, snapshot)
+			if fallbackBlock > 0 {
+				s.log.Warn("Using fallback head block for snapshot", "nodeType", nodeType, "fallbackBlock", fallbackBlock)
+				s.updateTestPlansWithDetectedHeadBlock(testPlans, nodeType, fallbackBlock)
+			} else {
+				s.log.Error("No fallback head block available, benchmark will likely fail", "nodeType", nodeType)
+			}
 			continue
 		}
 
@@ -505,19 +516,60 @@ func (s *service) detectHeadBlockForSnapshot(nodeType string, snapshot benchmark
 	tempOptions.ChainCfgPath = chainCfgPath
 
 	// Start the temporary client to query head block
+	s.log.Info("Starting temporary client for head detection", "nodeType", nodeType, "dataDir", tempSnapshotPath)
 	tempClient, _, err := network.SetupNodeForHeadDetection(ctx, s.log, nodeType, tempOptions, s.portState)
 	if err != nil {
 		return 0, fmt.Errorf("failed to setup temporary client for head detection: %w", err)
 	}
-	defer tempClient.Stop()
+	defer func() {
+		s.log.Info("Stopping temporary client for head detection", "nodeType", nodeType)
+		tempClient.Stop()
+	}()
 
-	// Query the head block
-	currentHeader, err := tempClient.Client().HeaderByNumber(ctx, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to query head block: %w", err)
+	// Wait a bit for the client to fully start
+	time.Sleep(2 * time.Second)
+
+	// Query the head block with retries
+	var currentHeader *ethtypes.Header
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		currentHeader, err = tempClient.Client().HeaderByNumber(ctx, nil)
+		if err == nil {
+			break
+		}
+		s.log.Warn("Failed to query head block, retrying", "attempt", i+1, "maxRetries", maxRetries, "error", err)
+		if i < maxRetries-1 {
+			time.Sleep(time.Duration(i+1) * time.Second)
+		}
 	}
 
-	return currentHeader.Number.Uint64(), nil
+	if err != nil {
+		return 0, fmt.Errorf("failed to query head block after %d attempts: %w", maxRetries, err)
+	}
+
+	headBlock := currentHeader.Number.Uint64()
+	s.log.Info("Successfully detected head block", "nodeType", nodeType, "headBlock", headBlock)
+	return headBlock, nil
+}
+
+// getFallbackHeadBlock attempts to provide a reasonable fallback head block when detection fails
+func (s *service) getFallbackHeadBlock(nodeType string, snapshot benchmark.SnapshotDefinition) uint64 {
+	// Check if there's a stored head block from previous successful detection
+	storedHeadBlock := s.dataDirState.GetInitialSnapshotHeadBlock(nodeType)
+	if storedHeadBlock > 0 {
+		s.log.Info("Using previously detected head block as fallback", "nodeType", nodeType, "headBlock", storedHeadBlock)
+		return storedHeadBlock
+	}
+
+	// If no stored head block, we could try other fallback strategies:
+	// 1. Use a default based on the snapshot type or command
+	// 2. Parse the snapshot path for hints about the block number
+	// 3. Use a conservative default (e.g., block 1000 for most devnets)
+
+	// For now, use a conservative default that should work for most devnet snapshots
+	defaultFallback := uint64(1000)
+	s.log.Info("Using conservative default as fallback head block", "nodeType", nodeType, "defaultBlock", defaultFallback)
+	return defaultFallback
 }
 
 func (s *service) updateTestPlansWithDetectedHeadBlock(testPlans []benchmark.TestPlan, nodeType string, headBlock uint64) {

@@ -417,7 +417,7 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 
 		gasUsed := transferTx.Gas()
 		if gasUsed > gas {
-			t.log.Warn("Gas used is greater than gas limit, stopping tx sending", "gasUsed", gasUsed, "gasLimit", t.params.GasLimit)
+			t.log.Warn("Gas used is greater than gas limit, stopping tx sending", "gasUsed", gasUsed, "gasLimit", t.params.GasLimit, "remainingGas", gas)
 			break
 		}
 

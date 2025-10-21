@@ -256,7 +256,7 @@ func (nb *NetworkBenchmark) performHeadRollbackIfNeeded(ctx context.Context, cli
 
 	// At this point, the rollback block should be set (either by user or auto-detected)
 	if nb.snapshotConfig.RollbackBlock == nil {
-		return fmt.Errorf("rollback_block not set for head_rollback method - this should have been auto-detected")
+		return fmt.Errorf("rollback_block not set for head_rollback method - head block detection failed during setup phase. Check logs for head detection errors or manually specify rollback_block in your snapshot configuration")
 	}
 
 	blockNumber := *nb.snapshotConfig.RollbackBlock
