@@ -56,7 +56,9 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 			GethBin: ctx.String(flags.GethBin),
 		},
 		RbuilderOptions: rbuilderoptions.RbuilderOptions{
-			RbuilderBin: ctx.String(flags.RbuilderBin),
+			RbuilderBin:    ctx.String(flags.RbuilderBin),
+			FallbackClient: ctx.String(flags.FlashblocksFallback),
+			RollupBoostBin: ctx.String(flags.RollupBoostBin),
 		},
 	}
 

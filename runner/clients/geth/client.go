@@ -125,6 +125,9 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	minerNewPayloadTimeout := time.Second * 2
 	args = append(args, "--miner.newpayload-timeout", minerNewPayloadTimeout.String())
 
+	// Append any custom args from RuntimeConfig
+	args = append(args, cfg.Args...)
+
 	jwtSecretStr, err := os.ReadFile(g.options.JWTSecretPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to read jwt secret")

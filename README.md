@@ -87,6 +87,49 @@ benchmarks:
 
 This configuration runs a `transfer-only` transaction payload against both Geth and Reth clients for 20 blocks.
 
+### Flashblocks Support
+
+The benchmark system supports **flashblocks** - Base's sub-200ms transaction preconfirmation feature via the `rbuilder` client.
+
+**Two Modes:**
+
+1. **Simple mode (standalone)**: Just rbuilder for testing
+   ```yaml
+   benchmarks:
+     - variables:
+         - type: node_type
+           value: rbuilder
+   ```
+
+2. **Dual-builder mode (production architecture)**: Fallback builder + rbuilder + optional rollup-boost
+   ```bash
+   ./bin/base-bench run \
+     --config ./configs/examples/flashblocks.yml \
+     --root-dir ./data-dir \
+     --reth-bin ./bin/op-reth \
+     --geth-bin ./bin/geth \
+     --rbuilder-bin ./bin/op-rbuilder \
+     --flashblocks-fallback reth \
+     --rollup-boost-bin ./bin/rollup-boost \
+     --output-dir ./output
+   ```
+
+**How it works (dual-builder mode):**
+- **Fallback builder** (geth/reth): Produces final 2s canonical blocks
+- **Rbuilder** (primary): Produces flashblocks every 200ms (10 per 2s block)
+- **Rollup-boost** (optional): Coordinates between the two builders
+
+**Configurable flashblock interval:**
+```yaml
+- type: flashblock_interval
+  values:
+    - 100   # 100ms (aggressive)
+    - 200   # 200ms (Base default)
+    - 500   # 500ms (conservative)
+```
+
+See [configs/examples/flashblocks.yml](configs/examples/flashblocks.yml) for complete examples.
+
 ### Test Methodology
 
 Each test executes a standardized workflow:
@@ -125,20 +168,37 @@ OPTIONS:
 
    # Reth Configuration
    --reth-bin value                Reth binary path (default: "reth")
-   --reth-http-port value          HTTP port (default: 9545)
-   --reth-auth-rpc-port value      Auth RPC port (default: 9551)
-   --reth-metrics-port value       Metrics port (default: 9080)
 
    # Geth Configuration
    --geth-bin value                Geth binary path (default: "geth")
-   --geth-http-port value          HTTP port (default: 8545)
-   --geth-auth-rpc-port value      Auth RPC port (default: 8551)
-   --geth-metrics-port value       Metrics port (default: 8080)
+
+   # Rbuilder (Flashblocks) Configuration
+   --rbuilder-bin value            Rbuilder binary path (default: "rbuilder")
+   --flashblocks-fallback value    Fallback client for dual-builder mode: geth or reth (default: "reth")
+   --rollup-boost-bin value        Rollup-boost coordinator binary for dual-builder mode
 
    # General Options
    --proxy-port value              Proxy port (default: 8546)
    --help, -h                      Show help (default: false)
 ```
+
+**Note**: Without `--flashblocks-fallback`, rbuilder runs in simple standalone mode. Set `--flashblocks-fallback` to enable production dual-builder architecture.
+
+### Client-Specific Arguments
+
+You can customize client behavior using the `client_args` variable in YAML configs:
+
+```yaml
+benchmarks:
+  - variables:
+      - type: client_args
+        value:
+          geth: "--verbosity 4 --txpool.globalslots 20000000"
+          reth: "--txpool.pending-max-count 200000000 -vvvv"
+          rbuilder: "--txpool.pending-max-count 200000000"
+```
+
+This allows testing different client configurations without code changes.
 
 ## 📊 Example Reports
 

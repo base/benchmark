@@ -1,0 +1,131 @@
+name: Flashblocks Performance Comparison
+description: |
+  Flashblocks Benchmark - Compares performance between standard clients and flashblocks-enabled execution.
+  
+  This benchmark tests flashblocks (sub-200ms preconfirmations) using rbuilder in two modes:
+  1. Simple mode: Rbuilder standalone (for testing/development)
+  2. Dual-builder mode: Fallback builder + rbuilder + optional rollup-boost (production architecture)
+  
+  In dual-builder mode:
+  - Fallback builder (geth/reth): Produces final 2s canonical blocks
+  - Rbuilder (primary): Produces flashblocks every 200ms (10 per 2s block)
+  - Rollup-boost (optional): Coordinates between the two builders
+  
+  Use Case: Evaluate flashblocks performance, measure preconfirmation latency, compare
+  production dual-builder vs standalone modes, and validate flashblocks under different workloads.
+
+payloads:
+  - name: Transfer-only
+    id: transfer-only
+    type: transfer-only
+  
+  - name: Simulator
+    id: simulator
+    type: simulator
+    accounts_loaded: 30
+    accounts_deleted: 1.27
+    accounts_updated: 20.17
+    accounts_created: 1
+    storage_loaded: 30
+    storage_deleted: 4.1
+    storage_updated: 14.7
+    storage_created: 14.7
+    calls_per_block: fill
+    precompiles:
+      bls12381MapG2: 6.81
+      ecrecover: 0.33
+      bls12381G1Add: 0.44
+      bls12381G1MultiExp: 0.18
+      sha256hash: 1
+      dataCopy: 1
+      bls12381Pairing: 1
+      bls12381G2Add: 1
+      bls12381G2MultiExp: 1
+
+benchmarks:
+  # Test 1: Compare all clients with transfer-only payload
+  - name: Transfer-only comparison
+    description: Compare geth, reth, and rbuilder (flashblocks) on simple transfers
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - rbuilder
+      - type: num_blocks
+        value: 20
+      - type: gas_limit
+        values:
+          - 30000000
+          - 60000000
+          - 90000000
+
+  # Test 2: Flashblocks with simulator payload
+  - name: Flashblocks with complex workload
+    description: Test flashblocks performance with complex mixed operations
+    variables:
+      - type: payload
+        value: simulator
+      - type: node_type
+        values:
+          - rbuilder
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 90000000
+      - type: flashblock_interval
+        value: 200  # 200ms flashblocks (10 per 2s block)
+
+  # Test 3: Custom client args for tuning
+  - name: Tuned performance comparison
+    description: Compare clients with optimized arguments
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - rbuilder
+      - type: num_blocks
+        value: 20
+      - type: gas_limit
+        value: 60000000
+      - type: client_args
+        value:
+          rbuilder: "--txpool.pending-max-count 200000000"
+
+  # Test 4: Different flashblock intervals
+  - name: Flashblock interval comparison
+    description: Compare performance with different flashblock intervals
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        value: rbuilder
+      - type: num_blocks
+        value: 15
+      - type: gas_limit
+        value: 60000000
+      - type: flashblock_interval
+        values:
+          - 100   # 100ms flashblocks (20 per 2s block) - very aggressive
+          - 200   # 200ms flashblocks (10 per 2s block) - Base production default
+          - 500   # 500ms flashblocks (4 per 2s block) - more conservative
+          - 1000  # 1000ms flashblocks (2 per 2s block) - minimal flashblocks
+
+# NOTE: To run rbuilder in dual-builder mode (production architecture),
+# use the following CLI flags:
+#
+#   --flashblocks-fallback reth    # or "geth"
+#   --rollup-boost-bin ./bin/rollup-boost  # optional
+#
+# Example command for dual-builder mode:
+#   ./bin/base-bench run \
+#     --config ./configs/examples/flashblocks.yml \
+#     --root-dir ./data-dir \
+#     --rbuilder-bin ./bin/op-rbuilder \
+#     --flashblocks-fallback reth \
+#     --rollup-boost-bin ./bin/rollup-boost \
+#     --output-dir ./output
+#
+# Without --flashblocks-fallback, rbuilder runs in simple standalone mode.
+

@@ -257,43 +257,20 @@ func (r *RethClient) GetVersion(ctx context.Context) (string, error) {
 
 // SetHead resets the blockchain to a specific block
 // For reth, we need to use a different approach since debug_setHead is not supported
+// Reth only supports: debug_getRawHeader, debug_getRawBlock, debug_getRawTransaction,
+// debug_getRawReceipts, and debug_getBadBlocks
 func (r *RethClient) SetHead(ctx context.Context, blockNumber uint64) error {
 	if r.client == nil {
 		return errors.New("client not initialized")
 	}
 
-	// First, try to check if debug_setHead is available (for compatibility with future reth versions)
-	blockHex := fmt.Sprintf("0x%x", blockNumber)
-	
-	// Try debug_setHead first (in case reth adds support in the future)
-	var result interface{}
-	err := r.client.Client().CallContext(ctx, &result, "debug_setHead", blockHex)
-	if err != nil {
-		// Check if it's a "method not found" error
-		if strings.Contains(err.Error(), "Method not found") || strings.Contains(err.Error(), "method not found") {
-			r.logger.Warn("debug_setHead not supported by reth, using alternative approach", "blockNumber", blockNumber)
-			return r.setHeadAlternative(ctx, blockNumber)
-		}
-		return errors.Wrap(err, "failed to call debug_setHead")
-	}
-
-	r.logger.Info("Successfully reset blockchain head using debug_setHead", "blockNumber", blockNumber, "blockHex", blockHex)
-	return nil
-}
-
-// setHeadAlternative implements an alternative approach for reth to reset the blockchain head
-func (r *RethClient) setHeadAlternative(ctx context.Context, blockNumber uint64) error {
-	// For reth, we can't directly set the head like in geth
-	// The best approach is to restart the client with a clean state up to the desired block
-	// However, since we're in a benchmark context, we'll log a warning and continue
-	// The snapshot should already be at the correct state
-	
-	r.logger.Warn("Reth does not support debug_setHead - head rollback will be skipped", 
+	// Reth does not support debug_setHead, so we skip the rollback
+	// The snapshot should already be at the correct block state
+	r.logger.Warn("Reth does not support debug_setHead - head rollback will be skipped",
 		"blockNumber", blockNumber,
 		"note", "The snapshot should already be at the correct block state")
-	
-	// For now, we'll return success since the snapshot copying should have already
-	// put us at the right state. In the future, we could implement a more sophisticated
-	// approach like restarting the client or using reth-specific commands.
+
+	// Return success since the snapshot copying should have already
+	// put us at the right state
 	return nil
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/benchmark/portmanager"
@@ -188,6 +189,49 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 	}, nil
 }
 
+// parseClientArgs parses a space-separated string of CLI arguments into a slice of strings.
+// It handles quoted arguments (single and double quotes) to allow spaces within arguments.
+// Example: "--flag value --another 'spaced value'" -> ["--flag", "value", "--another", "spaced value"]
+func parseClientArgs(argsStr string) []string {
+	if argsStr == "" {
+		return nil
+	}
+
+	var args []string
+	var currentArg strings.Builder
+	inQuote := false
+	quoteChar := rune(0)
+
+	for i, char := range argsStr {
+		switch {
+		case (char == '"' || char == '\'') && !inQuote:
+			// Start of quoted section
+			inQuote = true
+			quoteChar = char
+		case char == quoteChar && inQuote:
+			// End of quoted section
+			inQuote = false
+			quoteChar = 0
+		case char == ' ' && !inQuote:
+			// Space outside quotes - delimiter
+			if currentArg.Len() > 0 {
+				args = append(args, currentArg.String())
+				currentArg.Reset()
+			}
+		default:
+			// Regular character
+			currentArg.WriteRune(char)
+		}
+
+		// Handle end of string
+		if i == len(argsStr)-1 && currentArg.Len() > 0 {
+			args = append(args, currentArg.String())
+		}
+	}
+
+	return args
+}
+
 func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager) (types.ExecutionClient, string, error) {
 	if options == nil {
 		return nil, "", errors.New("client options cannot be nil")
@@ -225,9 +269,25 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	stdoutLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 	stderrLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 
+	// Parse client args from params
+	clientArgs := parseClientArgs(params.ClientArgs)
+
+	// Add flashblock interval arg if specified (for rbuilder)
+	if params.FlashblockInterval > 0 && params.NodeType == "rbuilder" {
+		// Calculate flashblocks per block based on block time and flashblock interval
+		// Example: BlockTime=2000ms, FlashblockInterval=200ms => 10 flashblocks per block
+		flashblocksPerBlock := int(params.BlockTime.Milliseconds()) / params.FlashblockInterval
+		clientArgs = append(clientArgs, "--flashblocks.block-time", fmt.Sprintf("%d", params.FlashblockInterval))
+		l.Info("Configuring flashblock interval",
+			"interval_ms", params.FlashblockInterval,
+			"block_time_ms", params.BlockTime.Milliseconds(),
+			"flashblocks_per_block", flashblocksPerBlock)
+	}
+
 	runtimeConfig := &types.RuntimeConfig{
 		Stdout: stdoutLogger,
 		Stderr: stderrLogger,
+		Args:   clientArgs,
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {

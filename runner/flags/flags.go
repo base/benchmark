@@ -7,9 +7,11 @@ import (
 )
 
 const (
-	RethBin     = "reth-bin"
-	RbuilderBin = "rbuilder-bin"
-	GethBin     = "geth-bin"
+	RethBin             = "reth-bin"
+	RbuilderBin         = "rbuilder-bin"
+	GethBin             = "geth-bin"
+	RollupBoostBin      = "rollup-boost-bin"
+	FlashblocksFallback = "flashblocks-fallback"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -31,6 +33,18 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "Rbuilder binary path",
 			Value:   "rbuilder",
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "RBUILDER_BIN"),
+		},
+		&cli.StringFlag{
+			Name:    RollupBoostBin,
+			Usage:   "Rollup-boost binary path for flashblocks dual-builder mode",
+			Value:   "",
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "ROLLUP_BOOST_BIN"),
+		},
+		&cli.StringFlag{
+			Name:    FlashblocksFallback,
+			Usage:   "Fallback client for flashblocks dual-builder mode (geth or reth)",
+			Value:   "reth",
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "FLASHBLOCKS_FALLBACK"),
 		},
 	}
 }

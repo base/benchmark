@@ -24,9 +24,20 @@ Builds the op-geth binary from the Ethereum Optimism op-geth repository using ju
 Builds the op-rbuilder binary from the op-rbuilder repository using Cargo.
 
 **Default Configuration:**
-- Repository: `https://github.com/haardikk21/op-rbuilder`
-- Version: `a8bb38693ece585e7fa98d52f51290e7dcececff`
+- Repository: `https://github.com/base/op-rbuilder.git`
+- Version: `bc7e167a8d11362a78b9c30d59adcd8d2c7f9e84`
 - Build tool: `cargo`
+
+### build-rollup-boost.sh
+Builds the rollup-boost binary from the Flashbots rollup-boost repository using Cargo.
+Required for flashblocks dual-builder mode (production architecture).
+
+**Default Configuration:**
+- Repository: `https://github.com/flashbots/rollup-boost.git`
+- Version: `08ebd3e75a8f4c7ebc12db13b042dee04e132c05`
+- Build tool: `cargo`
+
+**Note:** Rollup-boost is optional. Rbuilder can run in standalone mode without it.
 
 ## Usage
 
@@ -44,6 +55,9 @@ make build-geth
 
 # Build only op-rbuilder
 make build-rbuilder
+
+# Build only rollup-boost (for flashblocks dual-builder mode)
+make build-rollup-boost
 ```
 
 ### Direct Script Execution
@@ -58,6 +72,9 @@ cd clients
 
 # Build op-rbuilder with defaults
 ./build-rbuilder.sh
+
+# Build rollup-boost with defaults (for flashblocks dual-builder mode)
+./build-rollup-boost.sh
 ```
 
 ## Version Management
@@ -107,8 +124,14 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 
 #### For op-rbuilder (build-rbuilder.sh):
-- `RBUILDER_REPO`: Git repository URL (default: https://github.com/haardikk21/op-rbuilder)
-- `RBUILDER_VERSION`: Git branch, tag, or commit hash (default: a8bb38693ece585e7fa98d52f51290e7dcececff)
+- `RBUILDER_REPO`: Git repository URL (default: https://github.com/base/op-rbuilder.git)
+- `RBUILDER_VERSION`: Git branch, tag, or commit hash (default: bc7e167a8d11362a78b9c30d59adcd8d2c7f9e84)
+- `BUILD_DIR`: Directory for source code (default: ./build)
+- `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
+
+#### For rollup-boost (build-rollup-boost.sh):
+- `ROLLUP_BOOST_REPO`: Git repository URL (default: https://github.com/flashbots/rollup-boost.git)
+- `ROLLUP_BOOST_VERSION`: Git branch, tag, or commit hash (default: 08ebd3e75a8f4c7ebc12db13b042dee04e132c05)
 - `BUILD_DIR`: Directory for source code (default: ./build)
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 
@@ -126,9 +149,38 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 - Rust and Cargo installed
 - Git
 
+### For rollup-boost:
+- Rust and Cargo installed
+- Git
+- `libssl-dev` and `pkg-config` (on Linux)
+
 ## Output
 
 Built binaries will be placed in the `bin/` directory at the project root:
 - `bin/reth` - The reth binary
 - `bin/geth` - The op-geth binary
-- `bin/op-rbuilder` - The op-rbuilder binary 
+- `bin/op-rbuilder` - The op-rbuilder binary
+- `bin/rollup-boost` - The rollup-boost binary (for flashblocks dual-builder mode)
+
+## Flashblocks Dual-Builder Mode
+
+To run benchmarks with the full flashblocks architecture:
+
+1. Build the required binaries:
+   ```bash
+   make build-rbuilder
+   make build-rollup-boost
+   make build-reth  # or build-geth for fallback
+   ```
+
+2. Run benchmark with dual-builder flags:
+   ```bash
+   ./bin/base-bench run \
+     --config ./configs/examples/flashblocks.yml \
+     --rbuilder-bin ./bin/op-rbuilder \
+     --flashblocks-fallback reth \
+     --rollup-boost-bin ./bin/rollup-boost \
+     --output-dir ./output
+   ```
+
+See [configs/examples/flashblocks.yml](../configs/examples/flashblocks.yml) for complete examples. 
