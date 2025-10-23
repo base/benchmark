@@ -95,9 +95,22 @@ func (r *RbuilderClient) runSimpleMode(ctx context.Context, cfg *types.RuntimeCo
 	// Create rbuilder client
 	r.rbuilderClient = reth.NewRethClientWithBin(r.logger, r.options, r.ports, r.options.RbuilderBin)
 
-	// Add flashblocks flag
+	// Configure flashblocks via environment variables
 	cfg2 := *cfg
-	cfg2.Args = append(cfg2.Args, "--flashblocks.enabled")
+	cfg2.Env = map[string]string{
+		"ENABLE_FLASHBLOCKS": "true",
+	}
+
+	// Set flashblock interval if specified
+	if cfg.Params.FlashblockInterval > 0 {
+		cfg2.Env["FLASHBLOCK_BLOCK_TIME"] = fmt.Sprintf("%d", cfg.Params.FlashblockInterval)
+		r.logger.Info("Configuring flashblock interval",
+			"interval_ms", cfg.Params.FlashblockInterval,
+			"flashblocks_per_block", int(cfg.Params.BlockTime.Milliseconds())/cfg.Params.FlashblockInterval)
+	} else {
+		// Default to 200ms (Base production default - 10 flashblocks per 2s block)
+		cfg2.Env["FLASHBLOCK_BLOCK_TIME"] = "200"
+	}
 
 	if err := r.rbuilderClient.Run(ctx, &cfg2); err != nil {
 		return errors.Wrap(err, "failed to start rbuilder")
@@ -126,24 +139,34 @@ func (r *RbuilderClient) runDualBuilderMode(ctx context.Context, cfg *types.Runt
 	fallbackType := r.options.RbuilderOptions.FallbackClient
 	r.logger.Info("Starting fallback builder", "type", fallbackType)
 
+	// Create separate log file for fallback builder to avoid file descriptor conflicts
+	fallbackLogPath := fmt.Sprintf("%s-fallback.log", r.options.TestDirPath)
+	fallbackLogFile, err := os.OpenFile(fallbackLogPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to create fallback log file")
+	}
+
 	// Create fallback builder with original data directory
 	fallbackOptions := *r.options
+	fallbackCfg := *cfg
+	fallbackCfg.Stdout = fallbackLogFile
+	fallbackCfg.Stderr = fallbackLogFile
+
 	if fallbackType == "geth" {
 		r.fallbackClient = geth.NewGethClient(r.logger.New("component", "fallback-geth"), &fallbackOptions, r.ports)
 	} else {
 		r.fallbackClient = reth.NewRethClient(r.logger.New("component", "fallback-reth"), &fallbackOptions, r.ports)
 	}
 
-	if err := r.fallbackClient.Run(ctx, cfg); err != nil {
+	if err := r.fallbackClient.Run(ctx, &fallbackCfg); err != nil {
+		fallbackLogFile.Close()
 		return errors.Wrap(err, "failed to start fallback builder")
 	}
 
-	// Wait for fallback builder to be fully ready before starting rbuilder
-	r.logger.Info("Waiting for fallback builder to be ready")
-	time.Sleep(3 * time.Second)
+	r.logger.Info("Fallback builder started", "type", fallbackType)
 
 	// Step 2: Start rbuilder (produces flashblocks every 200ms)
-	// Create separate data directory for rbuilder to avoid database conflicts
+	// Create separate data directory and log file for rbuilder
 	r.logger.Info("Starting rbuilder (primary flashblock builder)")
 
 	// Create a fresh data directory for rbuilder
@@ -151,7 +174,17 @@ func (r *RbuilderClient) runDualBuilderMode(ctx context.Context, cfg *types.Runt
 	rbuilderDataDir := fmt.Sprintf("%s-rbuilder", r.options.DataDirPath)
 	if err := os.MkdirAll(rbuilderDataDir, 0755); err != nil {
 		r.fallbackClient.Stop()
+		fallbackLogFile.Close()
 		return errors.Wrap(err, "failed to create rbuilder data directory")
+	}
+
+	// Create separate log file for rbuilder
+	rbuilderLogPath := fmt.Sprintf("%s-rbuilder.log", r.options.TestDirPath)
+	rbuilderLogFile, err := os.OpenFile(rbuilderLogPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		r.fallbackClient.Stop()
+		fallbackLogFile.Close()
+		return errors.Wrap(err, "failed to create rbuilder log file")
 	}
 
 	rbuilderOptions := *r.options
@@ -165,15 +198,42 @@ func (r *RbuilderClient) runDualBuilderMode(ctx context.Context, cfg *types.Runt
 	)
 
 	rbuilderCfg := *cfg
-	rbuilderCfg.Args = append(rbuilderCfg.Args, "--flashblocks.enabled")
+	rbuilderCfg.Stdout = rbuilderLogFile
+	rbuilderCfg.Stderr = rbuilderLogFile
+
+	// Disable p2p networking on rbuilder to avoid port conflicts with fallback builder
+	// Rbuilder is just a builder, not a full node, so it doesn't need p2p
+	rbuilderCfg.Args = append(rbuilderCfg.Args, "--disable-discovery")
+	rbuilderCfg.Args = append(rbuilderCfg.Args, "--port", "0") // Disable p2p listener
+
+	// Configure flashblocks via environment variables (not CLI flags)
+	// These env vars are used by op-rbuilder based on Base production config
+	rbuilderCfg.Env = map[string]string{
+		"ENABLE_FLASHBLOCKS": "true",
+	}
+
+	// Set flashblock interval if specified
+	if cfg.Params.FlashblockInterval > 0 {
+		rbuilderCfg.Env["FLASHBLOCK_BLOCK_TIME"] = fmt.Sprintf("%d", cfg.Params.FlashblockInterval)
+		r.logger.Info("Configuring flashblock interval",
+			"interval_ms", cfg.Params.FlashblockInterval,
+			"flashblocks_per_block", int(cfg.Params.BlockTime.Milliseconds())/cfg.Params.FlashblockInterval)
+	} else {
+		// Default to 200ms (Base production default - 10 flashblocks per 2s block)
+		rbuilderCfg.Env["FLASHBLOCK_BLOCK_TIME"] = "200"
+	}
+
 	if err := r.rbuilderClient.Run(ctx, &rbuilderCfg); err != nil {
 		r.fallbackClient.Stop()
+		fallbackLogFile.Close()
+		rbuilderLogFile.Close()
 		return errors.Wrap(err, "failed to start rbuilder")
 	}
 
+	r.logger.Info("Rbuilder started successfully")
+
 	// Step 3: Optionally start rollup-boost coordinator
 	if r.options.RbuilderOptions.RollupBoostBin != "" {
-		r.logger.Info("Starting rollup-boost coordinator")
 		if err := r.startRollupBoost(ctx); err != nil {
 			r.rbuilderClient.Stop()
 			r.fallbackClient.Stop()
@@ -195,6 +255,7 @@ func (r *RbuilderClient) runDualBuilderMode(ctx context.Context, cfg *types.Runt
 		int(r.fallbackClient.MetricsPort()),
 		int(r.rbuilderClient.MetricsPort()),
 	)
+	r.logger.Info("Setup metrics collector for both builders")
 
 	return nil
 }
@@ -221,32 +282,54 @@ func (r *RbuilderClient) startRollupBoost(ctx context.Context) error {
 	jwtSecret := [32]byte{}
 	copy(jwtSecret[:], jwtSecretBytes[:])
 
-	// Build rollup-boost command
-	args := []string{
-		"--l2-url", r.fallbackClient.ClientURL(),
-		"--l2-jwt-path", r.options.JWTSecretPath,
-		"--builder-url", r.rbuilderClient.ClientURL(),
-		"--rpc-port", fmt.Sprintf("%d", r.rollupBoostPort),
-		"--execution-mode", "enabled",
-		"--metrics", "true",
-		"--log-format", "json",
+	// Rollup-boost configuration
+	fallbackAuthURL := r.fallbackClient.AuthURL()
+	rbuilderAuthURL := r.rbuilderClient.AuthURL()
+
+	r.logger.Info("Starting rollup-boost",
+		"port", r.rollupBoostPort,
+		"fallback_auth", fallbackAuthURL,
+		"rbuilder_auth", rbuilderAuthURL)
+
+	// Create separate log file for rollup-boost
+	rollupBoostLogPath := fmt.Sprintf("%s-rollup-boost.log", r.options.TestDirPath)
+	rollupBoostLogFile, err := os.OpenFile(rollupBoostLogPath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if err != nil {
+		return errors.Wrap(err, "failed to create rollup-boost log file")
 	}
 
-	r.logger.Info("Starting rollup-boost", "port", r.rollupBoostPort)
+	// Rollup-boost CLI arguments
+	args := []string{
+		"--l2-url", fallbackAuthURL,
+		"--l2-jwt-path", r.options.JWTSecretPath,
+		"--builder-url", rbuilderAuthURL,
+		"--builder-jwt-path", r.options.JWTSecretPath,
+		"--rpc-port", fmt.Sprintf("%d", r.rollupBoostPort),
+		"--execution-mode", "enabled",
+		"--metrics",
+		"--log-format", "json",
+		"--log-level", "debug",
+		// Health check configuration for local testing
+		// Prevents rollup-boost from shutting down due to old genesis timestamps
+		"--health-check-interval", "999999999", // Very long interval for testing
+		"--max-unsafe-interval", "999999999", // Allow very old blocks in testing
+	}
 
 	r.rollupBoostProcess = exec.CommandContext(ctx, r.options.RbuilderOptions.RollupBoostBin, args...)
-	r.rollupBoostProcess.Stdout = r.stdout
-	r.rollupBoostProcess.Stderr = r.stderr
+	r.rollupBoostProcess.Stdout = rollupBoostLogFile
+	r.rollupBoostProcess.Stderr = rollupBoostLogFile
 
 	if err := r.rollupBoostProcess.Start(); err != nil {
+		rollupBoostLogFile.Close()
 		return errors.Wrap(err, "failed to start rollup-boost process")
 	}
 
-	// Wait for rollup-boost to be ready
-	time.Sleep(2 * time.Second)
+	// Wait longer for rollup-boost to initialize and connect to both builders
+	r.logger.Info("Waiting for rollup-boost to initialize...")
+	time.Sleep(5 * time.Second)
 
 	// Connect to rollup-boost
-	r.clientURL = fmt.Sprintf("http://127.0.0.1:%d", r.rollupBoostPort)
+	r.clientURL = r.rbuilderClient.ClientURL()
 	rpcClient, err := rpc.DialOptions(ctx, r.clientURL, rpc.WithHTTPClient(&http.Client{
 		Timeout: 30 * time.Second,
 	}))
@@ -319,6 +402,19 @@ func (r *RbuilderClient) Client() *ethclient.Client {
 // ClientURL returns the URL for the client.
 func (r *RbuilderClient) ClientURL() string {
 	return r.clientURL
+}
+
+// AuthURL returns the auth RPC URL.
+func (r *RbuilderClient) AuthURL() string {
+	if r.rollupBoostPort > 0 {
+		// In rollup-boost mode, return rollup-boost's URL
+		return fmt.Sprintf("http://127.0.0.1:%d", r.rollupBoostPort)
+	}
+	// Otherwise return rbuilder's auth URL
+	if r.rbuilderClient != nil {
+		return r.rbuilderClient.AuthURL()
+	}
+	return ""
 }
 
 // AuthClient returns the auth client for engine API communication.

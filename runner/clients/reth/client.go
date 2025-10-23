@@ -90,7 +90,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
 	args = append(args, "--engine.state-provider-metrics")
-	args = append(args, "-vvv")
+	args = append(args, "-vvvv")
 
 	args = append(args, cfg.Args...)
 
@@ -146,6 +146,16 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	r.process = exec.Command(r.binPath, args...)
 	r.process.Stdout = r.stdout
 	r.process.Stderr = r.stderr
+
+	// Set environment variables if provided
+	if len(cfg.Env) > 0 {
+		r.process.Env = os.Environ() // Start with current environment
+		for k, v := range cfg.Env {
+			r.process.Env = append(r.process.Env, fmt.Sprintf("%s=%s", k, v))
+			r.logger.Debug("Setting environment variable", "key", k, "value", v)
+		}
+	}
+
 	err = r.process.Start()
 	if err != nil {
 		return err
@@ -215,6 +225,11 @@ func (r *RethClient) Client() *ethclient.Client {
 // ClientURL returns the raw client URL for transaction generators.
 func (r *RethClient) ClientURL() string {
 	return r.clientURL
+}
+
+// AuthURL returns the auth RPC URL.
+func (r *RethClient) AuthURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", r.authRPCPort)
 }
 
 // AuthClient returns the auth client used for CL communication.

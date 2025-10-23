@@ -220,6 +220,11 @@ func (g *GethClient) ClientURL() string {
 	return g.clientURL
 }
 
+// AuthURL returns the auth RPC URL.
+func (g *GethClient) AuthURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", g.authRPCPort)
+}
+
 // AuthClient returns the auth client used for CL communication.
 func (g *GethClient) AuthClient() client.RPC {
 	return g.authClient

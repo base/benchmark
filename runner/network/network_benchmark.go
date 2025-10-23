@@ -272,22 +272,11 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	// Parse client args from params
 	clientArgs := parseClientArgs(params.ClientArgs)
 
-	// Add flashblock interval arg if specified (for rbuilder)
-	if params.FlashblockInterval > 0 && params.NodeType == "rbuilder" {
-		// Calculate flashblocks per block based on block time and flashblock interval
-		// Example: BlockTime=2000ms, FlashblockInterval=200ms => 10 flashblocks per block
-		flashblocksPerBlock := int(params.BlockTime.Milliseconds()) / params.FlashblockInterval
-		clientArgs = append(clientArgs, "--flashblocks.block-time", fmt.Sprintf("%d", params.FlashblockInterval))
-		l.Info("Configuring flashblock interval",
-			"interval_ms", params.FlashblockInterval,
-			"block_time_ms", params.BlockTime.Milliseconds(),
-			"flashblocks_per_block", flashblocksPerBlock)
-	}
-
 	runtimeConfig := &types.RuntimeConfig{
 		Stdout: stdoutLogger,
 		Stderr: stderrLogger,
 		Args:   clientArgs,
+		Params: params, // Pass params for rbuilder to access flashblock config
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {
