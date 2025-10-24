@@ -7,7 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
-  const isLocal = env.IS_LOCAL === "true";
+  const isLocal = env.IS_LOCAL === "false";
 
   const processEnvVars = {
     API_BASE_URL: env.VITE_API_BASE_URL,

@@ -92,7 +92,7 @@ jobs:
           cp -r ${{ runner.temp }}/output/ ./output/
           pushd report
           npm install
-          npm run build:local
+          npm run build
           popd
 
       - name: Upload static files as artifact
