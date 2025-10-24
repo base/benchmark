@@ -7,8 +7,6 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
 
-  const isLocal = env.IS_LOCAL === "true";
-
   const processEnvVars = {
     API_BASE_URL: env.VITE_API_BASE_URL,
     DATA_SOURCE: env.VITE_DATA_SOURCE,
@@ -52,15 +50,14 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       tailwindcss(),
-      isLocal &&
-        viteStaticCopy({
-          targets: [
-            {
-              src: "../output/**/*",
-              dest: "output",
-            },
-          ],
-        }),
+      viteStaticCopy({
+        targets: [
+          {
+            src: "../output/**/*",
+            dest: "output",
+          },
+        ],
+      }),
     ],
   };
 });
