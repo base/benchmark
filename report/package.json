@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "IS_LOCAL=true vite",
     "build": "vite build",
+    "build:local": "IS_LOCAL=true vite build",
     "preview": "vite preview",
     "start": "vite build && vite preview",
     "check": "eslint . --ext .ts,.tsx --fix && prettier --check .",

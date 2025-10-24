@@ -86,7 +86,7 @@ jobs:
           cp -r ${{ runner.temp }}/output/ ./output/
           pushd report
           npm install
-          npm run build
+          npm run build:local
           popd
 
       - name: Upload Output
