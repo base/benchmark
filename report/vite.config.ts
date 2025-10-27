@@ -36,7 +36,7 @@ export default defineConfig(({ mode }) => {
             dest: "output",
           },
         ],
-      })
+      }),
     );
   } else {
     console.log("Output directory not found, skipping static copy");
