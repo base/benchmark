@@ -44,6 +44,10 @@ type service struct {
 	portState    portmanager.PortManager
 	metadataPath string
 
+	// tracks persistent test directories for reuse_existing snapshots
+	// key: nodeType, value: map["sequencer"|"validator"] -> directory path
+	persistentTestDirs map[string]map[string]string
+
 	config  config.Config
 	version string
 	log     log.Logger
@@ -53,12 +57,13 @@ func NewService(version string, cfg config.Config, log log.Logger) Service {
 	metadataPath := path.Join(cfg.OutputDir(), "metadata.json")
 
 	s := &service{
-		metadataPath: metadataPath,
-		portState:    portmanager.NewPortManager(),
-		dataDirState: benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
-		config:       cfg,
-		version:      version,
-		log:          log,
+		metadataPath:       metadataPath,
+		portState:          portmanager.NewPortManager(),
+		dataDirState:       benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
+		persistentTestDirs: make(map[string]map[string]string),
+		config:             cfg,
+		version:            version,
+		log:                log,
 	}
 
 	return s
@@ -80,99 +85,130 @@ func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
 	return config, err
 }
 
-func (s *service) setupInternalDirectories(testDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string) (*config.InternalClientOptions, error) {
+func (s *service) setupInternalDirectories(testDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string, dataDirOverride string) (*config.InternalClientOptions, error) {
 	err := os.MkdirAll(testDir, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create test directory")
 	}
 
 	metricsPath := path.Join(testDir, "metrics")
-	err = os.Mkdir(metricsPath, 0755)
+	// Use MkdirAll to avoid error if directory already exists
+	err = os.MkdirAll(metricsPath, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create metrics directory")
 	}
 
 	// write chain config to testDir/chain.json
 	chainCfgPath := path.Join(testDir, "chain.json")
-	chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open chain config file")
-	}
+	// Only create chain config if it doesn't exist (for reuse_existing)
+	if !s.fileExists(chainCfgPath) {
+		chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open chain config file")
+		}
 
-	err = json.NewEncoder(chainCfgFile).Encode(genesis)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to write chain config")
+		err = json.NewEncoder(chainCfgFile).Encode(genesis)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to write chain config")
+		}
+		if err := chainCfgFile.Close(); err != nil {
+			return nil, errors.Wrap(err, "failed to close chain config file")
+		}
 	}
 
 	var dataDirPath string
-	isSnapshot := snapshot != nil && snapshot.Command != ""
-	if isSnapshot {
-		dataDirPath = path.Join(testDir, "data")
+	var isSnapshot bool
 
-		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
+	// If dataDirOverride is provided, use it (already set up by caller)
+	if dataDirOverride != "" {
+		dataDirPath = dataDirOverride
+		isSnapshot = true // dataDirOverride is only set when using snapshots
+		s.log.Info("Using pre-configured datadir", "path", dataDirPath, "role", role)
+	} else {
+		isSnapshot = snapshot != nil && snapshot.Command != ""
+		if isSnapshot {
+			dataDirPath = path.Join(testDir, "data")
 
-		if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
-			snapshotMethod := snapshot.GetSnapshotMethod()
+			initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
 
-			switch snapshotMethod {
-			case benchmark.SnapshotMethodReuseExisting:
-				dataDirPath = initialSnapshotPath
-				s.log.Info("Reusing existing snapshot", "snapshotPath", initialSnapshotPath, "method", snapshotMethod)
-			case benchmark.SnapshotMethodHeadRollback:
-				// For head_rollback, copy the snapshot but mark it for rollback later
-				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to copy from initial snapshot for head rollback")
+			if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
+				snapshotMethod := snapshot.GetSnapshotMethod()
+
+				switch snapshotMethod {
+				case benchmark.SnapshotMethodReuseExisting:
+					dataDirPath = initialSnapshotPath
+					s.log.Info("Reusing existing snapshot", "snapshotPath", initialSnapshotPath, "method", snapshotMethod)
+				case benchmark.SnapshotMethodHeadRollback:
+					// For head_rollback, copy the snapshot but mark it for rollback later
+					err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to copy from initial snapshot for head rollback")
+					}
+					s.log.Info("Copied from initial snapshot for head rollback", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath, "method", snapshotMethod)
+				default:
+					// Default chain_copy behavior
+					err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
+					if err != nil {
+						return nil, errors.Wrap(err, "failed to copy from initial snapshot")
+					}
+					s.log.Info("Copied from initial snapshot", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath)
 				}
-				s.log.Info("Copied from initial snapshot for head rollback", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath, "method", snapshotMethod)
-			default:
-				// Default chain_copy behavior
-				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to copy from initial snapshot")
+			} else {
+				// Fallback to direct snapshot creation
+				if initialSnapshotPath != "" {
+					s.log.Warn("Initial snapshot path registered but doesn't exist, falling back to direct snapshot creation",
+						"path", initialSnapshotPath, "nodeType", params.NodeType)
 				}
-				s.log.Info("Copied from initial snapshot", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath)
+				snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to ensure snapshot")
+				}
+				dataDirPath = snapshotDir
 			}
 		} else {
-			// Fallback to direct snapshot creation
-			if initialSnapshotPath != "" {
-				s.log.Warn("Initial snapshot path registered but doesn't exist, falling back to direct snapshot creation",
-					"path", initialSnapshotPath, "nodeType", params.NodeType)
-			}
-			snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
+			// if no snapshot, just create a new datadir
+			dataDirPath = path.Join(testDir, "data")
+			err = os.Mkdir(dataDirPath, 0755)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to ensure snapshot")
+				return nil, errors.Wrap(err, "failed to create data directory")
 			}
-			dataDirPath = snapshotDir
 		}
-	} else {
-		// if no snapshot, just create a new datadir
-		dataDirPath = path.Join(testDir, "data")
-		err = os.Mkdir(dataDirPath, 0755)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create data directory")
-		}
-	}
-
-	var jwtSecret [32]byte
-	_, err = rand.Read(jwtSecret[:])
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate jwt secret")
 	}
 
 	jwtSecretPath := path.Join(testDir, "jwt_secret")
-	jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open jwt secret file")
-	}
+	var jwtSecretStr string
 
-	_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to write jwt secret")
-	}
+	// Check if JWT secret already exists (for reuse_existing)
+	if s.fileExists(jwtSecretPath) {
+		jwtSecretBytes, err := os.ReadFile(jwtSecretPath)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to read existing jwt secret")
+		}
+		jwtSecretStr = string(jwtSecretBytes)
+		s.log.Info("Reusing existing JWT secret", "path", jwtSecretPath, "role", role)
+	} else {
+		// Generate new JWT secret
+		var jwtSecret [32]byte
+		_, err = rand.Read(jwtSecret[:])
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate jwt secret")
+		}
 
-	if err = jwtSecretFile.Close(); err != nil {
-		return nil, errors.Wrap(err, "failed to close jwt secret file")
+		jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to open jwt secret file")
+		}
+
+		jwtSecretStr = hex.EncodeToString(jwtSecret[:])
+		_, err = jwtSecretFile.Write([]byte(jwtSecretStr))
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to write jwt secret")
+		}
+
+		if err = jwtSecretFile.Close(); err != nil {
+			return nil, errors.Wrap(err, "failed to close jwt secret file")
+		}
+		s.log.Info("Generated new JWT secret", "path", jwtSecretPath, "role", role)
 	}
 
 	options := s.config.ClientOptions()
@@ -184,7 +220,7 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 		ClientOptions: options,
 		JWTSecretPath: jwtSecretPath,
 		MetricsPath:   metricsPath,
-		JWTSecret:     hex.EncodeToString(jwtSecret[:]),
+		JWTSecret:     jwtSecretStr,
 		ChainCfgPath:  chainCfgPath,
 		DataDirPath:   dataDirPath,
 		TestDirPath:   testDir,
@@ -320,18 +356,56 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 	return genesis, nil
 }
 
-func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
-	// create temp directory for this test
-	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
-	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
-	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
+func (s *service) setupDataDirs(sequencerTestDir string, validatorTestDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
+	// Special handling for SnapshotMethodReuseExisting to avoid both nodes using the same datadir
+	var sequencerDataDirOverride, validatorDataDirOverride string
 
-	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, genesis, snapshot, "sequencer")
+	if snapshot != nil && snapshot.GetSnapshotMethod() == benchmark.SnapshotMethodReuseExisting {
+		sequencerDataDirOverride = path.Join(sequencerTestDir, "data")
+		validatorDataDirOverride = path.Join(validatorTestDir, "data")
+
+		// Check if this is the first run (directories don't exist yet)
+		isFirstRun := !s.fileExists(sequencerDataDirOverride) && !s.fileExists(validatorDataDirOverride)
+
+		if isFirstRun {
+			initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
+			if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
+				s.log.Info("First run with reuse_existing: copying to validator, moving to sequencer",
+					"initialSnapshot", initialSnapshotPath,
+					"sequencerDataDir", sequencerDataDirOverride,
+					"validatorDataDir", validatorDataDirOverride)
+
+				// First: copy from initial snapshot to validator directory
+				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, validatorDataDirOverride)
+				if err != nil {
+					return nil, nil, errors.Wrap(err, "failed to copy initial snapshot to validator directory")
+				}
+				s.log.Info("Copied initial snapshot to validator directory", "path", validatorDataDirOverride)
+
+				err = os.MkdirAll(sequencerTestDir, 0755)
+				if err != nil {
+					return nil, nil, errors.Wrap(err, "failed to create sequencer test directory")
+				}
+
+				err = os.Rename(initialSnapshotPath, sequencerDataDirOverride)
+				if err != nil {
+					return nil, nil, errors.Wrap(err, "failed to move initial snapshot to sequencer directory")
+				}
+				s.log.Info("Moved initial snapshot to sequencer directory", "from", initialSnapshotPath, "to", sequencerDataDirOverride)
+			}
+		} else {
+			s.log.Info("Reusing existing data directories from previous run",
+				"sequencerDataDir", sequencerDataDirOverride,
+				"validatorDataDir", validatorDataDirOverride)
+		}
+	}
+
+	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, genesis, snapshot, "sequencer", sequencerDataDirOverride)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
 	}
 
-	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator")
+	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator", validatorDataDirOverride)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
 	}
@@ -551,13 +625,41 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		return nil, errors.Wrap(err, "failed to get genesis block")
 	}
 
-	// create temp directory for this test
-	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
-	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
-	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
+	// Determine if we're using reuse_existing method
+	isReuseExisting := snapshotConfig != nil && snapshotConfig.GetSnapshotMethod() == benchmark.SnapshotMethodReuseExisting
+
+	var sequencerTestDir, validatorTestDir string
+	var testName string
+
+	if isReuseExisting {
+		// For reuse_existing, use persistent test directories
+		if _, exists := s.persistentTestDirs[params.NodeType]; !exists {
+			s.persistentTestDirs[params.NodeType] = make(map[string]string)
+		}
+
+		// Create or get persistent directories
+		if s.persistentTestDirs[params.NodeType]["sequencer"] == "" {
+			testName := fmt.Sprintf("persistent-%s", params.NodeType)
+			s.persistentTestDirs[params.NodeType]["sequencer"] = path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
+			s.persistentTestDirs[params.NodeType]["validator"] = path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
+			s.log.Info("Created persistent test directories to reuse snapshots",
+				"nodeType", params.NodeType,
+				"sequencer", s.persistentTestDirs[params.NodeType]["sequencer"],
+				"validator", s.persistentTestDirs[params.NodeType]["validator"])
+		}
+
+		sequencerTestDir = s.persistentTestDirs[params.NodeType]["sequencer"]
+		validatorTestDir = s.persistentTestDirs[params.NodeType]["validator"]
+		s.log.Info("Reusing persistent test directories", "sequencer", sequencerTestDir, "validator", validatorTestDir)
+	} else {
+		// For other methods, create temporary directories with timestamps
+		testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
+		sequencerTestDir = path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
+		validatorTestDir = path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
+	}
 
 	// setup data directories (restore from snapshot if needed)
-	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig)
+	sequencerOptions, validatorOptions, err := s.setupDataDirs(sequencerTestDir, validatorTestDir, params, genesis, snapshotConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup data dirs")
 	}
@@ -568,19 +670,22 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		}
 	}
 
-	defer func() {
-		// clean up test directory
-		err := os.RemoveAll(sequencerTestDir)
-		if err != nil {
-			log.Error("failed to remove test directory", "err", err)
-		}
+	// Only cleanup directories if NOT using reuse_existing
+	if !isReuseExisting {
+		defer func() {
+			// clean up test directory
+			err := os.RemoveAll(sequencerTestDir)
+			if err != nil {
+				log.Error("failed to remove test directory", "err", err)
+			}
 
-		// clean up test directory
-		err = os.RemoveAll(validatorTestDir)
-		if err != nil {
-			log.Error("failed to remove test directory", "err", err)
-		}
-	}()
+			// clean up test directory
+			err = os.RemoveAll(validatorTestDir)
+			if err != nil {
+				log.Error("failed to remove test directory", "err", err)
+			}
+		}()
+	}
 
 	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
 	batcherKey, err := crypto.ToECDSA(batcherKeyBytes)

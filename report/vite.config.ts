@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import { resolve } from "path";
+import { existsSync } from "fs";
 import { viteStaticCopy } from "vite-plugin-static-copy";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -17,6 +18,29 @@ export default defineConfig(({ mode }) => {
   const allowedHosts = env.VITE_ALLOWED_HOSTS
     ? env.VITE_ALLOWED_HOSTS.split(",").map((host) => host.trim())
     : ["localhost"];
+
+  // Check if output directory exists
+  const outputDirPath = resolve(__dirname, "../output");
+  const hasOutputDir = existsSync(outputDirPath);
+
+  // Build plugins array
+  const plugins = [react(), tailwindcss()];
+
+  // Only add static copy plugin if output directory exists
+  if (hasOutputDir) {
+    plugins.push(
+      viteStaticCopy({
+        targets: [
+          {
+            src: "../output/**/*",
+            dest: "output",
+          },
+        ],
+      })
+    );
+  } else {
+    console.log("Output directory not found, skipping static copy");
+  }
 
   return {
     server: {
@@ -46,18 +70,6 @@ export default defineConfig(({ mode }) => {
         env: processEnvVars,
       }),
     },
-    // assetsInclude: ['../output/**/*']
-    plugins: [
-      react(),
-      tailwindcss(),
-      viteStaticCopy({
-        targets: [
-          {
-            src: "../output/**/*",
-            dest: "output",
-          },
-        ],
-      }),
-    ],
+    plugins,
   };
 });
