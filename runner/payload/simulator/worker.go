@@ -170,6 +170,31 @@ func (t *simulatorPayloadWorker) Stop(ctx context.Context) error {
 func (t *simulatorPayloadWorker) mineAndConfirm(ctx context.Context, txs []*types.Transaction) error {
 	t.mempool.AddTransactions(txs)
 
+	// Wait for at least one block to be produced before checking for receipt
+	// This is especially important in dual-builder mode where there can be delays
+	initialBlock, err := t.client.BlockNumber(ctx)
+	if err != nil {
+		t.log.Warn("Failed to get initial block number, continuing anyway", "err", err)
+	} else {
+		t.log.Debug("Waiting for block to be mined", "currentBlock", initialBlock, "numTxs", len(txs))
+
+		// Wait for at least one new block (up to 30 seconds)
+		for i := 0; i < 30; i++ {
+			time.Sleep(1 * time.Second)
+			currentBlock, err := t.client.BlockNumber(ctx)
+			if err != nil {
+				t.log.Warn("Failed to get current block number", "err", err)
+				continue
+			}
+			if currentBlock > initialBlock {
+				t.log.Debug("New block detected", "newBlock", currentBlock, "previousBlock", initialBlock)
+				break
+			}
+		}
+		// Add extra delay for dual-builder mode to let fallback builder sync
+		time.Sleep(2 * time.Second)
+	}
+
 	receipt, err := t.waitForReceipt(ctx, txs[len(txs)-1].Hash())
 	if err != nil {
 		return errors.Wrap(err, "failed to wait for receipt")
@@ -390,11 +415,28 @@ func (t *simulatorPayloadWorker) Setup(ctx context.Context) error {
 }
 
 func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
-	return retry.Do(ctx, 240, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
+	t.log.Info("Waiting for transaction receipt", "txHash", txHash.Hex())
+
+	attemptCount := 0
+	return retry.Do(ctx, 600, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
+		attemptCount++
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
+			// Log every 30th attempt to track progress without spam
+			if attemptCount%30 == 0 {
+				t.log.Info("Still waiting for receipt...", "txHash", txHash.Hex(), "attempts", attemptCount, "err", err)
+
+				// Check if blocks are still being produced
+				blockNum, blockErr := t.client.BlockNumber(ctx)
+				if blockErr == nil {
+					t.log.Info("Current block number", "block", blockNum)
+				}
+			} else {
+				t.log.Debug("Receipt not found yet, retrying...", "txHash", txHash.Hex(), "attempt", attemptCount, "err", err)
+			}
 			return nil, err
 		}
+		t.log.Info("Receipt found", "txHash", txHash.Hex(), "blockNumber", receipt.BlockNumber, "attempts", attemptCount)
 		return receipt, nil
 	})
 }

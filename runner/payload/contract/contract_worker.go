@@ -179,11 +179,14 @@ func (t *contractPayloadWorker) Setup(ctx context.Context) error {
 }
 
 func (t *contractPayloadWorker) waitForReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	t.log.Info("Waiting for transaction receipt", "txHash", txHash.Hex())
 	return retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*types.Receipt, error) {
 		receipt, err := t.client.TransactionReceipt(ctx, txHash)
 		if err != nil {
+			t.log.Debug("Receipt not found yet, retrying...", "txHash", txHash.Hex(), "err", err)
 			return nil, err
 		}
+		t.log.Info("Receipt found", "txHash", txHash.Hex(), "blockNumber", receipt.BlockNumber)
 		return receipt, nil
 	})
 }

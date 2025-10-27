@@ -328,22 +328,32 @@ func (r *RbuilderClient) startRollupBoost(ctx context.Context) error {
 	r.logger.Info("Waiting for rollup-boost to initialize...")
 	time.Sleep(5 * time.Second)
 
-	// Connect to rollup-boost
-	r.clientURL = r.rbuilderClient.ClientURL()
+	// Hybrid approach:
+	// - Regular RPC calls (eth_*): Use fallback builder's RPC endpoint
+	// - Engine API calls (engine_*): Use rollup-boost auth endpoint
+	// Rollup-boost only proxies specific Engine API methods, not all RPC calls
+
+	// Connect regular client to fallback builder for eth_* calls
+	r.clientURL = r.fallbackClient.ClientURL()
+	r.logger.Info("Connecting regular RPC client to fallback builder", "url", r.clientURL)
+
 	rpcClient, err := rpc.DialOptions(ctx, r.clientURL, rpc.WithHTTPClient(&http.Client{
 		Timeout: 30 * time.Second,
 	}))
 	if err != nil {
-		return errors.Wrap(err, "failed to dial rollup-boost rpc")
+		return errors.Wrap(err, "failed to dial fallback builder rpc")
 	}
 
 	r.client = ethclient.NewClient(rpcClient)
 
-	// Create auth client
+	// Connect auth client to rollup-boost for engine_* calls
+	rollupBoostAuthURL := fmt.Sprintf("http://127.0.0.1:%d", r.rollupBoostPort)
+	r.logger.Info("Connecting auth client to rollup-boost", "url", rollupBoostAuthURL)
+
 	authRPC, err := client.NewRPC(
 		ctx,
 		r.logger,
-		r.clientURL,
+		rollupBoostAuthURL,
 		client.WithGethRPCOptions(rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret))),
 		client.WithCallTimeout(30*time.Second),
 	)
@@ -352,7 +362,13 @@ func (r *RbuilderClient) startRollupBoost(ctx context.Context) error {
 	}
 
 	r.authClient = authRPC
-	r.logger.Info("Rollup-boost started successfully")
+
+	// Wait for fallback builder to sync with initial state
+	// This is important because receipt queries go to the fallback builder
+	r.logger.Info("Waiting for fallback builder to sync initial state...")
+	time.Sleep(2 * time.Second)
+
+	r.logger.Info("Rollup-boost started successfully", "authURL", rollupBoostAuthURL, "rpcURL", r.clientURL)
 	return nil
 }
 

@@ -59,10 +59,11 @@ func (f *BaseConsensusClient) updateForkChoice(ctx context.Context, payloadAttrs
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
+	f.log.Debug("Calling engine_forkchoiceUpdatedV3", "headBlockHash", f.headBlockHash.Hex())
 	err := f.authClient.CallContext(ctx, &resp, "engine_forkchoiceUpdatedV3", fcu, payloadAttrs)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to propose block")
+		return nil, errors.Wrap(err, "engine_forkchoiceUpdatedV3 failed")
 	}
 
 	return resp.PayloadID, nil
@@ -73,9 +74,10 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 	ctx, cancel := context.WithTimeout(ctx, 240*time.Second)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
+	b.log.Debug("Calling engine_getPayloadV4", "payloadID", payloadID)
 	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", payloadID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get payload")
+		return nil, errors.Wrap(err, "engine_getPayloadV4 failed")
 	}
 
 	b.log.Debug("Built payload", "parent_hash", payloadResp.ExecutionPayload.ParentHash, "stateRoot", payloadResp.ExecutionPayload.StateRoot)
@@ -89,10 +91,11 @@ func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.Exe
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
+	b.log.Debug("Calling engine_newPayloadV4", "blockNumber", params.Number, "blockHash", params.BlockHash.Hex())
 	err := b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, beaconRoot, []common.Hash{})
 
 	if err != nil {
-		return errors.Wrap(err, "newPayload call failed")
+		return errors.Wrap(err, "engine_newPayloadV4 failed")
 	}
 
 	return nil

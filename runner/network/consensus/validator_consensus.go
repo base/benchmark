@@ -60,6 +60,9 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(types.UpdateForkChoiceLatencyMetric, duration)
 
+	// Add small delay to ensure state is fully committed before next operation
+	time.Sleep(100 * time.Millisecond)
+
 	return nil
 }
 

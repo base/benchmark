@@ -90,9 +90,11 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	mempool.AddTransactions([]*ethTypes.Transaction{depositTx})
 
 	// wait for the transaction to be mined
+	nb.log.Info("Waiting for deposit transaction receipt", "txHash", txHash.Hex())
 	receipt, err := retry.Do(ctx, 60, retry.Fixed(1*time.Second), func() (*ethTypes.Receipt, error) {
 		receipt, err := client.Client().TransactionReceipt(ctx, txHash)
 		if err != nil {
+			nb.log.Debug("Deposit receipt not found yet, retrying...", "txHash", txHash.Hex(), "err", err)
 			return nil, err
 		}
 		return receipt, nil
@@ -100,7 +102,7 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	if receipt == nil {
 		return fmt.Errorf("failed to get transaction receipt: %w", err)
 	}
-	nb.log.Info("Included deposit tx in block", "block", receipt.BlockNumber)
+	nb.log.Info("Included deposit tx in block", "block", receipt.BlockNumber, "txHash", txHash.Hex())
 	if err != nil {
 		return fmt.Errorf("failed to get transaction receipt: %w", err)
 	}
