@@ -340,21 +340,9 @@ const RunList = ({
             {isExpanded && (
               <div className="mt-4">
                 {/* Machine Information Section */}
-                {section.runs.length > 0 && (
+                {section.runs[0]?.machineInfo && (
                   <div className="mb-6">
-                    {section.runs[0].machineInfo ? (
-                      <MachineInfo machineInfo={section.runs[0].machineInfo} />
-                    ) : (
-                      <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
-                        <h3 className="text-sm font-semibold text-slate-700 mb-2">
-                          Machine Information
-                        </h3>
-                        <p className="text-sm text-slate-500">
-                          Machine information not available for this benchmark
-                          run.
-                        </p>
-                      </div>
-                    )}
+                    <MachineInfo machineInfo={section.runs[0]?.machineInfo} />
                   </div>
                 )}
                 <table className="min-w-full">
