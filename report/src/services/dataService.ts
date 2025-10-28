@@ -11,11 +11,11 @@ export class DataService {
   private baseUrl: string;
 
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, ""); // Remove trailing slash
+    this.baseUrl = baseUrl.replace(/\/$/, "") + "/"; // Ensure trailing slash
   }
 
   async getMetadata(): Promise<BenchmarkRuns> {
-    const response = await fetch(`${this.baseUrl}/output/metadata.json`);
+    const response = await fetch(`${this.baseUrl}output/metadata.json`);
 
     if (!response.ok) {
       throw new Error(
@@ -27,7 +27,7 @@ export class DataService {
   }
 
   async getMetrics(outputDir: string, nodeType: string): Promise<MetricData[]> {
-    const metricsPath = `${this.baseUrl}/output/${outputDir}/metrics-${nodeType}.json`;
+    const metricsPath = `${this.baseUrl}output/${outputDir}/metrics-${nodeType}.json`;
     const response = await fetch(metricsPath);
 
     if (!response.ok) {
@@ -72,7 +72,7 @@ export function getDataSourceConfig(): DataServiceConfig {
   const dataSource = getEnvVar("DATA_SOURCE") || "static";
 
   if (dataSource === "api" && apiBaseUrl) {
-    // API mode: use the configured API base URL
+    // API mode: use the configured API base URL (ensure trailing slash)
     return { baseUrl: apiBaseUrl };
   } else {
     // Static mode: use current origin (empty string means relative to current domain)
