@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -76,6 +77,13 @@ func (s *Service) downloadOutputFiles(baseURL, runID, runOutputDir string) error
 		"metrics-sequencer.json",
 	}
 
+	requiredFiles := []string{
+		"result-sequencer.json",
+		"metrics-validator.json",
+		"metrics-sequencer.json",
+		"result-validator.json",
+	}
+
 	// Structure output as output/<runId>/<outputDir>/
 	localOutputDir := filepath.Join(s.config.OutputDir(), runID, runOutputDir)
 	s.log.Info("Downloading output files", "runID", runID, "runOutputDir", runOutputDir, "localPath", localOutputDir)
@@ -89,6 +97,9 @@ func (s *Service) downloadOutputFiles(baseURL, runID, runOutputDir string) error
 		// Try to download the file
 		err := s.downloadFile(fileURL, localFilePath)
 		if err != nil {
+			if !slices.Contains(requiredFiles, fileName) {
+				return errors.Wrap(err, "failed to download file")
+			}
 			s.log.Warn("Failed to download file (continuing)", "file", fileName, "url", fileURL, "error", err)
 		} else {
 			s.log.Debug("Downloaded file", "file", fileName, "localPath", localFilePath)
@@ -150,15 +161,19 @@ func (s *Service) LoadSourceMetadata(source string) (*benchmark.RunGroup, error)
 	// If we loaded from URL, download output files for each run
 	if baseURL != "" {
 		s.log.Info("Downloading output files for all runs", "baseURL", baseURL)
+		newMetadata := make([]benchmark.Run, 0, len(metadata.Runs))
 		for _, run := range metadata.Runs {
 			if run.OutputDir != "" {
 				err := s.downloadOutputFiles(baseURL, run.ID, run.OutputDir)
 				if err != nil {
 					s.log.Warn("Failed to download output files for run", "runID", run.ID, "outputDir", run.OutputDir, "error", err)
 					// Continue with other runs even if one fails
+					continue
 				}
+				newMetadata = append(newMetadata, run)
 			}
 		}
+		metadata.Runs = newMetadata
 	}
 
 	return &metadata, nil
