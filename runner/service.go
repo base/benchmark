@@ -23,6 +23,7 @@ import (
 	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/datadir"
+	"github.com/base/base-bench/runner/datadir"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
 	"github.com/base/base-bench/runner/network/types"
@@ -45,6 +46,10 @@ type service struct {
 	dataDirManager *datadir.Manager
 	portState      portmanager.PortManager
 	metadataPath   string
+	dataDirState   benchmark.SnapshotManager
+	dataDirManager *datadir.Manager
+	portState      portmanager.PortManager
+	metadataPath   string
 
 	config  config.Config
 	version string
@@ -53,6 +58,7 @@ type service struct {
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
 	metadataPath := path.Join(cfg.OutputDir(), "metadata.json")
+	snapshotManager := benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots"))
 	snapshotManager := benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots"))
 
 	s := &service{
@@ -281,14 +287,13 @@ func (s *service) setupPersistentTestDirs(testPlans []benchmark.TestPlan) error 
 	}
 
 	// Setup persistent directories for each unique node type with reuse_existing
-	// This will create separate snapshots for sequencer and validator roles
 	for nodeType, runInfo := range testRunsWithReuseExisting {
-		s.log.Info("Setting up persistent test directories for both roles", "nodeType", nodeType)
-		err := s.dataDirManager.SetupTestDirs(runInfo.params, runInfo.genesis, runInfo.snapshot, s.config.ClientOptions())
+		s.log.Info("Setting up persistent test directories", "nodeType", nodeType)
+		_, err := s.dataDirManager.SetupTestDirs(runInfo.params, runInfo.genesis, runInfo.snapshot, s.config.ClientOptions())
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to setup persistent test directories for node type %s", nodeType))
 		}
-		s.log.Info("Persistent test directories setup completed for both sequencer and validator", "nodeType", nodeType)
+		s.log.Info("Persistent test directories setup completed", "nodeType", nodeType)
 	}
 
 	return nil
