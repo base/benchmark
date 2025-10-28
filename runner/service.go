@@ -68,11 +68,6 @@ func NewService(version string, cfg config.Config, log log.Logger) Service {
 	return s
 }
 
-func (s *service) fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
 	file, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
