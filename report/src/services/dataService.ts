@@ -11,7 +11,7 @@ export class DataService {
   private baseUrl: string;
 
   constructor(baseUrl: string) {
-    this.baseUrl = baseUrl.replace(/\/$/, "") + "/"; // Ensure trailing slash
+    this.baseUrl = baseUrl;
   }
 
   async getMetadata(): Promise<BenchmarkRuns> {
@@ -73,7 +73,7 @@ export function getDataSourceConfig(): DataServiceConfig {
 
   if (dataSource === "api" && apiBaseUrl) {
     // API mode: use the configured API base URL (ensure trailing slash)
-    return { baseUrl: apiBaseUrl };
+    return { baseUrl: apiBaseUrl.replace(/\/$/, "") + "/" };
   } else {
     // Static mode: use current origin (empty string means relative to current domain)
     return { baseUrl: "" };
