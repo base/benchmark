@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/base/base-bench/runner/config"
@@ -52,16 +53,38 @@ func (c *TestConfig) BatcherAddr() common.Address {
 
 // Params is the parameters for a single benchmark run.
 type RunParams struct {
-	NodeType       string
-	GasLimit       uint64
-	PayloadID      string
+	// NodeType is the type of node that's being benchmarked. Examples: geth, reth, nethermined, etc.
+	NodeType string
+
+	// GasLimit is the gas limit for the benchmark run which is the maximum gas that the sequencer will include per block.
+	GasLimit uint64
+
+	// PayloadID is a reference to a transaction payload that will be sent to the sequencer.
+	PayloadID string
+
+	// BenchmarkRunID is a unique identifier for the benchmark run.
 	BenchmarkRunID string
-	Name           string
-	Description    string
-	BlockTime      time.Duration
-	Env            map[string]string
-	NumBlocks      int
-	Tags           map[string]string
+
+	// Name is the name of the benchmark run in the config file.
+	Name string
+
+	// Description is the description of the benchmark run in the config file.
+	Description string
+
+	// BlockTime is the time between blocks in the benchmark run.
+	BlockTime time.Duration
+
+	// Env is the environment variables for the benchmark run.
+	Env map[string]string
+
+	// NumBlocks is the number of blocks to run in the benchmark run.
+	NumBlocks int
+
+	// Tags are the tags for the benchmark run.
+	Tags map[string]string
+
+	// NodeArgs are the arguments to be passed to the node binary.
+	NodeArgs []string
 }
 
 func (p RunParams) ToConfig() map[string]interface{} {
@@ -71,6 +94,7 @@ func (p RunParams) ToConfig() map[string]interface{} {
 		"TransactionPayload":    p.PayloadID,
 		"BenchmarkRun":          p.BenchmarkRunID,
 		"BlockTimeMilliseconds": p.BlockTime.Milliseconds(),
+		"NodeArgs":              strings.Join(p.NodeArgs, " "),
 	}
 
 	for k, v := range p.Tags {
@@ -82,6 +106,7 @@ func (p RunParams) ToConfig() map[string]interface{} {
 
 // ClientOptions applies any client customization options to the given client options.
 func (p RunParams) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
+	prevClientOptions.NodeArgs = p.NodeArgs
 	return prevClientOptions
 }
 
