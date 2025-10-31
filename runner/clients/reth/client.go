@@ -93,8 +93,6 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--engine.disable-caching-and-prewarming")
 	args = append(args, "-vvvv")
 
-	args = append(args, cfg.Args...)
-
 	// increase mempool size
 	args = append(args, "--txpool.pending-max-count", "100000000")
 	args = append(args, "--txpool.queued-max-count", "100000000")
@@ -102,6 +100,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--txpool.queued-max-size", "100")
 
 	args = append(args, "--db.read-transaction-timeout", "0")
+	args = append(args, cfg.Args...)
 
 	// delete datadir/txpool-transactions-backup.rlp if it exists
 	txpoolBackupPath := fmt.Sprintf("%s/txpool-transactions-backup.rlp", r.options.DataDirPath)

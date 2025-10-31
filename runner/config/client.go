@@ -64,4 +64,7 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 }
 
 // CommonOptions are common client configuration options.
-type CommonOptions struct{}
+type CommonOptions struct {
+	// NodeArgs are the arguments to be passed to the node binary.
+	NodeArgs []string
+}
