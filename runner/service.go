@@ -281,13 +281,14 @@ func (s *service) setupPersistentTestDirs(testPlans []benchmark.TestPlan) error 
 	}
 
 	// Setup persistent directories for each unique node type with reuse_existing
+	// This will create separate snapshots for sequencer and validator roles
 	for nodeType, runInfo := range testRunsWithReuseExisting {
-		s.log.Info("Setting up persistent test directories", "nodeType", nodeType)
-		_, err := s.dataDirManager.SetupTestDirs(runInfo.params, runInfo.genesis, runInfo.snapshot, s.config.ClientOptions())
+		s.log.Info("Setting up persistent test directories for both roles", "nodeType", nodeType)
+		err := s.dataDirManager.SetupTestDirs(runInfo.params, runInfo.genesis, runInfo.snapshot, s.config.ClientOptions())
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to setup persistent test directories for node type %s", nodeType))
 		}
-		s.log.Info("Persistent test directories setup completed", "nodeType", nodeType)
+		s.log.Info("Persistent test directories setup completed for both sequencer and validator", "nodeType", nodeType)
 	}
 
 	return nil
