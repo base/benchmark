@@ -19,6 +19,8 @@ This directory contains benchmark configurations for testing various aspects of 
 | [📄 simulator.yml](./examples/simulator.yml)       | Simulation     | Comprehensive workload with mixed operations    | 90M        |
 | [📄 snapshot.yml](./examples/snapshot.yml)         | Infrastructure | Tests snapshot creation and loading             | 15M-90M    |
 | [📄 tx-fuzz-geth.yml](./examples/tx-fuzz-geth.yml) | Stress Test    | Randomized transaction pattern testing          | Default    |
+| [📄 flashblocks.yml](./examples/flashblocks.yml)         | Flashblocks    | Tests flashblocks (sub-200ms preconfirmations)  | 30M-90M    |
+| [📄 client-args-demo.yml](./examples/client-args-demo.yml) | Configuration  | Demonstrates custom client argument usage       | 30M-60M    |
 
 ## 📁 Public Configurations
 
@@ -77,10 +79,70 @@ benchmarks:
   - name: "Benchmark Name"
     description: "What this benchmark tests"
     variables:
-      - type: payload|node_type|num_blocks|gas_limit
+      - type: payload|node_type|num_blocks|gas_limit|client_args|flashblock_interval
         value: single-value
         values: [array, of, values] # for matrix testing
 ```
+
+### Client Arguments
+
+You can customize client behavior using the `client_args` variable:
+
+```yaml
+# Per-client argument mapping
+- type: client_args
+  value:
+    geth: "--verbosity 4 --txpool.globalslots 20000000"
+    reth: "--txpool.pending-max-count 200000000 -vvvv"
+    rbuilder: "--txpool.pending-max-count 200000000"
+
+# Or test multiple configurations
+- type: client_args
+  values:
+    - geth: "--verbosity 3"
+    - geth: "--verbosity 4"
+    - geth: "--verbosity 5"
+```
+
+### Flashblocks Support
+
+Flashblocks provides sub-200ms transaction preconfirmations using the `rbuilder` client in two modes:
+
+**Simple mode (standalone):**
+```yaml
+- type: node_type
+  value: rbuilder  # Just rbuilder for testing
+```
+
+**Dual-builder mode (production):**
+```bash
+# Use CLI flags to enable dual-builder architecture
+./bin/base-bench run \
+  --config ./configs/examples/flashblocks.yml \
+  --rbuilder-bin ./bin/op-rbuilder \
+  --flashblocks-fallback reth \
+  --rollup-boost-bin ./bin/rollup-boost \
+  --output-dir ./output
+```
+
+In dual-builder mode:
+- **Fallback builder** (geth/reth): Produces final 2s canonical blocks
+- **Rbuilder** (primary): Produces flashblocks every 200ms (10 per 2s block)  
+- **Rollup-boost** (optional): Coordinates between the two builders
+
+**Configurable Flashblock Interval:**
+
+You can customize the flashblock interval (default 200ms) using the `flashblock_interval` variable:
+
+```yaml
+- type: flashblock_interval
+  values:
+    - 100   # 100ms (20 flashblocks per 2s block)
+    - 200   # 200ms (10 flashblocks per 2s block) - Base default
+    - 500   # 500ms (4 flashblocks per 2s block)
+```
+
+This only applies to the `rbuilder` node type.
 
 ## 🎯 Choosing the Right Configuration
 

@@ -7,7 +7,7 @@ if [ -f "versions.env" ]; then
     source versions.env
 else
     # Default values
-    RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/haardikk21/op-rbuilder}"
+    RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/base/op-rbuilder.git}"
     RBUILDER_VERSION="${RBUILDER_VERSION:-main}"
     BUILD_DIR="${BUILD_DIR:-./build}"
     OUTPUT_DIR="${OUTPUT_DIR:-../bin}"

@@ -90,3 +90,101 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 	r.metrics = append(r.metrics, *m.Copy())
 	return nil
 }
+
+// dualBuilderMetricsCollector collects metrics from both builders in dual-builder mode.
+type dualBuilderMetricsCollector struct {
+	log                 log.Logger
+	fallbackClient      *ethclient.Client
+	rbuilderClient      *ethclient.Client
+	fallbackMetricsPort int
+	rbuilderMetricsPort int
+	metrics             []metrics.BlockMetrics
+}
+
+func newDualBuilderMetricsCollector(log log.Logger, fallbackClient *ethclient.Client, rbuilderClient *ethclient.Client, fallbackPort int, rbuilderPort int) metrics.Collector {
+	return &dualBuilderMetricsCollector{
+		log:                 log,
+		fallbackClient:      fallbackClient,
+		rbuilderClient:      rbuilderClient,
+		fallbackMetricsPort: fallbackPort,
+		rbuilderMetricsPort: rbuilderPort,
+		metrics:             make([]metrics.BlockMetrics, 0),
+	}
+}
+
+func (d *dualBuilderMetricsCollector) GetMetricsEndpoint() string {
+	return fmt.Sprintf("fallback:http://localhost:%d/metrics,rbuilder:http://localhost:%d/metrics", d.fallbackMetricsPort, d.rbuilderMetricsPort)
+}
+
+func (d *dualBuilderMetricsCollector) GetMetrics() []metrics.BlockMetrics {
+	return d.metrics
+}
+
+func (d *dualBuilderMetricsCollector) GetMetricTypes() map[string]bool {
+	return map[string]bool{
+		// Rbuilder metrics
+		"reth_op_rbuilder_block_built_success":             true,
+		"reth_op_rbuilder_flashblock_count":                true,
+		"reth_op_rbuilder_total_block_built_duration":      true,
+		"reth_op_rbuilder_flashblock_build_duration":       true,
+		"reth_op_rbuilder_state_root_calculation_duration": true,
+		"reth_op_rbuilder_sequencer_tx_duration":           true,
+		"reth_op_rbuilder_payload_tx_simulation_duration":  true,
+		// Fallback builder metrics
+		"reth_sync_execution_execution_duration":         true,
+		"reth_sync_block_validation_state_root_duration": true,
+	}
+}
+
+func (d *dualBuilderMetricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics) error {
+	// Collect metrics from rbuilder (primary builder)
+	if err := d.collectFromBuilder(d.rbuilderMetricsPort, m, "rbuilder"); err != nil {
+		d.log.Warn("Failed to collect rbuilder metrics", "err", err)
+	}
+
+	// Collect metrics from fallback builder
+	if err := d.collectFromBuilder(d.fallbackMetricsPort, m, "fallback"); err != nil {
+		d.log.Warn("Failed to collect fallback metrics", "err", err)
+	}
+
+	d.metrics = append(d.metrics, *m.Copy())
+	return nil
+}
+
+func (d *dualBuilderMetricsCollector) collectFromBuilder(port int, m *metrics.BlockMetrics, builderName string) error {
+	endpoint := fmt.Sprintf("http://localhost:%d/metrics", port)
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to get %s metrics: %w", builderName, err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read %s metrics response: %w", builderName, err)
+	}
+
+	txtParser := expfmt.TextParser{}
+	metrics, err := txtParser.TextToMetricFamilies(bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to parse %s metrics: %w", builderName, err)
+	}
+
+	metricTypes := d.GetMetricTypes()
+	for _, metric := range metrics {
+		name := metric.GetName()
+		if metricTypes[name] {
+			metricVal := metric.GetMetric()
+			if len(metricVal) != 1 {
+				d.log.Warn("expected 1 metric, got %d for metric %s from %s", len(metricVal), name, builderName)
+			}
+			// Prefix metric name with builder type for clarity
+			prefixedName := fmt.Sprintf("%s_%s", builderName, name)
+			if err := m.UpdatePrometheusMetric(prefixedName, metricVal[0]); err != nil {
+				d.log.Warn("failed to add metric %s from %s: %s", name, builderName, err)
+			}
+		}
+	}
+
+	return nil
+}

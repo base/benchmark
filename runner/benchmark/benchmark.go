@@ -80,6 +80,30 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 			} else {
 				return nil, fmt.Errorf("invalid num blocks %s", v)
 			}
+		case "client_args":
+			// client_args can be either a simple string or a map[string]string for per-client args
+			if vStr, ok := v.(string); ok {
+				// Simple string applies to all clients
+				params.ClientArgs = vStr
+			} else if vMap, ok := v.(map[string]interface{}); ok {
+				// Per-client mapping - extract args for the current node type
+				if args, exists := vMap[params.NodeType]; exists {
+					if argsStr, ok := args.(string); ok {
+						params.ClientArgs = argsStr
+					} else {
+						return nil, fmt.Errorf("invalid client_args value for node type %s", params.NodeType)
+					}
+				}
+				// If node type not in map, ClientArgs remains empty (use defaults)
+			} else {
+				return nil, fmt.Errorf("invalid client_args format: must be string or map[string]string")
+			}
+		case "flashblock_interval":
+			if vInt, ok := v.(int); ok {
+				params.FlashblockInterval = vInt
+			} else {
+				return nil, fmt.Errorf("invalid flashblock_interval %s", v)
+			}
 		}
 	}
 

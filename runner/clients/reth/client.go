@@ -85,12 +85,12 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	// todo: make this dynamic eventually
 	args = append(args, "--http")
 	args = append(args, "--http.port", fmt.Sprintf("%d", r.rpcPort))
-	args = append(args, "--http.api", "eth,net,web3,miner")
+	args = append(args, "--http.api", "eth,net,web3,miner,debug")
 	args = append(args, "--authrpc.port", fmt.Sprintf("%d", r.authRPCPort))
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
 	args = append(args, "--engine.state-provider-metrics")
-	args = append(args, "-vvv")
+	args = append(args, "-vvvv")
 
 	args = append(args, cfg.Args...)
 
@@ -146,6 +146,16 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	r.process = exec.Command(r.binPath, args...)
 	r.process.Stdout = r.stdout
 	r.process.Stderr = r.stderr
+
+	// Set environment variables if provided
+	if len(cfg.Env) > 0 {
+		r.process.Env = os.Environ() // Start with current environment
+		for k, v := range cfg.Env {
+			r.process.Env = append(r.process.Env, fmt.Sprintf("%s=%s", k, v))
+			r.logger.Debug("Setting environment variable", "key", k, "value", v)
+		}
+	}
+
 	err = r.process.Start()
 	if err != nil {
 		return err
@@ -217,6 +227,11 @@ func (r *RethClient) ClientURL() string {
 	return r.clientURL
 }
 
+// AuthURL returns the auth RPC URL.
+func (r *RethClient) AuthURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", r.authRPCPort)
+}
+
 // AuthClient returns the auth client used for CL communication.
 func (r *RethClient) AuthClient() client.RPC {
 	return r.authClient
@@ -255,22 +270,22 @@ func (r *RethClient) GetVersion(ctx context.Context) (string, error) {
 	return "unknown", nil
 }
 
-// SetHead resets the blockchain to a specific block using debug.setHead
+// SetHead resets the blockchain to a specific block
+// For reth, we need to use a different approach since debug_setHead is not supported
+// Reth only supports: debug_getRawHeader, debug_getRawBlock, debug_getRawTransaction,
+// debug_getRawReceipts, and debug_getBadBlocks
 func (r *RethClient) SetHead(ctx context.Context, blockNumber uint64) error {
 	if r.client == nil {
 		return errors.New("client not initialized")
 	}
 
-	// Convert block number to hex string
-	blockHex := fmt.Sprintf("0x%x", blockNumber)
+	// Reth does not support debug_setHead, so we skip the rollback
+	// The snapshot should already be at the correct block state
+	r.logger.Warn("Reth does not support debug_setHead - head rollback will be skipped",
+		"blockNumber", blockNumber,
+		"note", "The snapshot should already be at the correct block state")
 
-	// Call debug.setHead via RPC
-	var result interface{}
-	err := r.client.Client().CallContext(ctx, &result, "debug_setHead", blockHex)
-	if err != nil {
-		return errors.Wrap(err, "failed to call debug_setHead")
-	}
-
-	r.logger.Info("Successfully reset blockchain head", "blockNumber", blockNumber, "blockHex", blockHex)
+	// Return success since the snapshot copying should have already
+	// put us at the right state
 	return nil
 }

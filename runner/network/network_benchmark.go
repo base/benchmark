@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/benchmark/portmanager"
@@ -188,6 +189,49 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 	}, nil
 }
 
+// parseClientArgs parses a space-separated string of CLI arguments into a slice of strings.
+// It handles quoted arguments (single and double quotes) to allow spaces within arguments.
+// Example: "--flag value --another 'spaced value'" -> ["--flag", "value", "--another", "spaced value"]
+func parseClientArgs(argsStr string) []string {
+	if argsStr == "" {
+		return nil
+	}
+
+	var args []string
+	var currentArg strings.Builder
+	inQuote := false
+	quoteChar := rune(0)
+
+	for i, char := range argsStr {
+		switch {
+		case (char == '"' || char == '\'') && !inQuote:
+			// Start of quoted section
+			inQuote = true
+			quoteChar = char
+		case char == quoteChar && inQuote:
+			// End of quoted section
+			inQuote = false
+			quoteChar = 0
+		case char == ' ' && !inQuote:
+			// Space outside quotes - delimiter
+			if currentArg.Len() > 0 {
+				args = append(args, currentArg.String())
+				currentArg.Reset()
+			}
+		default:
+			// Regular character
+			currentArg.WriteRune(char)
+		}
+
+		// Handle end of string
+		if i == len(argsStr)-1 && currentArg.Len() > 0 {
+			args = append(args, currentArg.String())
+		}
+	}
+
+	return args
+}
+
 func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager) (types.ExecutionClient, string, error) {
 	if options == nil {
 		return nil, "", errors.New("client options cannot be nil")
@@ -225,9 +269,14 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	stdoutLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 	stderrLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 
+	// Parse client args from params
+	clientArgs := parseClientArgs(params.ClientArgs)
+
 	runtimeConfig := &types.RuntimeConfig{
 		Stdout: stdoutLogger,
 		Stderr: stderrLogger,
+		Args:   clientArgs,
+		Params: params, // Pass params for rbuilder to access flashblock config
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {
@@ -256,7 +305,7 @@ func (nb *NetworkBenchmark) performHeadRollbackIfNeeded(ctx context.Context, cli
 
 	// At this point, the rollback block should be set (either by user or auto-detected)
 	if nb.snapshotConfig.RollbackBlock == nil {
-		return fmt.Errorf("rollback_block not set for head_rollback method - this should have been auto-detected")
+		return fmt.Errorf("rollback_block not set for head_rollback method - head block detection failed during setup phase. Check logs for head detection errors or manually specify rollback_block in your snapshot configuration")
 	}
 
 	blockNumber := *nb.snapshotConfig.RollbackBlock

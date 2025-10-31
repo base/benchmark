@@ -125,6 +125,9 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	minerNewPayloadTimeout := time.Second * 2
 	args = append(args, "--miner.newpayload-timeout", minerNewPayloadTimeout.String())
 
+	// Append any custom args from RuntimeConfig
+	args = append(args, cfg.Args...)
+
 	jwtSecretStr, err := os.ReadFile(g.options.JWTSecretPath)
 	if err != nil {
 		return errors.Wrap(err, "failed to read jwt secret")
@@ -215,6 +218,11 @@ func (g *GethClient) Client() *ethclient.Client {
 // ClientURL returns the raw client URL for transaction generators.
 func (g *GethClient) ClientURL() string {
 	return g.clientURL
+}
+
+// AuthURL returns the auth RPC URL.
+func (g *GethClient) AuthURL() string {
+	return fmt.Sprintf("http://127.0.0.1:%d", g.authRPCPort)
 }
 
 // AuthClient returns the auth client used for CL communication.

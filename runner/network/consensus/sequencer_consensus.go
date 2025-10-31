@@ -291,5 +291,16 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 		return nil, err
 	}
 
+	// Call forkchoiceUpdated without attributes to finalize the block as canonical
+	// This is critical for rollup-boost mode to ensure the fallback builder updates its canonical chain
+	// Without this, receipts won't be queryable on the fallback builder
+	startTime = time.Now()
+	_, err = f.updateForkChoice(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	duration = time.Since(startTime)
+	f.log.Debug("Finalized block as canonical", "blockNumber", payload.Number, "duration", duration)
+
 	return payload, nil
 }

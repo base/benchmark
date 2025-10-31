@@ -1,0 +1,112 @@
+name: Client Arguments Demo
+description: |
+  Client Arguments Configuration Demo - Demonstrates how to use client_args to customize
+  execution client behavior per benchmark run.
+  
+  This configuration shows various ways to specify client arguments:
+  1. Per-client argument mapping (different args for geth, reth, rbuilder)
+  2. Testing different verbosity levels
+  3. Testing different mempool configurations
+  4. Testing different timeout settings
+  
+  Use Case: Testing performance impact of different client configurations, finding optimal
+  settings for specific workloads, and debugging client behavior with increased logging.
+
+payloads:
+  - name: Transfer-only
+    id: transfer-only
+    type: transfer-only
+
+benchmarks:
+  # Example 1: Per-client argument mapping
+  - name: Custom args per client
+    description: Different arguments for each client type
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        values:
+          - geth
+          - reth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 30000000
+      - type: client_args
+        value:
+          geth: "--verbosity 4 --txpool.globalslots 20000000 --txpool.globalqueue 20000000"
+          reth: "--txpool.pending-max-count 200000000 --txpool.queued-max-count 200000000 -vvvv"
+          rbuilder: "--txpool.pending-max-count 200000000 -vvv"
+
+  # Example 2: Test different verbosity levels
+  - name: Verbosity level comparison
+    description: Compare performance with different logging verbosity
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        value: geth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 30000000
+      - type: client_args
+        values:
+          - geth: "--verbosity 3"
+          - geth: "--verbosity 4"
+          - geth: "--verbosity 5"
+
+  # Example 3: Test different mempool sizes
+  - name: Mempool size comparison
+    description: Test performance impact of different mempool configurations
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        value: reth
+      - type: num_blocks
+        value: 15
+      - type: gas_limit
+        value: 60000000
+      - type: client_args
+        values:
+          - reth: "--txpool.pending-max-count 100000000 --txpool.queued-max-count 100000000"
+          - reth: "--txpool.pending-max-count 200000000 --txpool.queued-max-count 200000000"
+          - reth: "--txpool.pending-max-count 500000000 --txpool.queued-max-count 500000000"
+
+  # Example 4: Database timeout settings
+  - name: Database timeout comparison
+    description: Test impact of different database read timeouts
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        value: reth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 30000000
+      - type: client_args
+        values:
+          - reth: "--db.read-transaction-timeout 0"
+          - reth: "--db.read-transaction-timeout 10"
+          - reth: "--db.read-transaction-timeout 30"
+
+  # Example 5: Flashblock interval configurations (rbuilder only)
+  - name: Flashblock interval comparison
+    description: Test different flashblock production intervals
+    variables:
+      - type: payload
+        value: transfer-only
+      - type: node_type
+        value: rbuilder
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        value: 30000000
+      - type: flashblock_interval
+        values:
+          - 100   # Very aggressive - 20 flashblocks per 2s block
+          - 200   # Base production default - 10 flashblocks per 2s block
+          - 500   # Conservative - 4 flashblocks per 2s block
+

@@ -51,8 +51,15 @@ build-geth:
 build-rbuilder:
 	cd clients && ./build-rbuilder.sh
 
+.PHONY: build-rollup-boost
+build-rollup-boost:
+	cd clients && ./build-rollup-boost.sh
+
 .PHONY: build-binaries
 build-binaries: build-reth build-geth build-rbuilder
+
+.PHONY: build-binaries-flashblocks
+build-binaries-flashblocks: build-reth build-geth build-rbuilder build-rollup-boost
 
 .PHONY: build-frontend
 build-frontend:
