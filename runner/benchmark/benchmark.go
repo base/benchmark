@@ -80,6 +80,24 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 			} else {
 				return nil, fmt.Errorf("invalid num blocks %s", v)
 			}
+		case "node_args":
+			// either a list of strings or a string (separated by spaces)
+			if vStr, ok := v.(string); ok {
+				params.NodeArgs = strings.Split(vStr, " ")
+			} else if vArr, ok := v.([]interface{}); ok {
+				// convert []interface{} to []string
+				nodeArgs := make([]string, len(vArr))
+				for i, arg := range vArr {
+					arg, ok := arg.(string)
+					if !ok {
+						return nil, fmt.Errorf("invalid non-string node arg %v", arg)
+					}
+					nodeArgs[i] = arg
+				}
+				params.NodeArgs = nodeArgs
+			} else {
+				return nil, fmt.Errorf("invalid node args %v", v)
+			}
 		}
 	}
 

@@ -228,6 +228,7 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	runtimeConfig := &types.RuntimeConfig{
 		Stdout: stdoutLogger,
 		Stderr: stderrLogger,
+		Args:   options.NodeArgs,
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {
