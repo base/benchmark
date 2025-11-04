@@ -1,5 +1,8 @@
 import { useMemo, useState } from "react";
-import ChartSelector, { SelectedData } from "../components/ChartSelector";
+import ChartSelector, {
+  DataSelection,
+  EmptyDataSelection,
+} from "../components/ChartSelector";
 import ChartGrid from "../components/ChartGrid";
 import { useTestMetadata, useMultipleDataSeries } from "../utils/useDataSeries";
 import { DataSeries } from "../types";
@@ -13,7 +16,7 @@ function RunComparison() {
     throw new Error("Benchmark run ID is required");
   }
 
-  const [selection, setSelection] = useState<SelectedData[]>([]);
+  const [selection, setSelection] = useState<DataSelection>(EmptyDataSelection);
 
   const { data: allBenchmarkRuns, isLoading: isLoadingBenchmarkRuns } =
     useTestMetadata();
@@ -42,7 +45,7 @@ function RunComparison() {
   }, [allBenchmarkRuns, benchmarkRunId]);
 
   const dataQueryKey = useMemo(() => {
-    return selection.map((query) => {
+    return selection.data.map((query) => {
       // Find the run that matches this outputDir to get the runId
       const run = benchmarkRuns.runs.find(
         (r) => r.outputDir === query.outputDir,
@@ -50,7 +53,7 @@ function RunComparison() {
       const runId = run?.id || query.outputDir; // Fallback to outputDir if no ID found
       return [runId, query.outputDir, query.role] as [string, string, string];
     });
-  }, [selection, benchmarkRuns]);
+  }, [selection.data, benchmarkRuns]);
 
   const { data: dataPerFile, isLoading } = useMultipleDataSeries(dataQueryKey);
   const data = useMemo(() => {
@@ -59,15 +62,15 @@ function RunComparison() {
     }
 
     return dataPerFile.map((data, index): DataSeries => {
-      const { name, color } = selection[index];
+      const { name, color } = selection.data[index];
       return {
         name,
         data,
         color,
-        thresholds: selection[index].thresholds,
+        thresholds: selection.data[index].thresholds,
       };
     });
-  }, [dataPerFile, selection]);
+  }, [dataPerFile, selection.data]);
 
   if (!benchmarkRuns || isLoadingBenchmarkRuns) {
     return <div>Loading...</div>;
@@ -82,7 +85,11 @@ function RunComparison() {
             onChangeDataQuery={setSelection}
             benchmarkRuns={benchmarkRuns}
           />
-          {isLoading ? "Loading..." : <ChartGrid data={data ?? []} />}
+          {isLoading ? (
+            "Loading..."
+          ) : (
+            <ChartGrid role={selection.role} data={data ?? []} />
+          )}
         </div>
       </div>
     </div>

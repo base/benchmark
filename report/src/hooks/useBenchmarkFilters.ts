@@ -96,6 +96,16 @@ export function useBenchmarkFilters(
     [setRawFilterSelections],
   );
 
+  // get the role if not grouped by role
+  const role = useMemo(() => {
+    console.log(filterSelections.params.role);
+
+    if (filterSelections.byMetric === "role") {
+      return null;
+    }
+    return filterSelections.params.role as "sequencer" | "validator" | null;
+  }, [filterSelections]);
+
   return {
     variables,
     filterOptions,
@@ -103,5 +113,6 @@ export function useBenchmarkFilters(
     filterSelections, // Return current selections for UI binding
     setFilters, // Return the simplified setter
     setByMetric,
+    role,
   };
 }
