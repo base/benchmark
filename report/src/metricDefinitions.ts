@@ -1,5 +1,5 @@
 import { ChartConfig } from "./types"; // Import from types.ts
-export const CHART_CONFIG: Record<string, ChartConfig> = {
+export const CHART_CONFIG = {
   "latency/send_txs": {
     type: "line",
     title: "Send Txs",
@@ -210,4 +210,46 @@ export const CHART_CONFIG: Record<string, ChartConfig> = {
     description: "Shows the 90th percentile latency for account loads",
     unit: "s",
   },
-};
+} satisfies Record<string, ChartConfig>;
+
+const CHART_CONFIG_ORDER: (keyof typeof CHART_CONFIG)[] = [
+  "latency/get_payload",
+  "latency/new_payload",
+  "latency/update_fork_choice",
+  "latency/send_txs",
+  "gas/per_block",
+  "transactions/per_block",
+  "chain/inserts.50-percentile",
+  "chain/account/reads.50-percentile",
+  "chain/storage/reads.50-percentile",
+  "chain/execution.50-percentile",
+  "chain/account/updates.50-percentile",
+  "chain/account/hashes.50-percentile",
+  "chain/storage/updates.50-percentile",
+  "chain/validation.50-percentile",
+  "chain/crossvalidation.50-percentile",
+  "chain/write.50-percentile",
+  "chain/account/commits.50-percentile",
+  "chain/storage/commits.50-percentile",
+  "chain/snapshot/commits.50-percentile",
+  "chain/triedb/commits.50-percentile",
+];
+
+export const SORTED_CHART_CONFIG: [string, ChartConfig][] = Object.entries(
+  CHART_CONFIG,
+).sort((a, b) => {
+  const aIndex = CHART_CONFIG_ORDER.indexOf(a[0] as keyof typeof CHART_CONFIG);
+  const bIndex = CHART_CONFIG_ORDER.indexOf(b[0] as keyof typeof CHART_CONFIG);
+
+  // if both doesn't exist, sort it last (infinity)
+  if (aIndex === -1 && bIndex === -1) {
+    return 0;
+  }
+  if (aIndex === -1) {
+    return 1;
+  }
+  if (bIndex === -1) {
+    return -1;
+  }
+  return aIndex - bIndex;
+});
