@@ -153,7 +153,7 @@ OPTIONS:
 When you view benchmark results in the interactive dashboard, you can switch between different test runs using the run switcher:
 
 <div align="center">
-  <img src=".github/assets/run-switcher.png" alt="Run Switcher" width="600">
+  <img src="./.github/assets/run-switcher.png" alt="Run Switcher" width="600">
 </div>
 
 ### Creating Test Runs
