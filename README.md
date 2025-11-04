@@ -19,7 +19,7 @@ Base Benchmark provides comprehensive testing capabilities:
 
 ## 📋 Quick Start
 
-[Install Forge](https://book.getfoundry.sh/getting-started/installation)
+[Install Foundry](https://book.getfoundry.sh/getting-started/installation)
 
 Recursively clone github submodules:
 
@@ -145,6 +145,73 @@ OPTIONS:
 <div align="center">
   <p><i>Performance comparison between Geth and Reth clients</i></p>
 </div>
+
+## 📈 Managing Test Runs
+
+### Understanding Runs and Suites
+
+When you view benchmark results in the interactive dashboard, you can switch between different test runs using the run switcher:
+
+<div align="center">
+  <img src=".github/assets/run-switcher.png" alt="Run Switcher" width="600">
+</div>
+
+### Creating Test Runs
+
+**Running benchmarks adds a new suite by default:**
+
+```bash
+./bin/base-bench run --config ./configs/public/basic.yml
+```
+
+Each execution creates a new suite entry in the run list, allowing you to track performance over time or across different configurations.
+
+### Combining Multiple Runs
+
+Use `import-runs` to merge benchmark results from multiple machines or configurations:
+
+```bash
+./bin/base-bench import-runs \
+  --output-dir ./output \
+  ./results-from-server-1/metadata.json
+```
+
+**Two import strategies:**
+
+1. **Add to latest suite with tags** - Merge imported runs into your most recent suite, using tags to differentiate:
+
+   ```bash
+   # Add imported runs to the last suite with tags for differentiation
+   ./bin/base-bench import-runs \
+     --src-tag "instance=server-lg" \
+     --dest-tag "instance=server-md" \
+     --output-dir ./output \
+     ./results-from-server-1/metadata.json
+
+   # --src-tag fills missing tags on existing runs (won't overwrite)
+   # --dest-tag applies to the imported runs
+   # Useful for comparing hardware configurations within the same test run
+   ```
+
+2. **Create new separate suite** - Add imported runs as an independent suite in the list:
+
+   ```bash
+   # Interactive mode (recommended) - prompts you to choose strategy and configure tags
+   ./bin/base-bench import-runs \
+     --output-dir ./output \
+     ./results-from-server-1/metadata.json
+
+   # Creates a new entry differentiated by BenchmarkRun ID
+   # Useful for tracking performance across different code versions or time periods
+   ```
+
+**Interactive Mode:** Without specifying tags, the tool enters interactive mode and guides you through:
+
+- Choosing between adding to last suite or creating new suite
+- Configuring appropriate tags if needed
+- Confirming the import operation
+
+This flexibility lets you organize benchmarks by hardware type, client version, or any dimension relevant to your analysis.
 
 ## 🤝 Contributing
 
