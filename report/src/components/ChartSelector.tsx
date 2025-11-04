@@ -24,8 +24,18 @@ export interface SelectedData {
 
 interface ChartSelectorProps {
   benchmarkRuns: BenchmarkRuns;
-  onChangeDataQuery: (data: SelectedData[]) => void;
+  onChangeDataQuery: (data: DataSelection) => void;
 }
+
+export interface DataSelection {
+  data: SelectedData[];
+  role: "sequencer" | "validator" | null;
+}
+
+export const EmptyDataSelection: DataSelection = {
+  data: [],
+  role: null,
+};
 
 const ChartSelector = ({
   benchmarkRuns,
@@ -51,6 +61,7 @@ const ChartSelector = ({
     filterSelections,
     setFilters,
     setByMetric,
+    role,
   } = useBenchmarkFilters(runsWithRoles, "role");
 
   const lastSentDataRef = useRef<SelectedData[]>([]);
@@ -106,9 +117,9 @@ const ChartSelector = ({
 
     if (!isEqual(dataToSend, lastSentDataRef.current)) {
       lastSentDataRef.current = dataToSend;
-      onChangeDataQuery(dataToSend);
+      onChangeDataQuery({ data: dataToSend, role });
     }
-  }, [matchedRuns, filterSelections.byMetric, onChangeDataQuery]);
+  }, [matchedRuns, filterSelections.byMetric, role, onChangeDataQuery]);
 
   return (
     <div className="flex items-start">

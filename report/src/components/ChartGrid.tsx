@@ -5,12 +5,16 @@ import LineChart from "./LineChart";
 
 interface ProvidedProps {
   data: DataSeries[];
+  role: "sequencer" | "validator" | null;
 }
 
-const ChartGrid: React.FC<ProvidedProps> = ({ data }: ProvidedProps) => {
+const ChartGrid: React.FC<ProvidedProps> = ({ data, role }: ProvidedProps) => {
   return (
     <div className="charts-container">
       {Object.entries(CHART_CONFIG).map(([metricKey, config]) => {
+        // sequencer and validator have different thresholds
+        console.log(role, metricKey);
+        const thresholdKey = role ? `${role}/${metricKey}` : null;
         const chartData = data.flatMap((s) => s.data);
         const thresholds = data[0]?.thresholds;
         const executionMetrics = chartData
@@ -32,7 +36,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data }: ProvidedProps) => {
 
         return (
           <div key={metricKey} className="chart-container">
-            <LineChart {...chartProps} />
+            <LineChart thresholdKey={thresholdKey} {...chartProps} />
           </div>
         );
       })}

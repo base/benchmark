@@ -16,6 +16,7 @@ import { isEqual } from "lodash";
 
 interface LineChartProps {
   series: DataSeries[];
+  thresholdKey: string | null;
   metricKey: string;
   title?: string;
   description?: string;
@@ -48,6 +49,7 @@ const MAX_TICKS = 10;
 
 const LineChart: React.FC<LineChartProps> = ({
   series,
+  thresholdKey,
   metricKey,
   title,
   description,
@@ -342,14 +344,14 @@ const LineChart: React.FC<LineChartProps> = ({
   const maxThreshold = useMemo(() => {
     let maxThreshold = 0;
     for (const thresholdMap of [thresholds?.warning, thresholds?.error]) {
-      if (thresholdMap) {
-        if (thresholdMap[metricKey] > maxThreshold) {
-          maxThreshold = thresholdMap[metricKey];
+      if (thresholdMap && thresholdKey) {
+        if (thresholdMap[thresholdKey] > maxThreshold) {
+          maxThreshold = thresholdMap[thresholdKey];
         }
       }
     }
     return maxThreshold;
-  }, [thresholds, metricKey]);
+  }, [thresholds, thresholdKey]);
 
   return (
     <BaseChart
@@ -409,9 +411,10 @@ const LineChart: React.FC<LineChartProps> = ({
           // Add warning threshold line (yellow)
           if (
             thresholds.warning &&
-            thresholds.warning[metricKey] !== undefined
+            thresholdKey &&
+            thresholds.warning[thresholdKey] !== undefined
           ) {
-            const warningY = y(thresholds.warning[metricKey]);
+            const warningY = y(thresholds.warning[thresholdKey]);
             svg
               .append("line")
               .attr("class", "threshold-line warning")
@@ -425,8 +428,12 @@ const LineChart: React.FC<LineChartProps> = ({
           }
 
           // Add error threshold line (red)
-          if (thresholds.error && thresholds.error[metricKey] !== undefined) {
-            const errorY = y(thresholds.error[metricKey]);
+          if (
+            thresholds.error &&
+            thresholdKey &&
+            thresholds.error[thresholdKey] !== undefined
+          ) {
+            const errorY = y(thresholds.error[thresholdKey]);
             svg
               .append("line")
               .attr("class", "threshold-line error")
