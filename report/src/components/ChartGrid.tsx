@@ -1,5 +1,5 @@
 import React from "react";
-import { CHART_CONFIG } from "../metricDefinitions";
+import { SORTED_CHART_CONFIG } from "../metricDefinitions";
 import { DataSeries } from "../types";
 import LineChart from "./LineChart";
 
@@ -11,9 +11,8 @@ interface ProvidedProps {
 const ChartGrid: React.FC<ProvidedProps> = ({ data, role }: ProvidedProps) => {
   return (
     <div className="charts-container">
-      {Object.entries(CHART_CONFIG).map(([metricKey, config]) => {
+      {SORTED_CHART_CONFIG.map(([metricKey, config]) => {
         // sequencer and validator have different thresholds
-        console.log(role, metricKey);
         const thresholdKey = role ? `${role}/${metricKey}` : null;
         const chartData = data.flatMap((s) => s.data);
         const thresholds = data[0]?.thresholds;
