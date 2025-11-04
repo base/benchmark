@@ -98,13 +98,16 @@ export function useBenchmarkFilters(
 
   // get the role if not grouped by role
   const role = useMemo(() => {
-    console.log(filterSelections.params.role);
-
+    console.log(variables);
     if (filterSelections.byMetric === "role") {
       return null;
     }
-    return filterSelections.params.role as "sequencer" | "validator" | null;
-  }, [filterSelections]);
+
+    return (
+      (filterSelections.params.role as "sequencer" | "validator") ??
+      variables.role[0]
+    );
+  }, [variables]);
 
   return {
     variables,
