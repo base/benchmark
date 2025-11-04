@@ -135,9 +135,9 @@ const RunList = ({
     // Handle threshold displays for specific columns
     if (column === "getPayload") {
       const warningThreshold =
-        (run.thresholds?.warning?.["latency/get_payload"] ?? 0) / 1e9;
+        (run.thresholds?.warning?.["sequencer/latency/get_payload"] ?? 0) / 1e9;
       const errorThreshold =
-        (run.thresholds?.error?.["latency/get_payload"] ?? 0) / 1e9;
+        (run.thresholds?.error?.["sequencer/latency/get_payload"] ?? 0) / 1e9;
 
       return (
         <ThresholdDisplay
@@ -152,9 +152,9 @@ const RunList = ({
 
     if (column === "newPayload") {
       const warningThreshold =
-        (run.thresholds?.warning?.["latency/new_payload"] ?? 0) / 1e9;
+        (run.thresholds?.warning?.["validator/latency/new_payload"] ?? 0) / 1e9;
       const errorThreshold =
-        (run.thresholds?.error?.["latency/new_payload"] ?? 0) / 1e9;
+        (run.thresholds?.error?.["validator/latency/new_payload"] ?? 0) / 1e9;
 
       return (
         <ThresholdDisplay
