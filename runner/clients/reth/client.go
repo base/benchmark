@@ -90,7 +90,8 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
 	args = append(args, "--engine.state-provider-metrics")
-	args = append(args, "-vvv")
+	args = append(args, "--engine.disable-caching-and-prewarming")
+	args = append(args, "-vvvv")
 
 	// increase mempool size
 	args = append(args, "--txpool.pending-max-count", "100000000")

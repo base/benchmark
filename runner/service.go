@@ -22,6 +22,7 @@ import (
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/datadir"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
 	"github.com/base/base-bench/runner/network/types"
@@ -40,9 +41,10 @@ type Service interface {
 type service struct {
 	// tracks the state of the datadirs for each test
 	// this is used to avoid copying the datadirs for each test
-	dataDirState benchmark.SnapshotManager
-	portState    portmanager.PortManager
-	metadataPath string
+	dataDirState   benchmark.SnapshotManager
+	dataDirManager *datadir.Manager
+	portState      portmanager.PortManager
+	metadataPath   string
 
 	config  config.Config
 	version string
@@ -51,22 +53,19 @@ type service struct {
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
 	metadataPath := path.Join(cfg.OutputDir(), "metadata.json")
+	snapshotManager := benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots"))
 
 	s := &service{
-		metadataPath: metadataPath,
-		portState:    portmanager.NewPortManager(),
-		dataDirState: benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots")),
-		config:       cfg,
-		version:      version,
-		log:          log,
+		metadataPath:   metadataPath,
+		portState:      portmanager.NewPortManager(),
+		dataDirState:   snapshotManager,
+		dataDirManager: datadir.NewManager(cfg.DataDir(), snapshotManager, log),
+		config:         cfg,
+		version:        version,
+		log:            log,
 	}
 
 	return s
-}
-
-func (s *service) fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
@@ -78,119 +77,6 @@ func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
 	var config *benchmark.BenchmarkConfig
 	err = yaml.NewDecoder(file).Decode(&config)
 	return config, err
-}
-
-func (s *service) setupInternalDirectories(testDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string) (*config.InternalClientOptions, error) {
-	err := os.MkdirAll(testDir, 0755)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create test directory")
-	}
-
-	metricsPath := path.Join(testDir, "metrics")
-	err = os.Mkdir(metricsPath, 0755)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create metrics directory")
-	}
-
-	// write chain config to testDir/chain.json
-	chainCfgPath := path.Join(testDir, "chain.json")
-	chainCfgFile, err := os.OpenFile(chainCfgPath, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open chain config file")
-	}
-
-	err = json.NewEncoder(chainCfgFile).Encode(genesis)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to write chain config")
-	}
-
-	var dataDirPath string
-	isSnapshot := snapshot != nil && snapshot.Command != ""
-	if isSnapshot {
-		dataDirPath = path.Join(testDir, "data")
-
-		initialSnapshotPath := s.dataDirState.GetInitialSnapshotPath(params.NodeType)
-
-		if initialSnapshotPath != "" && s.fileExists(initialSnapshotPath) {
-			snapshotMethod := snapshot.GetSnapshotMethod()
-
-			switch snapshotMethod {
-			case benchmark.SnapshotMethodReuseExisting:
-				dataDirPath = initialSnapshotPath
-				s.log.Info("Reusing existing snapshot", "snapshotPath", initialSnapshotPath, "method", snapshotMethod)
-			case benchmark.SnapshotMethodHeadRollback:
-				// For head_rollback, copy the snapshot but mark it for rollback later
-				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to copy from initial snapshot for head rollback")
-				}
-				s.log.Info("Copied from initial snapshot for head rollback", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath, "method", snapshotMethod)
-			default:
-				// Default chain_copy behavior
-				err := s.dataDirState.CopyFromInitialSnapshot(initialSnapshotPath, dataDirPath)
-				if err != nil {
-					return nil, errors.Wrap(err, "failed to copy from initial snapshot")
-				}
-				s.log.Info("Copied from initial snapshot", "initialSnapshotPath", initialSnapshotPath, "dataDirPath", dataDirPath)
-			}
-		} else {
-			// Fallback to direct snapshot creation
-			if initialSnapshotPath != "" {
-				s.log.Warn("Initial snapshot path registered but doesn't exist, falling back to direct snapshot creation",
-					"path", initialSnapshotPath, "nodeType", params.NodeType)
-			}
-			snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to ensure snapshot")
-			}
-			dataDirPath = snapshotDir
-		}
-	} else {
-		// if no snapshot, just create a new datadir
-		dataDirPath = path.Join(testDir, "data")
-		err = os.Mkdir(dataDirPath, 0755)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to create data directory")
-		}
-	}
-
-	var jwtSecret [32]byte
-	_, err = rand.Read(jwtSecret[:])
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to generate jwt secret")
-	}
-
-	jwtSecretPath := path.Join(testDir, "jwt_secret")
-	jwtSecretFile, err := os.OpenFile(jwtSecretPath, os.O_WRONLY|os.O_CREATE, 0644)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to open jwt secret file")
-	}
-
-	_, err = jwtSecretFile.Write([]byte(hex.EncodeToString(jwtSecret[:])))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to write jwt secret")
-	}
-
-	if err = jwtSecretFile.Close(); err != nil {
-		return nil, errors.Wrap(err, "failed to close jwt secret file")
-	}
-
-	options := s.config.ClientOptions()
-	options = params.ClientOptions(options)
-
-	options.SkipInit = isSnapshot
-
-	internalOptions := &config.InternalClientOptions{
-		ClientOptions: options,
-		JWTSecretPath: jwtSecretPath,
-		MetricsPath:   metricsPath,
-		JWTSecret:     hex.EncodeToString(jwtSecret[:]),
-		ChainCfgPath:  chainCfgPath,
-		DataDirPath:   dataDirPath,
-		TestDirPath:   testDir,
-	}
-
-	return internalOptions, nil
 }
 
 type TestRunMetadata struct {
@@ -320,25 +206,6 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 	return genesis, nil
 }
 
-func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
-	// create temp directory for this test
-	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
-	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
-	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
-
-	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, genesis, snapshot, "sequencer")
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
-	}
-
-	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator")
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
-	}
-
-	return sequencerOptions, validatorOptions, nil
-}
-
 func (s *service) setupBlobsDir(workingDir string) error {
 	// create temp directory for blobs
 	blobsDir := path.Join(workingDir, "blobs")
@@ -368,6 +235,60 @@ func (s *service) setupInitialSnapshots(testPlans []benchmark.TestPlan) error {
 			return errors.Wrap(err, fmt.Sprintf("failed to setup initial snapshot for node type %s", nodeType))
 		}
 		s.log.Info("Initial snapshot setup completed", "node_type", nodeType)
+	}
+
+	return nil
+}
+
+func (s *service) setupPersistentTestDirs(testPlans []benchmark.TestPlan) error {
+	// Collect all test runs that use reuse_existing snapshots
+	testRunsWithReuseExisting := make(map[string]struct {
+		params   types.RunParams
+		genesis  *core.Genesis
+		snapshot *benchmark.SnapshotDefinition
+	})
+
+	for _, testPlan := range testPlans {
+		for _, run := range testPlan.Runs {
+			// Find the appropriate snapshot for this node type
+			var snapshotConfig *benchmark.SnapshotDefinition
+			for _, s := range testPlan.InitialSnapshots {
+				if s.NodeType == run.Params.NodeType {
+					snapshotConfig = &s
+					break
+				}
+			}
+
+			// Only setup if using reuse_existing method
+			if snapshotConfig != nil && snapshotConfig.GetSnapshotMethod() == benchmark.SnapshotMethodReuseExisting {
+				// Get genesis for this snapshot
+				genesis, err := s.getGenesisForSnapshotConfig(snapshotConfig)
+				if err != nil {
+					return errors.Wrap(err, "failed to get genesis block")
+				}
+
+				testRunsWithReuseExisting[run.Params.NodeType] = struct {
+					params   types.RunParams
+					genesis  *core.Genesis
+					snapshot *benchmark.SnapshotDefinition
+				}{
+					params:   run.Params,
+					genesis:  genesis,
+					snapshot: snapshotConfig,
+				}
+			}
+		}
+	}
+
+	// Setup persistent directories for each unique node type with reuse_existing
+	// This will create separate snapshots for sequencer and validator roles
+	for nodeType, runInfo := range testRunsWithReuseExisting {
+		s.log.Info("Setting up persistent test directories for both roles", "nodeType", nodeType)
+		err := s.dataDirManager.SetupTestDirs(runInfo.params, runInfo.genesis, runInfo.snapshot, s.config.ClientOptions())
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to setup persistent test directories for node type %s", nodeType))
+		}
+		s.log.Info("Persistent test directories setup completed for both sequencer and validator", "nodeType", nodeType)
 	}
 
 	return nil
@@ -551,15 +472,11 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		return nil, errors.Wrap(err, "failed to get genesis block")
 	}
 
-	// create temp directory for this test
-	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
-	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
-	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
-
-	// setup data directories (restore from snapshot if needed)
-	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig)
+	// Get or create test directories using the datadir manager
+	testTimestamp := time.Now().Unix()
+	sequencerOptions, validatorOptions, shouldCleanup, err := s.dataDirManager.GetOrCreateTestDirs(params, genesis, snapshotConfig, s.config.ClientOptions(), testTimestamp)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to setup data dirs")
+		return nil, errors.Wrap(err, "failed to get or create test dirs")
 	}
 
 	if proofConfig != nil {
@@ -568,19 +485,25 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		}
 	}
 
-	defer func() {
-		// clean up test directory
-		err := os.RemoveAll(sequencerTestDir)
-		if err != nil {
-			log.Error("failed to remove test directory", "err", err)
-		}
+	// Only cleanup directories if shouldCleanup is true (non-reuse_existing)
+	if shouldCleanup {
+		defer func() {
+			// clean up test directory
+			err := os.RemoveAll(sequencerOptions.TestDirPath)
+			if err != nil {
+				log.Error("failed to remove sequencer test directory", "err", err)
+			}
 
-		// clean up test directory
-		err = os.RemoveAll(validatorTestDir)
-		if err != nil {
-			log.Error("failed to remove test directory", "err", err)
-		}
-	}()
+			// clean up test directory
+			err = os.RemoveAll(validatorOptions.TestDirPath)
+			if err != nil {
+				log.Error("failed to remove validator test directory", "err", err)
+			}
+		}()
+	}
+
+	// Generate testName for output
+	testName := fmt.Sprintf("%d-%s-test", testTimestamp, params.NodeType)
 
 	batcherKeyBytes := common.FromHex("0xd2ba8e70072983384203c438d4e94bf399cbd88bbcafb82b61cc96ed12541707")
 	batcherKey, err := crypto.ToECDSA(batcherKeyBytes)
@@ -744,6 +667,12 @@ func (s *service) Run(ctx context.Context) error {
 	err = s.detectSnapshotHeadBlocks(testPlans)
 	if err != nil {
 		return errors.Wrap(err, "failed to detect snapshot head blocks")
+	}
+
+	// Setup persistent test directories for reuse_existing snapshots before running any tests
+	err = s.setupPersistentTestDirs(testPlans)
+	if err != nil {
+		return errors.Wrap(err, "failed to setup persistent test directories")
 	}
 
 	// Create machine info from config
