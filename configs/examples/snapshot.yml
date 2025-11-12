@@ -1,5 +1,7 @@
 name: Two-Tier Snapshot Functionality Test
 description: |
+  IMPORTANT: This feature is currently in development, and the results are not yet reliable.
+
   Two-Tier Snapshot Functionality Test - Demonstrates the new optimized snapshot system with initial snapshots and per-test copying.
 
   This benchmark suite uses a two-tier snapshot approach:
@@ -21,7 +23,7 @@ benchmarks:
         command: ./scripts/setup-base-snapshot.sh --network=sepolia --node-type=reth --destination=/data/snapshots/reth/initial
         destination: /data/snapshots/reth/initial
         superchain_chain_id: 84532
-      - node_type: geth  
+      - node_type: geth
         # Download an initial geth snapshot that can be copied for each test
         command: ./scripts/setup-base-snapshot.sh --network=sepolia --node-type=geth --destination=/data/snapshots/geth/initial
         destination: /data/snapshots/geth/initial
