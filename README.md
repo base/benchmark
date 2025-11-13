@@ -25,6 +25,16 @@ Base Benchmark is a performance testing framework for Ethereum execution clients
 [![GitHub pull requests by-label](https://img.shields.io/github/issues-pr-raw/base/benchmark)](https://github.com/base/benchmark/pulls)
 [![GitHub Issues](https://img.shields.io/github/issues-raw/base/benchmark.svg)](https://github.com/base/benchmark/issues)
 
+## Results
+
+Public results are available at the following links:
+
+| Network      | Link                                                                   |
+| ------------ | ---------------------------------------------------------------------- |
+| Devnet       | [https://base.github.io/benchmark/](https://base.github.io/benchmark/) |
+| Base Sepolia | Coming soon                                                            |
+| Base Mainnet | Coming soon                                                            |
+
 ## Features
 
 - **Performance Evaluation:** Test both block building and validation performance across execution clients (Geth, Reth, and more)
