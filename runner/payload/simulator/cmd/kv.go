@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 // StateOracle defines the high-level API used to retrieve L2 state data pre-images
@@ -63,12 +65,35 @@ func newGethPreimageOracle(db ethdb.KeyValueStore, client *ethclient.Client) *ge
 	}
 }
 
-func (o *gethPreimageOracle) CodeByHash(codeHash common.Hash, chainID eth.ChainID) []byte {
+const maxDbGetRetries = 5
 
+// debugDbGet calls the debug_dbGet RPC method with retry logic.
+// Retries up to maxDbGetRetries times with exponential backoff.
+func debugDbGet(client *rpc.Client, key string) (hexutil.Bytes, error) {
 	var result hexutil.Bytes
-	// code, err := o.dbGet(ctx, )
+	var lastErr error
 
-	err := o.client.Client().CallContext(context.Background(), &result, "debug_dbGet", hexutil.Bytes(append(append(make([]byte, 0), rawdb.CodePrefix...), codeHash[:]...)).String())
+	for attempt := 0; attempt < maxDbGetRetries; attempt++ {
+		err := client.CallContext(context.Background(), &result, "debug_dbGet", key)
+		if err == nil {
+			return result, nil
+		}
+
+		lastErr = err
+
+		// Don't sleep after the last attempt
+		if attempt < maxDbGetRetries-1 {
+			backoff := time.Duration(1<<attempt) * 100 * time.Millisecond
+			time.Sleep(backoff)
+		}
+	}
+
+	return nil, fmt.Errorf("debug_dbGet failed after %d retries: %w", maxDbGetRetries, lastErr)
+}
+
+func (o *gethPreimageOracle) CodeByHash(codeHash common.Hash, chainID eth.ChainID) []byte {
+	key := hexutil.Bytes(append(append(make([]byte, 0), rawdb.CodePrefix...), codeHash[:]...)).String()
+	result, err := debugDbGet(o.client.Client(), key)
 	if err != nil {
 		panic(err)
 	}
@@ -76,8 +101,7 @@ func (o *gethPreimageOracle) CodeByHash(codeHash common.Hash, chainID eth.ChainI
 }
 
 func (o *gethPreimageOracle) NodeByHash(nodeHash common.Hash, chainID eth.ChainID) []byte {
-	var result hexutil.Bytes
-	err := o.client.Client().CallContext(context.Background(), &result, "debug_dbGet", nodeHash.Hex())
+	result, err := debugDbGet(o.client.Client(), nodeHash.Hex())
 	if err != nil {
 		panic(err)
 	}
