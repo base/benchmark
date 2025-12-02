@@ -2,22 +2,17 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
 )
-
-// KeyValueStore is a subset of the ethdb.KeyValueStore interface that's required for block processing.
-type KeyValueStore interface {
-	ethdb.KeyValueReader
-	ethdb.Batcher
-	// Put inserts the given value into the key-value data store.
-	Put(key []byte, value []byte) error
-}
 
 // StateOracle defines the high-level API used to retrieve L2 state data pre-images
 // The returned data is always the preimage of the requested hash.
@@ -56,13 +51,46 @@ func (o *preimageOracle) NodeByHash(nodeHash common.Hash, chainID eth.ChainID) [
 
 var _ StateOracle = (*preimageOracle)(nil)
 
+type gethPreimageOracle struct {
+	db     ethdb.KeyValueStore
+	client *ethclient.Client
+}
+
+func newGethPreimageOracle(db ethdb.KeyValueStore, client *ethclient.Client) *gethPreimageOracle {
+	return &gethPreimageOracle{
+		db:     db,
+		client: client,
+	}
+}
+
+func (o *gethPreimageOracle) CodeByHash(codeHash common.Hash, chainID eth.ChainID) []byte {
+
+	var result hexutil.Bytes
+	// code, err := o.dbGet(ctx, )
+
+	err := o.client.Client().CallContext(context.Background(), &result, "debug_dbGet", hexutil.Bytes(append(append(make([]byte, 0), rawdb.CodePrefix...), codeHash[:]...)).String())
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func (o *gethPreimageOracle) NodeByHash(nodeHash common.Hash, chainID eth.ChainID) []byte {
+	var result hexutil.Bytes
+	err := o.client.Client().CallContext(context.Background(), &result, "debug_dbGet", nodeHash.Hex())
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
 type OracleKeyValueStore struct {
-	db      KeyValueStore
+	db      ethdb.KeyValueStore
 	oracle  StateOracle
 	chainID eth.ChainID
 }
 
-func NewOracleBackedDB(kv KeyValueStore, oracle StateOracle, chainID eth.ChainID) *OracleKeyValueStore {
+func NewOracleBackedDB(kv ethdb.KeyValueStore, oracle StateOracle, chainID eth.ChainID) *OracleKeyValueStore {
 	return &OracleKeyValueStore{
 		db:      kv,
 		oracle:  oracle,
@@ -133,3 +161,9 @@ func (o *OracleKeyValueStore) NewIterator(prefix []byte, start []byte) ethdb.Ite
 func (o *OracleKeyValueStore) Compact(start []byte, limit []byte) error {
 	panic("not supported")
 }
+
+func (o *OracleKeyValueStore) SyncKeyValue() error {
+	return nil
+}
+
+var _ ethdb.KeyValueStore = (*OracleKeyValueStore)(nil)

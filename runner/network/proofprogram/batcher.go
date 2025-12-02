@@ -142,7 +142,7 @@ func (b *Batcher) CreateAndSendBatch(payloads []engine.ExecutableData, parentHas
 			return fmt.Errorf("failed to create blob: %w", err)
 		}
 
-		sidecar, blobHashes, err := txmgr.MakeSidecar([]*eth.Blob{&blob})
+		sidecar, blobHashes, err := txmgr.MakeSidecar([]*eth.Blob{&blob}, false)
 		if err != nil {
 			return fmt.Errorf("failed to create sidecar: %w", err)
 		}
@@ -156,7 +156,7 @@ func (b *Batcher) CreateAndSendBatch(payloads []engine.ExecutableData, parentHas
 			return fmt.Errorf("pending header does not have excess blob gas")
 		}
 
-		blobBaseFee := eth.CalcBlobFeeDefault(pendingHeader.Header())
+		blobBaseFee := eth.CalcBlobFeeCancun(*pendingHeader.Header().ExcessBlobGas)
 		blobFeeCap := new(uint256.Int).Mul(uint256.NewInt(2), uint256.MustFromBig(blobBaseFee))
 		if blobFeeCap.Lt(uint256.NewInt(params.GWei)) { // ensure we meet 1 gwei geth tx-pool minimum
 			blobFeeCap = uint256.NewInt(params.GWei)
