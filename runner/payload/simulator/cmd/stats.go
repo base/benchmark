@@ -27,7 +27,20 @@ import (
 	"github.com/ethereum/go-ethereum/triedb"
 )
 
-func fetchBlockStats(log log.Logger, client *ethclient.Client, block *types.Block, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
+func fetchBlockStatsGeth(log log.Logger, client *ethclient.Client, block *types.Block, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
+	parentBlock, err := client.BlockByHash(context.Background(), block.ParentHash())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	db := memorydb.New()
+	oracleKv := newGethPreimageOracle(db, client)
+	oracleDb := NewOracleBackedDB(db, oracleKv, eth.ChainIDFromBig(genesis.Config.ChainID))
+
+	return executeBlock(log, client, parentBlock, block, oracleDb, genesis, headerCache)
+}
+
+func fetchBlockStatsReth(log log.Logger, client *ethclient.Client, block *types.Block, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
 	log.Info("Fetching execution witness")
 
 	var result *eth.ExecutionWitness
@@ -43,7 +56,21 @@ func fetchBlockStats(log log.Logger, client *ethclient.Client, block *types.Bloc
 		return nil, nil, err
 	}
 
-	return executeBlock(log, client, parentBlock, block, result, genesis, headerCache)
+	codes := make(map[common.Hash][]byte)
+	nodes := make(map[common.Hash][]byte)
+	for _, code := range result.Codes {
+		codes[crypto.Keccak256Hash(code)] = []byte(code)
+	}
+
+	for _, node := range result.State {
+		nodes[crypto.Keccak256Hash(node)] = []byte(node)
+	}
+
+	db := memorydb.New()
+	oracleKv := newPreimageOracle(db, codes, nodes)
+	oracleDb := NewOracleBackedDB(db, oracleKv, eth.ChainIDFromBig(genesis.Config.ChainID))
+
+	return executeBlock(log, client, parentBlock, block, oracleDb, genesis, headerCache)
 }
 
 type blockCtx struct {
@@ -87,24 +114,16 @@ func (b *blockCtx) Config() *params.ChainConfig {
 	return b.config
 }
 
-func updateStats(db *state.StateDB, codePrestate map[common.Hash][]byte, s *simulatorstats.Stats) {
+func updateStats(db *state.StateDB, s *simulatorstats.Stats) {
 	s.AccountLoaded = float64(db.AccountLoaded)
 	s.AccountDeleted = float64(db.AccountDeleted)
 	s.AccountsUpdated = float64(db.AccountUpdated)
 	s.StorageLoaded = float64(db.StorageLoaded)
 	s.StorageDeleted = float64(db.StorageDeleted.Load())
 	s.StorageUpdated = float64(db.StorageUpdated.Load())
-
-	totalCodeSize := uint64(0)
-	for _, code := range codePrestate {
-		totalCodeSize += uint64(len(code))
-	}
-
-	s.CodeSizeLoaded = float64(totalCodeSize)
-	s.NumContractsLoaded = float64(len(codePrestate))
 	s.Opcodes = s.Opcodes.RemoveAllBut("EXP", "KECCAK256")
 }
-func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block, executedBlock *types.Block, witness *eth.ExecutionWitness, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
+func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block, executedBlock *types.Block, oracleDb *OracleKeyValueStore, genesis *core.Genesis, headerCache map[common.Hash]*types.Header) (*simulatorstats.Stats, []*simulatorstats.Stats, error) {
 	header := &types.Header{
 		ParentHash:      parent.Hash(),
 		Coinbase:        executedBlock.Coinbase(),
@@ -118,10 +137,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 		RequestsHash:    executedBlock.RequestsHash(),
 	}
 
-	codes := make(map[common.Hash][]byte)
-	nodes := make(map[common.Hash][]byte)
-
-	chainCfg, err := chainconfig.ChainConfigByChainID(eth.ChainIDFromBig(big.NewInt(8453)))
+	chainCfg, err := chainconfig.L2ChainConfigByChainID(eth.ChainIDFromBig(big.NewInt(8453)))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get chain config: %w", err)
 	}
@@ -129,18 +145,6 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 	genesis.Config = chainCfg
 
 	chainCtx := newBlockCtx(genesis, client, headerCache)
-
-	for _, code := range witness.Codes {
-		codes[crypto.Keccak256Hash(code)] = []byte(code)
-	}
-
-	for _, node := range witness.State {
-		nodes[crypto.Keccak256Hash(node)] = []byte(node)
-	}
-
-	db := memorydb.New()
-	oracleKv := newPreimageOracle(db, codes, nodes)
-	oracleDb := NewOracleBackedDB(db, oracleKv, eth.ChainIDFromBig(genesis.Config.ChainID))
 
 	// copied from geth:
 	initialState, err := state.New(parent.Root(), state.NewDatabase(triedb.NewDatabase(rawdb.NewDatabase(oracleDb), nil), nil))
@@ -182,12 +186,13 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 	gasPool := new(core.GasPool)
 	gasPool.AddGas(header.GasLimit)
 
-	updateStats(statedb, codes, blockStats)
+	updateStats(statedb, blockStats)
 
 	log.Info("Finished initializing state db")
 	hookedState := state.NewHookedState(statedb, blockTracer.Tracer())
 
 	for i, tx := range executedBlock.Transactions() {
+		log.Debug("Executing tx", "tx", tx.Hash().Hex())
 		if tx.Gas() > header.GasLimit {
 			return nil, nil, fmt.Errorf("tx consumes %d gas, more than available in L1 block %d", tx.Gas(), header.GasLimit)
 		}
@@ -204,7 +209,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 		}
 
 		prevBlockStats := blockStats.Copy()
-		updateStats(statedb, codes, blockStats)
+		updateStats(statedb, blockStats)
 		blockStats.Precompiles = blockTracer.precompileStats.Copy()
 		txStats[i] = blockStats.Sub(prevBlockStats)
 	}
@@ -214,7 +219,7 @@ func executeBlock(log log.Logger, client *ethclient.Client, parent *types.Block,
 
 	log.Info("Finished executing block transactions")
 
-	updateStats(statedb, codes, blockStats)
+	updateStats(statedb, blockStats)
 
 	isCancun := genesis.Config.IsCancun(header.Number, header.Time)
 	// Write state changes to db

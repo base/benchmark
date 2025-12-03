@@ -2,22 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ethereum-optimism/optimism/op-service/eth"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/ethdb"
+	"github.com/ethereum/go-ethereum/rpc"
 )
-
-// KeyValueStore is a subset of the ethdb.KeyValueStore interface that's required for block processing.
-type KeyValueStore interface {
-	ethdb.KeyValueReader
-	ethdb.Batcher
-	// Put inserts the given value into the key-value data store.
-	Put(key []byte, value []byte) error
-}
 
 // StateOracle defines the high-level API used to retrieve L2 state data pre-images
 // The returned data is always the preimage of the requested hash.
@@ -56,13 +53,68 @@ func (o *preimageOracle) NodeByHash(nodeHash common.Hash, chainID eth.ChainID) [
 
 var _ StateOracle = (*preimageOracle)(nil)
 
+type gethPreimageOracle struct {
+	db     ethdb.KeyValueStore
+	client *ethclient.Client
+}
+
+func newGethPreimageOracle(db ethdb.KeyValueStore, client *ethclient.Client) *gethPreimageOracle {
+	return &gethPreimageOracle{
+		db:     db,
+		client: client,
+	}
+}
+
+const maxDbGetRetries = 5
+
+// debugDbGet calls the debug_dbGet RPC method with retry logic.
+// Retries up to maxDbGetRetries times with exponential backoff.
+func debugDbGet(client *rpc.Client, key string) (hexutil.Bytes, error) {
+	var result hexutil.Bytes
+	var lastErr error
+
+	for attempt := 0; attempt < maxDbGetRetries; attempt++ {
+		err := client.CallContext(context.Background(), &result, "debug_dbGet", key)
+		if err == nil {
+			return result, nil
+		}
+
+		lastErr = err
+
+		// Don't sleep after the last attempt
+		if attempt < maxDbGetRetries-1 {
+			backoff := time.Duration(1<<attempt) * 100 * time.Millisecond
+			time.Sleep(backoff)
+		}
+	}
+
+	return nil, fmt.Errorf("debug_dbGet failed after %d retries: %w", maxDbGetRetries, lastErr)
+}
+
+func (o *gethPreimageOracle) CodeByHash(codeHash common.Hash, chainID eth.ChainID) []byte {
+	key := hexutil.Bytes(append(append(make([]byte, 0), rawdb.CodePrefix...), codeHash[:]...)).String()
+	result, err := debugDbGet(o.client.Client(), key)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
+func (o *gethPreimageOracle) NodeByHash(nodeHash common.Hash, chainID eth.ChainID) []byte {
+	result, err := debugDbGet(o.client.Client(), nodeHash.Hex())
+	if err != nil {
+		panic(err)
+	}
+	return result
+}
+
 type OracleKeyValueStore struct {
-	db      KeyValueStore
+	db      ethdb.KeyValueStore
 	oracle  StateOracle
 	chainID eth.ChainID
 }
 
-func NewOracleBackedDB(kv KeyValueStore, oracle StateOracle, chainID eth.ChainID) *OracleKeyValueStore {
+func NewOracleBackedDB(kv ethdb.KeyValueStore, oracle StateOracle, chainID eth.ChainID) *OracleKeyValueStore {
 	return &OracleKeyValueStore{
 		db:      kv,
 		oracle:  oracle,
@@ -133,3 +185,9 @@ func (o *OracleKeyValueStore) NewIterator(prefix []byte, start []byte) ethdb.Ite
 func (o *OracleKeyValueStore) Compact(start []byte, limit []byte) error {
 	panic("not supported")
 }
+
+func (o *OracleKeyValueStore) SyncKeyValue() error {
+	return nil
+}
+
+var _ ethdb.KeyValueStore = (*OracleKeyValueStore)(nil)
