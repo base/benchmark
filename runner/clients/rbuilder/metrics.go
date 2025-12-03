@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 )
 
 type metricsCollector struct {
@@ -65,7 +66,7 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 		return fmt.Errorf("failed to read metrics response: %w", err)
 	}
 
-	txtParser := expfmt.TextParser{}
+	txtParser := expfmt.NewTextParser(model.LegacyValidation)
 	metrics, err := txtParser.TextToMetricFamilies(bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("failed to parse metrics: %w", err)
