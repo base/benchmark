@@ -140,6 +140,27 @@ Explore the comprehensive collection of benchmark configurations:
 
 Choose from storage operations, precompile tests, token workloads, mainnet simulations, and more.
 
+## Tools
+
+### Payload Simulator
+
+The **[Payload Simulator](runner/payload/simulator/README.md)** analyzes real-world block execution characteristics by fetching blocks from live chains and computing statistics about:
+
+- Account and storage operations (reads, writes, creates, deletes)
+- Opcode usage patterns (EXP, KECCAK256, etc.)
+- Precompile calls (ecrecover, bn256, BLS12-381, etc.)
+
+Use it to generate realistic benchmark configurations based on actual mainnet data:
+
+```bash
+go build -o bin/payload-simulator ./runner/payload/simulator/cmd
+
+# RPC must support debug_executionWitness
+./bin/payload-simulator \
+  --rpc-url <your-rpc-url> \
+  --sample-size 100
+```
+
 ## Architecture
 
 ### Benchmark Structure

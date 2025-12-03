@@ -142,8 +142,6 @@ func (s *StatsConfig) ToStats() *Stats {
 	storageDeleted := 0.0
 	storageUpdated := 0.0
 	storageCreated := 0.0
-	codeSizeLoaded := 0.0
-	numContractsLoaded := 0.0
 	callsPerBlock := "fill"
 	opcodes := make(OpcodeStats)
 	precompiles := make(OpcodeStats)
@@ -172,17 +170,11 @@ func (s *StatsConfig) ToStats() *Stats {
 	if s.StorageCreated != nil {
 		storageCreated = *s.StorageCreated
 	}
-	if s.CodeSizeLoaded != nil {
-		codeSizeLoaded = *s.CodeSizeLoaded
-	}
 	if s.Opcodes != nil {
 		opcodes = *s.Opcodes
 	}
 	if s.Precompiles != nil {
 		precompiles = *s.Precompiles
-	}
-	if s.NumContractsLoaded != nil {
-		numContractsLoaded = *s.NumContractsLoaded
 	}
 	if s.CallsPerBlock != nil {
 		if *s.CallsPerBlock == "fill" {
@@ -199,36 +191,32 @@ func (s *StatsConfig) ToStats() *Stats {
 	}
 
 	return &Stats{
-		AccountLoaded:      accountLoaded,
-		AccountDeleted:     accountDeleted,
-		AccountsUpdated:    accountsUpdated,
-		AccountsCreated:    accountsCreated,
-		StorageLoaded:      storageLoaded,
-		StorageDeleted:     storageDeleted,
-		StorageUpdated:     storageUpdated,
-		StorageCreated:     storageCreated,
-		CodeSizeLoaded:     codeSizeLoaded,
-		NumContractsLoaded: numContractsLoaded,
-		CallsPerBlock:      callsPerBlock,
-		Opcodes:            opcodes,
-		Precompiles:        precompiles,
+		AccountLoaded:   accountLoaded,
+		AccountDeleted:  accountDeleted,
+		AccountsUpdated: accountsUpdated,
+		AccountsCreated: accountsCreated,
+		StorageLoaded:   storageLoaded,
+		StorageDeleted:  storageDeleted,
+		StorageUpdated:  storageUpdated,
+		StorageCreated:  storageCreated,
+		CallsPerBlock:   callsPerBlock,
+		Opcodes:         opcodes,
+		Precompiles:     precompiles,
 	}
 }
 
 type Stats struct {
-	AccountLoaded      float64
-	AccountDeleted     float64
-	AccountsUpdated    float64
-	AccountsCreated    float64
-	StorageLoaded      float64
-	StorageDeleted     float64
-	StorageUpdated     float64
-	StorageCreated     float64
-	CodeSizeLoaded     float64
-	NumContractsLoaded float64
-	CallsPerBlock      string
-	Opcodes            OpcodeStats
-	Precompiles        OpcodeStats
+	AccountLoaded   float64
+	AccountDeleted  float64
+	AccountsUpdated float64
+	AccountsCreated float64
+	StorageLoaded   float64
+	StorageDeleted  float64
+	StorageUpdated  float64
+	StorageCreated  float64
+	CallsPerBlock   string
+	Opcodes         OpcodeStats
+	Precompiles     OpcodeStats
 }
 
 func (s *Stats) ToConfig() (*abi.SimulatorConfig, error) {
@@ -267,103 +255,91 @@ func NewStats() *Stats {
 
 func (s *Stats) Sub(other *Stats) *Stats {
 	return &Stats{
-		AccountLoaded:      s.AccountLoaded - other.AccountLoaded,
-		AccountDeleted:     s.AccountDeleted - other.AccountDeleted,
-		AccountsUpdated:    s.AccountsUpdated - other.AccountsUpdated,
-		AccountsCreated:    s.AccountsCreated - other.AccountsCreated,
-		StorageLoaded:      s.StorageLoaded - other.StorageLoaded,
-		StorageDeleted:     s.StorageDeleted - other.StorageDeleted,
-		StorageUpdated:     s.StorageUpdated - other.StorageUpdated,
-		StorageCreated:     s.StorageCreated - other.StorageCreated,
-		Opcodes:            s.Opcodes.Sub(other.Opcodes),
-		CodeSizeLoaded:     s.CodeSizeLoaded - other.CodeSizeLoaded,
-		NumContractsLoaded: s.NumContractsLoaded - other.NumContractsLoaded,
-		Precompiles:        s.Precompiles.Sub(other.Precompiles),
+		AccountLoaded:   s.AccountLoaded - other.AccountLoaded,
+		AccountDeleted:  s.AccountDeleted - other.AccountDeleted,
+		AccountsUpdated: s.AccountsUpdated - other.AccountsUpdated,
+		AccountsCreated: s.AccountsCreated - other.AccountsCreated,
+		StorageLoaded:   s.StorageLoaded - other.StorageLoaded,
+		StorageDeleted:  s.StorageDeleted - other.StorageDeleted,
+		StorageUpdated:  s.StorageUpdated - other.StorageUpdated,
+		StorageCreated:  s.StorageCreated - other.StorageCreated,
+		Opcodes:         s.Opcodes.Sub(other.Opcodes),
+		Precompiles:     s.Precompiles.Sub(other.Precompiles),
 	}
 }
 
 func (s *Stats) Pow(n float64) *Stats {
 	return &Stats{
-		AccountLoaded:      math.Pow(s.AccountLoaded, n),
-		AccountDeleted:     math.Pow(s.AccountDeleted, n),
-		AccountsUpdated:    math.Pow(s.AccountsUpdated, n),
-		AccountsCreated:    math.Pow(s.AccountsCreated, n),
-		StorageLoaded:      math.Pow(s.StorageLoaded, n),
-		StorageDeleted:     math.Pow(s.StorageDeleted, n),
-		StorageUpdated:     math.Pow(s.StorageUpdated, n),
-		StorageCreated:     math.Pow(s.StorageCreated, n),
-		Opcodes:            s.Opcodes.Pow(n),
-		CodeSizeLoaded:     math.Pow(s.CodeSizeLoaded, n),
-		NumContractsLoaded: math.Pow(s.NumContractsLoaded, n),
-		Precompiles:        s.Precompiles.Pow(n),
+		AccountLoaded:   math.Pow(s.AccountLoaded, n),
+		AccountDeleted:  math.Pow(s.AccountDeleted, n),
+		AccountsUpdated: math.Pow(s.AccountsUpdated, n),
+		AccountsCreated: math.Pow(s.AccountsCreated, n),
+		StorageLoaded:   math.Pow(s.StorageLoaded, n),
+		StorageDeleted:  math.Pow(s.StorageDeleted, n),
+		StorageUpdated:  math.Pow(s.StorageUpdated, n),
+		StorageCreated:  math.Pow(s.StorageCreated, n),
+		Opcodes:         s.Opcodes.Pow(n),
+		Precompiles:     s.Precompiles.Pow(n),
 	}
 }
 
 func (s *Stats) Add(other *Stats) *Stats {
 	return &Stats{
-		AccountLoaded:      s.AccountLoaded + other.AccountLoaded,
-		AccountDeleted:     s.AccountDeleted + other.AccountDeleted,
-		AccountsUpdated:    s.AccountsUpdated + other.AccountsUpdated,
-		AccountsCreated:    s.AccountsCreated + other.AccountsCreated,
-		StorageLoaded:      s.StorageLoaded + other.StorageLoaded,
-		StorageDeleted:     s.StorageDeleted + other.StorageDeleted,
-		StorageUpdated:     s.StorageUpdated + other.StorageUpdated,
-		StorageCreated:     s.StorageCreated + other.StorageCreated,
-		Opcodes:            s.Opcodes.Add(other.Opcodes),
-		CodeSizeLoaded:     s.CodeSizeLoaded + other.CodeSizeLoaded,
-		NumContractsLoaded: s.NumContractsLoaded + other.NumContractsLoaded,
-		Precompiles:        s.Precompiles.Add(other.Precompiles),
+		AccountLoaded:   s.AccountLoaded + other.AccountLoaded,
+		AccountDeleted:  s.AccountDeleted + other.AccountDeleted,
+		AccountsUpdated: s.AccountsUpdated + other.AccountsUpdated,
+		AccountsCreated: s.AccountsCreated + other.AccountsCreated,
+		StorageLoaded:   s.StorageLoaded + other.StorageLoaded,
+		StorageDeleted:  s.StorageDeleted + other.StorageDeleted,
+		StorageUpdated:  s.StorageUpdated + other.StorageUpdated,
+		StorageCreated:  s.StorageCreated + other.StorageCreated,
+		Opcodes:         s.Opcodes.Add(other.Opcodes),
+		Precompiles:     s.Precompiles.Add(other.Precompiles),
 	}
 }
 
 func (s *Stats) Mul(n float64) *Stats {
 	return &Stats{
-		AccountLoaded:      s.AccountLoaded * n,
-		AccountDeleted:     s.AccountDeleted * n,
-		AccountsUpdated:    s.AccountsUpdated * n,
-		AccountsCreated:    s.AccountsCreated * n,
-		StorageLoaded:      s.StorageLoaded * n,
-		StorageDeleted:     s.StorageDeleted * n,
-		StorageUpdated:     s.StorageUpdated * n,
-		StorageCreated:     s.StorageCreated * n,
-		Opcodes:            s.Opcodes.Mul(n),
-		CodeSizeLoaded:     s.CodeSizeLoaded * n,
-		NumContractsLoaded: s.NumContractsLoaded * n,
-		Precompiles:        s.Precompiles.Mul(n),
+		AccountLoaded:   s.AccountLoaded * n,
+		AccountDeleted:  s.AccountDeleted * n,
+		AccountsUpdated: s.AccountsUpdated * n,
+		AccountsCreated: s.AccountsCreated * n,
+		StorageLoaded:   s.StorageLoaded * n,
+		StorageDeleted:  s.StorageDeleted * n,
+		StorageUpdated:  s.StorageUpdated * n,
+		StorageCreated:  s.StorageCreated * n,
+		Opcodes:         s.Opcodes.Mul(n),
+		Precompiles:     s.Precompiles.Mul(n),
 	}
 }
 
 func (s *Stats) Round() *Stats {
 	return &Stats{
-		AccountLoaded:      math.Round(s.AccountLoaded),
-		AccountDeleted:     math.Round(s.AccountDeleted),
-		AccountsUpdated:    math.Round(s.AccountsUpdated),
-		AccountsCreated:    math.Round(s.AccountsCreated),
-		StorageLoaded:      math.Round(s.StorageLoaded),
-		StorageDeleted:     math.Round(s.StorageDeleted),
-		StorageUpdated:     math.Round(s.StorageUpdated),
-		StorageCreated:     math.Round(s.StorageCreated),
-		Opcodes:            s.Opcodes.Round(),
-		CodeSizeLoaded:     math.Round(s.CodeSizeLoaded),
-		NumContractsLoaded: math.Round(s.NumContractsLoaded),
-		Precompiles:        s.Precompiles.Round(),
+		AccountLoaded:   math.Round(s.AccountLoaded),
+		AccountDeleted:  math.Round(s.AccountDeleted),
+		AccountsUpdated: math.Round(s.AccountsUpdated),
+		AccountsCreated: math.Round(s.AccountsCreated),
+		StorageLoaded:   math.Round(s.StorageLoaded),
+		StorageDeleted:  math.Round(s.StorageDeleted),
+		StorageUpdated:  math.Round(s.StorageUpdated),
+		StorageCreated:  math.Round(s.StorageCreated),
+		Opcodes:         s.Opcodes.Round(),
+		Precompiles:     s.Precompiles.Round(),
 	}
 }
 
 func (s *Stats) Copy() *Stats {
 	return &Stats{
-		AccountLoaded:      s.AccountLoaded,
-		AccountDeleted:     s.AccountDeleted,
-		AccountsUpdated:    s.AccountsUpdated,
-		AccountsCreated:    s.AccountsCreated,
-		StorageLoaded:      s.StorageLoaded,
-		StorageDeleted:     s.StorageDeleted,
-		StorageUpdated:     s.StorageUpdated,
-		StorageCreated:     s.StorageCreated,
-		CodeSizeLoaded:     s.CodeSizeLoaded,
-		NumContractsLoaded: s.NumContractsLoaded,
-		Opcodes:            s.Opcodes.Copy(),
-		Precompiles:        s.Precompiles.Copy(),
+		AccountLoaded:   s.AccountLoaded,
+		AccountDeleted:  s.AccountDeleted,
+		AccountsUpdated: s.AccountsUpdated,
+		AccountsCreated: s.AccountsCreated,
+		StorageLoaded:   s.StorageLoaded,
+		StorageDeleted:  s.StorageDeleted,
+		StorageUpdated:  s.StorageUpdated,
+		StorageCreated:  s.StorageCreated,
+		Opcodes:         s.Opcodes.Copy(),
+		Precompiles:     s.Precompiles.Copy(),
 	}
 }
 
@@ -376,8 +352,6 @@ func (s *Stats) String() string {
 	res += fmt.Sprintf("- Storage Deletes: %.2f\n", s.StorageDeleted)
 	res += fmt.Sprintf("- Storage Updates: %.2f\n", s.StorageUpdated)
 	res += fmt.Sprintf("- Storage Created: %.2f\n", s.StorageCreated)
-	res += fmt.Sprintf("- Code Size Loaded: %.2f\n", s.CodeSizeLoaded)
-	res += fmt.Sprintf("- Number of Contracts Loaded: %.2f\n", s.NumContractsLoaded)
 	res += fmt.Sprintf("- Opcode Stats: %s\n", s.Opcodes.String())
 	res += fmt.Sprintf("- Precompile Stats: %s\n", s.Precompiles.String())
 	return res
