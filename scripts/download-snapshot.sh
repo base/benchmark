@@ -2,65 +2,60 @@
 
 set -e
 
-# setup-base-snapshot.sh - Downloads and extracts Base network snapshots
+# download-snapshot.sh - Downloads and extracts Base network snapshots
 # 
 # Downloads the latest snapshot from Base's official snapshot servers and extracts
 # it to the specified destination directory. Supports both mainnet and testnet (sepolia).
 #
 # Requirements: curl, tar, zstd (for .tar.zst files)
 #
-# Usage: ./setup-base-snapshot.sh --network <network> --node-type <node-type> --destination <destination> [--skip-if-nonempty]
+# Usage: ./download-snapshot.sh --network <network> [--skip-if-nonempty] <node-type> <destination>
 #
 # Networks: mainnet, sepolia (testnet)
 # Node types: geth (full snapshots), reth (archive snapshots)
 # 
 # Examples:
-#   ./setup-base-snapshot.sh --network mainnet --node-type geth --destination ./geth-data
-#   ./setup-base-snapshot.sh --network sepolia --node-type reth --destination ./reth-data --skip-if-nonempty
+#   ./download-snapshot.sh --network mainnet geth ./geth-data
+#   ./download-snapshot.sh --network sepolia --skip-if-nonempty reth ./reth-data
 
 POSITIONAL_ARGS=()
-for arg in "$@"; do
-    case $arg in
+while [[ $# -gt 0 ]]; do
+    case $1 in
         --skip-if-nonempty)
             SKIP_IF_NONEMPTY=true
-            shift # Remove --skip-if-nonempty from processing
+            shift
             ;;
         --network)
             NETWORK=$2
             shift 2
             ;;
-        --node-type)
-            NODE_TYPE=$2
-            shift 2
-            ;;
-        --destination)
-            DESTINATION=$2
-            shift 2
-            ;;
         *)
-            POSITIONAL_ARGS+=("$arg") # Save positional argument
+            POSITIONAL_ARGS+=("$1")
+            shift
             ;;
     esac
 done
-set -- "${POSITIONAL_ARGS[@]}" # Restore positional parameters
-# Check if the correct number of arguments is provided
+
+# Extract positional arguments
+NODE_TYPE="${POSITIONAL_ARGS[0]}"
+DESTINATION="${POSITIONAL_ARGS[1]}"
 
 if [ -z "$NETWORK" ] || [ -z "$NODE_TYPE" ] || [ -z "$DESTINATION" ]; then
     echo "Error: Missing required parameters"
     echo ""
-    echo "Usage: $0 --network <network> --node-type <node-type> --destination <destination> [--skip-if-nonempty]"
+    echo "Usage: $0 --network <network> [--skip-if-nonempty] <node-type> <destination>"
     echo ""
     echo "Required parameters:"
-    echo "  --network <network>        Network to download snapshot for (mainnet, sepolia)"
-    echo "  --node-type <node-type>    Node type (geth, reth)"
-    echo "  --destination <destination> Directory to extract snapshot to"
+    echo "  --network <network>   Network to download snapshot for (mainnet, sepolia)"
+    echo "  <node-type>           Node type (geth, reth)"
+    echo "  <destination>         Directory to extract snapshot to"
     echo ""
     echo "Optional parameters:"
-    echo "  --skip-if-nonempty        Skip download if destination already contains data"
+    echo "  --skip-if-nonempty    Skip download if destination already contains data"
     echo ""
     echo "Examples:"
-    echo "  $0 --network mainnet --node-type geth --destination ./geth-data"
-    echo "  $0 --network sepolia --node-type reth --destination ./reth-data --skip-if-nonempty"
+    echo "  $0 --network mainnet geth ./geth-data"
+    echo "  $0 --network sepolia --skip-if-nonempty reth ./reth-data"
     exit 1
 fi
 
