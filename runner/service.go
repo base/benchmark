@@ -26,6 +26,7 @@ import (
 	"github.com/base/base-bench/runner/network"
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload"
+	"github.com/base/base-bench/runner/utils"
 	"github.com/ethereum/go-ethereum/core"
 	ethparams "github.com/ethereum/go-ethereum/params"
 )
@@ -507,7 +508,6 @@ func (s *service) Run(ctx context.Context) error {
 		}
 	}
 
-
 	// Create machine info from config
 	var machineInfo *benchmark.MachineInfo
 	s.log.Info("Machine info config values",
@@ -583,7 +583,7 @@ outerLoop:
 			if err != nil {
 				return errors.Wrap(err, "failed to write test metadata")
 			}
-			
+
 			runIdx++
 
 			select {
