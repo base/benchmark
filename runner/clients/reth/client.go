@@ -101,6 +101,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 
 	args = append(args, "--db.read-transaction-timeout", "0")
 	args = append(args, cfg.Args...)
+	args = append(args, cfg.Args...)
 
 	// delete datadir/txpool-transactions-backup.rlp if it exists
 	txpoolBackupPath := fmt.Sprintf("%s/txpool-transactions-backup.rlp", r.options.DataDirPath)
