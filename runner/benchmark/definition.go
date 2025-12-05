@@ -91,9 +91,15 @@ type BenchmarkConfig struct {
 	TransactionPayloads []payload.Definition `yaml:"payloads"`
 }
 
+type DatadirConfig struct {
+	Sequencer *string `yaml:"sequencer"`
+	Validator *string `yaml:"validator"`
+}
+
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
+	Datadir      *DatadirConfig       `yaml:"datadirs"`
 	Snapshot     *SnapshotDefinition  `yaml:"snapshot"`
 	Metrics      *ThresholdConfig     `yaml:"metrics"`
 	Tags         *map[string]string   `yaml:"tags"`
