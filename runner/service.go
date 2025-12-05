@@ -23,7 +23,6 @@ import (
 	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/datadir"
-	"github.com/base/base-bench/runner/datadir"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network"
 	"github.com/base/base-bench/runner/network/types"
@@ -46,10 +45,6 @@ type service struct {
 	dataDirManager *datadir.Manager
 	portState      portmanager.PortManager
 	metadataPath   string
-	dataDirState   benchmark.SnapshotManager
-	dataDirManager *datadir.Manager
-	portState      portmanager.PortManager
-	metadataPath   string
 
 	config  config.Config
 	version string
@@ -58,7 +53,6 @@ type service struct {
 
 func NewService(version string, cfg config.Config, log log.Logger) Service {
 	metadataPath := path.Join(cfg.OutputDir(), "metadata.json")
-	snapshotManager := benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots"))
 	snapshotManager := benchmark.NewSnapshotManager(path.Join(cfg.DataDir(), "snapshots"))
 
 	s := &service{
