@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"os"
 	"path"
 
@@ -12,12 +13,15 @@ import (
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/payload"
+	ethTypes "github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/base/base-bench/runner/logger"
 	"github.com/base/base-bench/runner/metrics"
 
 	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
@@ -69,35 +73,24 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	}
 
 	// Benchmark the sequencer first to build payloads
-	payloads, firstTestBlock, err := nb.benchmarkSequencer(ctx, l1Chain)
+	payloads, firstTestBlock, sequencerClient, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
 
 	// Benchmark the validator to sync the payloads
-	if err := nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain); err != nil {
+	if err := nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, sequencerClient); err != nil {
 		return fmt.Errorf("failed to run validator benchmark: %w", err)
 	}
 
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, error) {
+func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, types.ExecutionClient, error) {
 	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.sequencerOptions, nb.ports)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to setup sequencer node: %w", err)
+		return nil, 0, nil, fmt.Errorf("failed to setup sequencer node: %w", err)
 	}
-
-	// Ensure client is stopped even if benchmark fails
-	defer func() {
-		currentHeader, err := sequencerClient.Client().HeaderByNumber(ctx, nil)
-		if err != nil {
-			nb.log.Error("Failed to get current block number", "error", err)
-		} else {
-			nb.log.Info("Sequencer node stopped at block", "number", currentHeader.Number.Uint64(), "hash", currentHeader.Hash().Hex())
-		}
-		sequencerClient.Stop()
-	}()
 
 	// Create metrics collector and writer
 	metricsCollector := sequencerClient.MetricsCollector()
@@ -115,12 +108,21 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	}()
 
 	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain, nb.transactionPayload)
-	return benchmark.Run(ctx, metricsCollector)
+
+	executionData, lastBlock, err := benchmark.Run(ctx, metricsCollector)
+
+	if err != nil {
+		sequencerClient.Stop()
+		return nil, 0, nil, err
+	}
+
+	return executionData, lastBlock, sequencerClient, err
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain) error {
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
 	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions, nb.ports)
 	if err != nil {
+		sequencerClient.Stop()
 		return fmt.Errorf("failed to setup validator node: %w", err)
 	}
 
@@ -133,6 +135,40 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		}
 		validatorClient.Stop()
 	}()
+
+	// check if validator is behind first test block
+	validatorHeader, err := validatorClient.Client().HeaderByNumber(ctx, nil)
+	if err != nil {
+		sequencerClient.Stop()
+		return fmt.Errorf("failed to get validator header: %w", err)
+	}
+
+	nb.log.Info("Validator header", "number", validatorHeader.Number.Uint64(), "lastSetupBlock", firstTestBlock-1)
+
+	if validatorHeader.Number.Cmp(big.NewInt(int64(firstTestBlock))) < 0 {
+		nb.log.Info("Validator is behind first test block, catching up", "validator_block", validatorHeader.Number.Uint64(), "first_test_block", firstTestBlock)
+		// fetch all blocks the validator node is missing
+		for i := validatorHeader.Number.Uint64() + 1; i < firstTestBlock; i++ {
+			block, err := sequencerClient.Client().BlockByNumber(ctx, big.NewInt(int64(i)))
+			if err != nil {
+				sequencerClient.Stop()
+				return fmt.Errorf("failed to get block %d: %w", i, err)
+			}
+
+			log.Info("Sending newpayload to validator node to catch up", "block", block.NumberU64())
+
+			// send newpayload to validator node
+			payload := engine.BlockToExecutableData(block, big.NewInt(0), []*ethTypes.BlobTxSidecar{}, [][]byte{}).ExecutionPayload
+			root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
+
+			validatorClient.AuthClient().CallContext(ctx, nil, "engine_newPayloadV4", payload, []common.Hash{}, root, []common.Hash{})
+			if err != nil {
+				validatorClient.Stop()
+				return fmt.Errorf("failed to send newpayload to validator node: %w", err)
+			}
+		}
+	}
+	sequencerClient.Stop()
 
 	// Create metrics collector and writer
 	metricsCollector := validatorClient.MetricsCollector()

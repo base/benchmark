@@ -2,7 +2,7 @@ package payload
 
 import (
 	"context"
-	"errors"
+	"fmt"
 
 	clienttypes "github.com/base/base-bench/runner/clients/types"
 	benchtypes "github.com/base/base-bench/runner/network/types"
@@ -41,7 +41,7 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 		worker, err = simulator.NewSimulatorPayloadWorker(
 			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, definition.Params)
 	default:
-		return nil, errors.New("invalid payload type")
+		return nil, fmt.Errorf("invalid payload type: %s", definition.Type)
 	}
 
 	return worker, err
