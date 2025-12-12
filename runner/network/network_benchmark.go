@@ -73,13 +73,13 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	}
 
 	// Benchmark the sequencer first to build payloads
-	payloads, firstTestBlock, sequencerClient, err := nb.benchmarkSequencer(ctx, l1Chain)
+	payloads, lastSetupBlock, sequencerClient, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
 
 	// Benchmark the validator to sync the payloads
-	if err := nb.benchmarkValidator(ctx, payloads, firstTestBlock, l1Chain, sequencerClient); err != nil {
+	if err := nb.benchmarkValidator(ctx, payloads, lastSetupBlock, l1Chain, sequencerClient); err != nil {
 		return fmt.Errorf("failed to run validator benchmark: %w", err)
 	}
 
@@ -119,7 +119,7 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	return executionData, lastBlock, sequencerClient, err
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
 	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions, nb.ports)
 	if err != nil {
 		sequencerClient.Stop()
@@ -143,12 +143,12 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		return fmt.Errorf("failed to get validator header: %w", err)
 	}
 
-	nb.log.Info("Validator header", "number", validatorHeader.Number.Uint64(), "lastSetupBlock", firstTestBlock-1)
+	nb.log.Info("Validator header", "number", validatorHeader.Number.Uint64(), "lastSetupBlock", lastSetupBlock)
 
-	if validatorHeader.Number.Cmp(big.NewInt(int64(firstTestBlock))) < 0 {
-		nb.log.Info("Validator is behind first test block, catching up", "validator_block", validatorHeader.Number.Uint64(), "first_test_block", firstTestBlock)
+	if validatorHeader.Number.Cmp(big.NewInt(int64(lastSetupBlock))) < 0 {
+		nb.log.Info("Validator is behind first test block, catching up", "validator_block", validatorHeader.Number.Uint64(), "first_test_block", lastSetupBlock)
 		// fetch all blocks the validator node is missing
-		for i := validatorHeader.Number.Uint64() + 1; i < firstTestBlock; i++ {
+		for i := validatorHeader.Number.Uint64() + 1; i <= lastSetupBlock; i++ {
 			block, err := sequencerClient.Client().BlockByNumber(ctx, big.NewInt(int64(i)))
 			if err != nil {
 				sequencerClient.Stop()
@@ -161,10 +161,22 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 			payload := engine.BlockToExecutableData(block, big.NewInt(0), []*ethTypes.BlobTxSidecar{}, [][]byte{}).ExecutionPayload
 			root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
 
-			validatorClient.AuthClient().CallContext(ctx, nil, "engine_newPayloadV4", payload, []common.Hash{}, root, []common.Hash{})
+			err = validatorClient.AuthClient().CallContext(ctx, nil, "engine_newPayloadV4", payload, []common.Hash{}, root, []common.Hash{})
 			if err != nil {
 				validatorClient.Stop()
 				return fmt.Errorf("failed to send newpayload to validator node: %w", err)
+			}
+
+			forkchoiceUpdate := engine.ForkchoiceStateV1{
+				HeadBlockHash:      payload.BlockHash,
+				SafeBlockHash:      payload.BlockHash,
+				FinalizedBlockHash: payload.BlockHash,
+			}
+
+			err = validatorClient.AuthClient().CallContext(ctx, nil, "engine_forkchoiceUpdatedV3", forkchoiceUpdate, nil)
+			if err != nil {
+				validatorClient.Stop()
+				return fmt.Errorf("failed to send forkchoice update to validator node: %w", err)
 			}
 		}
 	}
@@ -186,7 +198,7 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 	}()
 
 	benchmark := newValidatorBenchmark(nb.log, *nb.testConfig, validatorClient, l1Chain, nb.proofConfig)
-	return benchmark.Run(ctx, payloads, firstTestBlock, metricsCollector)
+	return benchmark.Run(ctx, payloads, lastSetupBlock, metricsCollector)
 }
 
 func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
