@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/base/base-bench/runner/payload/simulator/simulatorstats"
@@ -17,6 +19,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/node"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,6 +29,10 @@ var flags = []cli.Flag{
 		Name:     "rpc-url",
 		Usage:    "RPC URL of the chain to fetch payloads from",
 		Required: true,
+	},
+	&cli.StringFlag{
+		Name:  "rpc-url-jwt-secret",
+		Usage: "Hex-encoded JWT secret for authenticating RPC calls (optional)",
 	},
 	&cli.IntFlag{
 		Name:  "sample-size",
@@ -95,16 +103,6 @@ func main() {
 		var genesis *core.Genesis
 		var err error
 		if chainID != "" {
-			genesisFile, err := os.Open(genesisFilePath)
-			if err != nil {
-				return err
-			}
-			defer func() { _ = genesisFile.Close() }()
-			err = json.NewDecoder(genesisFile).Decode(&genesis)
-			if err != nil {
-				return err
-			}
-		} else {
 			chainIDBig, ok := new(big.Int).SetString(chainID, 10)
 			if !ok {
 				return fmt.Errorf("invalid chain ID: %s", chainID)
@@ -114,11 +112,43 @@ func main() {
 			if err != nil {
 				return err
 			}
+		} else {
+			genesisFile, err := os.Open(genesisFilePath)
+			if err != nil {
+				return err
+			}
+			defer func() { _ = genesisFile.Close() }()
+			err = json.NewDecoder(genesisFile).Decode(&genesis)
+			if err != nil {
+				return err
+			}
 		}
 
-		client, err := ethclient.DialContext(c.Context, rpcURL)
-		if err != nil {
-			return err
+		// Create ethclient with optional JWT authentication
+		var client *ethclient.Client
+		if jwtSecretHex := c.String("rpc-url-jwt-secret"); jwtSecretHex != "" {
+			jwtSecretBytes, err := hex.DecodeString(strings.TrimPrefix(jwtSecretHex, "0x"))
+			if err != nil {
+				return fmt.Errorf("failed to decode jwt secret: %w", err)
+			}
+
+			if len(jwtSecretBytes) != 32 {
+				return fmt.Errorf("jwt secret must be 32 bytes, got %d", len(jwtSecretBytes))
+			}
+
+			var jwtSecret [32]byte
+			copy(jwtSecret[:], jwtSecretBytes)
+
+			rpcClient, err := rpc.DialOptions(c.Context, rpcURL, rpc.WithHTTPAuth(node.NewJWTAuth(jwtSecret)))
+			if err != nil {
+				return fmt.Errorf("failed to dial rpc with jwt auth: %w", err)
+			}
+			client = ethclient.NewClient(rpcClient)
+		} else {
+			client, err = ethclient.DialContext(c.Context, rpcURL)
+			if err != nil {
+				return err
+			}
 		}
 
 		latestBlock, err := client.BlockByNumber(c.Context, nil)
