@@ -214,6 +214,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	// Process batches in parallel, 4 at a time
 	parallelBatches := 4
+	failedTxCount := 0
 	for i := 0; i < batches; i += parallelBatches {
 		g, gCtx := errgroup.WithContext(ctx)
 
@@ -234,12 +235,21 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 				err := f.client.Client().BatchCallContext(gCtx, batchCall)
 				if err != nil {
+					if f.options.AllowTxFailures {
+						f.log.Warn("Failed to send transaction batch", "error", err)
+						return nil
+					}
 					return errors.Wrap(err, "failed to send transactions")
 				}
 
 				for _, tx := range batchCall {
 					if tx.Error != nil {
-						return errors.Wrapf(tx.Error, "failed to send transaction %#v", tx.Args[0])
+						if f.options.AllowTxFailures {
+							f.log.Warn("Transaction failed", "error", tx.Error)
+							failedTxCount++
+						} else {
+							return errors.Wrapf(tx.Error, "failed to send transaction %#v", tx.Args[0])
+						}
 					}
 				}
 				return nil
@@ -249,6 +259,10 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 		if err := g.Wait(); err != nil {
 			return nil, err
 		}
+	}
+
+	if failedTxCount > 0 {
+		f.log.Warn("Some transactions failed during replay", "failed_count", failedTxCount, "total_count", len(sendTxs))
 	}
 
 	duration := time.Since(startTime)

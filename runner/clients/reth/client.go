@@ -94,7 +94,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--engine.state-provider-metrics")
 	args = append(args, "--disable-discovery")
 	args = append(args, "--port", fmt.Sprintf("%d", r.p2pPort))
-	args = append(args, "-vvv")
+	args = append(args, "-vvvv")
 
 	// increase mempool size
 	args = append(args, "--txpool.pending-max-count", "100000000")

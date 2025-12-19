@@ -96,6 +96,18 @@ type DatadirConfig struct {
 	Validator *string `yaml:"validator"`
 }
 
+// ReplayConfig specifies configuration for replaying transactions from an
+// external node instead of generating synthetic transactions.
+type ReplayConfig struct {
+	// SourceRPCURL is the RPC endpoint of the node to fetch transactions from
+	SourceRPCURL string `yaml:"source_rpc_url"`
+
+	// StartBlock is the first block to replay transactions from.
+	// If not specified (0), it will be automatically detected from the
+	// snapshot's head block + 1.
+	StartBlock uint64 `yaml:"start_block,omitempty"`
+}
+
 // TestDefinition is the user-facing YAML configuration for specifying a
 // matrix of benchmark runs.
 type TestDefinition struct {
@@ -105,6 +117,7 @@ type TestDefinition struct {
 	Tags         *map[string]string   `yaml:"tags"`
 	Variables    []Param              `yaml:"variables"`
 	ProofProgram *ProofProgramOptions `yaml:"proof_program"`
+	Replay       *ReplayConfig        `yaml:"replay"`
 }
 
 func (bc *TestDefinition) Check() error {
