@@ -213,7 +213,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		// run for a few blocks
 		for i := 0; i < params.NumBlocks; i++ {
-			blockMetrics.SetBlockNumber(uint64(i))
+			blockMetrics.SetBlockNumber(uint64(i) + 1)
 			err := transactionWorker.SendTxs(benchmarkCtx)
 			if err != nil {
 				nb.log.Warn("failed to send transactions", "err", err)

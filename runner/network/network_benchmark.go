@@ -146,7 +146,7 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 	nb.log.Info("Validator header", "number", validatorHeader.Number.Uint64(), "lastSetupBlock", lastSetupBlock)
 
 	if validatorHeader.Number.Cmp(big.NewInt(int64(lastSetupBlock))) < 0 {
-		nb.log.Info("Validator is behind first test block, catching up", "validator_block", validatorHeader.Number.Uint64(), "first_test_block", lastSetupBlock)
+		nb.log.Info("Validator is behind first test block, catching up", "validator_block", validatorHeader.Number.Uint64(), "last_setup_block", lastSetupBlock)
 		// fetch all blocks the validator node is missing
 		for i := validatorHeader.Number.Uint64() + 1; i <= lastSetupBlock; i++ {
 			block, err := sequencerClient.Client().BlockByNumber(ctx, big.NewInt(int64(i)))
@@ -155,12 +155,13 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 				return fmt.Errorf("failed to get block %d: %w", i, err)
 			}
 
-			log.Info("Sending newpayload to validator node to catch up", "block", block.NumberU64())
+			log.Info("Sending newpayload to validator node to catch up", "block", block.NumberU64(), "withdrawalsRoot", block.WithdrawalsRoot())
 
 			// send newpayload to validator node
 			payload := engine.BlockToExecutableData(block, big.NewInt(0), []*ethTypes.BlobTxSidecar{}, [][]byte{}).ExecutionPayload
+			payload.WithdrawalsRoot = block.WithdrawalsRoot()
 			root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
-
+			
 			err = validatorClient.AuthClient().CallContext(ctx, nil, "engine_newPayloadV4", payload, []common.Hash{}, root, []common.Hash{})
 			if err != nil {
 				validatorClient.Stop()

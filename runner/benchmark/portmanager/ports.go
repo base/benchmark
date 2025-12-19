@@ -14,6 +14,7 @@ const (
 	ELMetricsPortPurpose
 	BuilderMetricsPortPurpose
 	P2PPortPurpose
+	FlashblocksWebsocketPortPurpose
 )
 
 type PortManager interface {

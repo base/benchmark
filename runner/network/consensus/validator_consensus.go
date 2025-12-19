@@ -33,7 +33,7 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 
 	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(1).Bytes())
 
-	f.log.Info("Validate payload", "payload_index", payload.Number)
+	f.log.Info("Validate payload", "payload_index", payload.Number, "num_txs", len(payload.Transactions))
 	startTime := time.Now()
 	err := f.newPayload(ctx, payload, root)
 	if err != nil {
@@ -64,18 +64,18 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 }
 
 // Start starts the fake consensus client.
-func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.Collector, firstTestBlock uint64) error {
+func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.Collector, lastSetupBlock uint64) error {
 	f.log.Info("Starting sync benchmark", "num_payloads", len(payloads))
 	m := metrics.NewBlockMetrics()
 	for i := 0; i < len(payloads); i++ {
-		m.SetBlockNumber(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock))))
+		m.SetBlockNumber(uint64(max(0, int(payloads[i].Number)-int(lastSetupBlock))))
 		f.log.Info("Proposing payload", "payload_index", i)
 		err := f.propose(ctx, &payloads[i], m)
 		if err != nil {
 			return err
 		}
 
-		if payloads[i].Number >= firstTestBlock {
+		if payloads[i].Number > lastSetupBlock {
 			err = metricsCollector.Collect(ctx, m)
 			if err != nil {
 				f.log.Error("Failed to collect metrics", "error", err)
