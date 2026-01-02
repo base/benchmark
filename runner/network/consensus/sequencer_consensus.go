@@ -274,7 +274,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 
 	duration = time.Since(startTime)
 	blockMetrics.AddExecutionMetric(networktypes.GetPayloadLatencyMetric, duration)
-	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "number", payload.Number, "hash", payload.BlockHash.Hex())
+	f.log.Info("Fetched built payload", "duration", duration, "txs", len(payload.Transactions), "gas_used", payload.GasUsed, "number", payload.Number, "hash", payload.BlockHash.Hex())
 
 	// get gas usage
 	gasPerBlock := payload.GasUsed
