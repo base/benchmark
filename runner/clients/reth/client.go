@@ -95,8 +95,8 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	// increase mempool size
 	args = append(args, "--txpool.pending-max-count", "100000000")
 	args = append(args, "--txpool.queued-max-count", "100000000")
-	args = append(args, "--txpool.pending-max-size", "100")
-	args = append(args, "--txpool.queued-max-size", "100")
+	args = append(args, "--txpool.pending-max-size", "100000")
+	args = append(args, "--txpool.queued-max-size", "100000")
 
 	args = append(args, "--db.read-transaction-timeout", "0")
 	args = append(args, cfg.Args...)
