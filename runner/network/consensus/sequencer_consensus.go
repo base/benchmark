@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // SequencerConsensusClient is a fake consensus client that generates blocks on a timer.
@@ -199,43 +200,82 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	return payloadAttrs, &root, nil
 }
 
-// Propose starts block generation, waits BlockTime, and generates a block.
-func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics, isSetupPayload bool) (*engine.ExecutableData, error) {
-	startTime := time.Now()
+// sendTransactionsParallel sends transactions in parallel batches for improved throughput.
+// It divides transactions into batches and sends them all concurrently.
+func (f *SequencerConsensusClient) sendTransactionsParallel(ctx context.Context, sendTxs [][]byte) error {
+	if len(sendTxs) == 0 {
+		return nil
+	}
 
-	sendTxs, sequencerTxs := f.mempool.NextBlock()
+	// Each batch contains up to 100 transactions for a single RPC call
+	const txsPerBatch = 100
 
-	sendCallsPerBatch := 100
-	batches := (len(sendTxs) + sendCallsPerBatch - 1) / sendCallsPerBatch
+	numBatches := (len(sendTxs) + txsPerBatch - 1) / txsPerBatch
 
-	for i := 0; i < batches; i++ {
-		batch := sendTxs[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(sendTxs))]
-		results := make([]interface{}, len(batch))
+	// Use errgroup for parallel execution with error handling
+	const maxConcurrentRequests = 10
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(maxConcurrentRequests)
 
-		batchCall := make([]rpc.BatchElem, len(batch))
-		for j, tx := range batch {
-			batchCall[j] = rpc.BatchElem{
-				Method: "eth_sendRawTransaction",
-				Args:   []interface{}{hexutil.Encode(tx)},
-				Result: &results[j],
-			}
-		}
+	for i := 0; i < numBatches; i++ {
+		start := i * txsPerBatch
+		end := min((i+1)*txsPerBatch, len(sendTxs))
+		batch := sendTxs[start:end]
 
-		err := f.client.Client().BatchCallContext(ctx, batchCall)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to send transactions")
-		}
+		g.Go(func() error {
+			return f.sendBatch(ctx, batch)
+		})
+	}
 
-		for _, tx := range batchCall {
-			if tx.Error != nil {
-				return nil, errors.Wrapf(tx.Error, "failed to send transaction %#v", tx.Args[0])
-			}
+	if err := g.Wait(); err != nil {
+		return errors.Wrap(err, "failed to send transactions in parallel")
+	}
+
+	return nil
+}
+
+// sendBatch sends a single batch of transactions via RPC BatchCall.
+func (f *SequencerConsensusClient) sendBatch(ctx context.Context, txs [][]byte) error {
+	results := make([]interface{}, len(txs))
+	batchCall := make([]rpc.BatchElem, len(txs))
+
+	for i, tx := range txs {
+		batchCall[i] = rpc.BatchElem{
+			Method: "eth_sendRawTransaction",
+			Args:   []interface{}{hexutil.Encode(tx)},
+			Result: &results[i],
 		}
 	}
 
-	duration := time.Since(startTime)
-	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(sendTxs))
-	blockMetrics.AddExecutionMetric(networktypes.SendTxsLatencyMetric, duration)
+	err := f.client.Client().BatchCallContext(ctx, batchCall)
+	if err != nil {
+		return errors.Wrap(err, "failed to send batch")
+	}
+
+	for _, elem := range batchCall {
+		if elem.Error != nil {
+			return errors.Wrapf(elem.Error, "failed to send transaction")
+		}
+	}
+
+	return nil
+}
+
+// Propose starts block generation, waits BlockTime, and generates a block.
+func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *metrics.BlockMetrics, isSetupPayload bool) (*engine.ExecutableData, error) {
+	f.log.Info("Getting transactions from mempool")
+	sendTxs, sequencerTxs := f.mempool.NextBlock()
+	f.log.Info("Got transactions from mempool", "num_txs", len(sendTxs))
+
+	f.log.Info("Sending transactions", "num_txs", len(sendTxs))
+	sendStart := time.Now()
+	err := f.sendTransactionsParallel(ctx, sendTxs)
+	if err != nil {
+		return nil, err
+	}
+	sendDuration := time.Since(sendStart)
+	f.log.Info("Sent transactions", "duration", sendDuration, "num_txs", len(sendTxs))
+	blockMetrics.AddExecutionMetric(networktypes.SendTxsLatencyMetric, sendDuration)
 	startBlockBuildingTime := time.Now()
 
 	f.log.Info("Starting block building")
@@ -245,7 +285,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 		return nil, errors.Wrap(err, "failed to generate payload attributes")
 	}
 
-	startTime = time.Now()
+	startTime := time.Now()
 	payloadID, err := f.updateForkChoice(ctx, payloadAttrs)
 	if err != nil {
 		return nil, err
@@ -254,7 +294,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	if payloadID == nil {
 		return nil, errors.New("failed to build block")
 	}
-	duration = time.Since(startTime)
+	duration := time.Since(startTime)
 	blockMetrics.AddExecutionMetric(networktypes.UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID

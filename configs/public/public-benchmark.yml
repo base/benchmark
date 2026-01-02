@@ -45,7 +45,7 @@ benchmarks:
         values:
           - reth
       - type: num_blocks
-        value: 10000
+        value: 1000
       - type: gas_limit
         values:
           - 1000000000

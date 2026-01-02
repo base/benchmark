@@ -310,6 +310,25 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
+## Danyal Perf Notes
+
+#### Mixed random read/write (70/30 - realistic for Reth)
+fio --name=mixed-rw --ioengine=libaio --iodepth=32 --rw=randrw \
+    --rwmixread=70 --bs=4k --direct=1 --size=4G --numjobs=4 \
+    --runtime=60 --group_reporting
+
+#### Running Mainnet Test
+```
+sudo rm -rf /data/bench-work && sudo rm -rf /data/bench-out
+sudo mkdir /data/bench-work && sudo mkdir /data/bench-out
+
+sudo ./bin/base-bench run \
+    --config /home/danyal/code/benchmark/configs/public/public-benchmark.yml \
+    --root-dir /data/bench-work \
+    --output-dir /data/bench-out \
+    --reth-bin /home/danyal/code/node-reth/target/maxperf/base-reth-node
+```
+
 ---
 
 **Built with ❤️ by [Base](https://base.org)**
