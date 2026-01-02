@@ -18,8 +18,7 @@ payloads:
     storage_created: 2
     code_size_loaded: 662473.15
     num_contracts_loaded: 4.330
-    avg_gas_used: 35000000
-    calls_per_block: 100
+    calls_per_block: fill
     opcodes:
       EXP: 626.30
       KECCAK256: 29.21
@@ -45,7 +44,7 @@ benchmarks:
         values:
           - reth
       - type: num_blocks
-        value: 1000
+        value: 10
       - type: gas_limit
         values:
           - 1000000000
