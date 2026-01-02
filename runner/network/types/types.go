@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"sort"
 	"strings"
 	"time"
 
@@ -125,26 +126,60 @@ func getAverage(metrics []metrics.BlockMetrics, metricName string) float64 {
 	return total / float64(count)
 }
 
+func getPercentile(metrics []metrics.BlockMetrics, metricName string, percentile float64) float64 {
+	var values []float64
+	for _, metric := range metrics {
+		if value, ok := metric.GetMetricFloat(metricName); ok {
+			values = append(values, value)
+		}
+	}
+	if len(values) == 0 {
+		return 0
+	}
+	sort.Float64s(values)
+	index := int(float64(len(values)-1) * percentile / 100)
+	return values[index]
+}
+
+// LatencyStats holds average and percentile statistics for a latency metric.
+type LatencyStats struct {
+	Avg float64 `json:"avg"`
+	P50 float64 `json:"p50"`
+	P90 float64 `json:"p90"`
+	P99 float64 `json:"p99"`
+}
+
+func getLatencyStats(metrics []metrics.BlockMetrics, metricName string) LatencyStats {
+	return LatencyStats{
+		Avg: getAverage(metrics, metricName),
+		P50: getPercentile(metrics, metricName, 50),
+		P90: getPercentile(metrics, metricName, 90),
+		P99: getPercentile(metrics, metricName, 99),
+	}
+}
+
 const (
-	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
-	NewPayloadLatencyMetric       = "latency/new_payload"
-	GetPayloadLatencyMetric       = "latency/get_payload"
-	SendTxsLatencyMetric          = "latency/send_txs"
-	GasPerBlockMetric             = "gas/per_block"
-	GasPerSecondMetric            = "gas/per_second"
-	TransactionsPerBlockMetric    = "transactions/per_block"
+	UpdateForkChoiceLatencyMetric    = "latency/update_fork_choice"
+	NewPayloadLatencyMetric          = "latency/new_payload"
+	SequencerNewPayloadLatencyMetric = "latency/sequencer_new_payload"
+	GetPayloadLatencyMetric          = "latency/get_payload"
+	SendTxsLatencyMetric             = "latency/send_txs"
+	GasPerBlockMetric                = "gas/per_block"
+	GasPerSecondMetric               = "gas/per_second"
+	TransactionsPerBlockMetric       = "transactions/per_block"
 )
 
 type SequencerKeyMetrics struct {
 	CommonKeyMetrics
-	AverageFCULatency        float64 `json:"forkChoiceUpdated"`
-	AverageGetPayloadLatency float64 `json:"getPayload"`
-	AverageSendTxsLatency    float64 `json:"sendTxs"`
+	FCULatency        LatencyStats `json:"forkChoiceUpdated"`
+	GetPayloadLatency LatencyStats `json:"getPayload"`
+	NewPayloadLatency LatencyStats `json:"newPayload"`
+	SendTxsLatency    LatencyStats `json:"sendTxs"`
 }
 
 type ValidatorKeyMetrics struct {
 	CommonKeyMetrics
-	AverageNewPayloadLatency float64 `json:"newPayload"`
+	NewPayloadLatency LatencyStats `json:"newPayload"`
 }
 
 type CommonKeyMetrics struct {
@@ -153,11 +188,11 @@ type CommonKeyMetrics struct {
 
 // BlockMetricsToValidatorSummary converts block metrics to a validator summary.
 func BlockMetricsToValidatorSummary(metrics []metrics.BlockMetrics) *ValidatorKeyMetrics {
-	averageNewPayloadLatency := getAverage(metrics, NewPayloadLatencyMetric)
+	newPayloadLatency := getLatencyStats(metrics, NewPayloadLatencyMetric)
 	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
 
 	return &ValidatorKeyMetrics{
-		AverageNewPayloadLatency: averageNewPayloadLatency,
+		NewPayloadLatency: newPayloadLatency,
 		CommonKeyMetrics: CommonKeyMetrics{
 			AverageGasPerSecond: averageGasPerSecond,
 		},
@@ -166,15 +201,17 @@ func BlockMetricsToValidatorSummary(metrics []metrics.BlockMetrics) *ValidatorKe
 
 // BlockMetricsToSequencerSummary converts block metrics to a sequencer summary.
 func BlockMetricsToSequencerSummary(metrics []metrics.BlockMetrics) *SequencerKeyMetrics {
-	averageUpdateForkChoiceLatency := getAverage(metrics, UpdateForkChoiceLatencyMetric)
-	averageSendTxsLatency := getAverage(metrics, SendTxsLatencyMetric)
-	averageGetPayloadLatency := getAverage(metrics, GetPayloadLatencyMetric)
+	fcuLatency := getLatencyStats(metrics, UpdateForkChoiceLatencyMetric)
+	sendTxsLatency := getLatencyStats(metrics, SendTxsLatencyMetric)
+	getPayloadLatency := getLatencyStats(metrics, GetPayloadLatencyMetric)
+	newPayloadLatency := getLatencyStats(metrics, SequencerNewPayloadLatencyMetric)
 	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
 
 	return &SequencerKeyMetrics{
-		AverageFCULatency:        averageUpdateForkChoiceLatency,
-		AverageSendTxsLatency:    averageSendTxsLatency,
-		AverageGetPayloadLatency: averageGetPayloadLatency,
+		FCULatency:        fcuLatency,
+		SendTxsLatency:    sendTxsLatency,
+		GetPayloadLatency: getPayloadLatency,
+		NewPayloadLatency: newPayloadLatency,
 		CommonKeyMetrics: CommonKeyMetrics{
 			AverageGasPerSecond: averageGasPerSecond,
 		},

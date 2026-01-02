@@ -326,10 +326,13 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	transactionsPerBlock := len(payload.Transactions)
 	blockMetrics.AddExecutionMetric(networktypes.TransactionsPerBlockMetric, transactionsPerBlock)
 
+	startTime = time.Now()
 	err = f.newPayload(ctx, payload, *beaconRoot)
 	if err != nil {
 		return nil, err
 	}
+	duration = time.Since(startTime)
+	blockMetrics.AddExecutionMetric(networktypes.SequencerNewPayloadLatencyMetric, duration)
 
 	return payload, nil
 }
