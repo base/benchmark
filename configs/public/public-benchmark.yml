@@ -47,4 +47,4 @@ benchmarks:
         value: 10
       - type: gas_limit
         values:
-          - 1000000000
+          - 2000000000

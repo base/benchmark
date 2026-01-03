@@ -118,7 +118,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 1))
 
-	timestamp := f.lastTimestamp + 1
+	timestamp := f.lastTimestamp + uint64(f.options.BlockTime.Seconds())
 
 	number := uint64(0)
 	time := uint64(0)

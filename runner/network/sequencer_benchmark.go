@@ -237,7 +237,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 				return
 			}
 
-			time.Sleep(1000 * time.Millisecond)
+			time.Sleep(params.BlockTime)
 
 			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
 			if err != nil {

@@ -31,7 +31,7 @@ const (
 var DefaultParams = &types.RunParams{
 	NodeType:  "geth",
 	GasLimit:  50e9,
-	BlockTime: 1 * time.Second,
+	BlockTime: 2 * time.Second,
 }
 
 // NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
