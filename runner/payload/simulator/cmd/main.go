@@ -36,6 +36,11 @@ var flags = []cli.Flag{
 		Usage: "Range of blocks to sample from (defaults to sample-size for consecutive blocks). Set to a larger value to pick random blocks over a wider timeframe.",
 		Value: 0,
 	},
+	&cli.Uint64Flag{
+		Name:  "start-block",
+		Usage: "Block number to start sampling from (defaults to latest block - 100). Blocks are sampled backwards from this block.",
+		Value: 0,
+	},
 	&cli.IntFlag{
 		Name:  "num-workers",
 		Usage: "Number of parallel workers for fetching and processing blocks",
@@ -73,6 +78,7 @@ func main() {
 		genesisFilePath := c.String("genesis")
 		sampleSize := c.Int("sample-size")
 		sampleRange := c.Int("sample-range")
+		startBlock := c.Uint64("start-block")
 		numWorkers := c.Int("num-workers")
 		clientType := c.String("client")
 
@@ -121,16 +127,24 @@ func main() {
 			return err
 		}
 
-		latestBlock, err := client.BlockByNumber(c.Context, nil)
-		if err != nil {
-			return err
+		// Determine the reference block number for sampling
+		var referenceBlockNum uint64
+		if startBlock > 0 {
+			// Use user-specified start block
+			referenceBlockNum = startBlock
+		} else {
+			// Default to latest block - 100
+			latestBlock, err := client.BlockByNumber(c.Context, nil)
+			if err != nil {
+				return err
+			}
+			referenceBlockNum = latestBlock.NumberU64() - 100
 		}
-		latestBlockNum := latestBlock.NumberU64()
 
 		logger := oplog.NewLogger(os.Stdout, oplog.ReadCLIConfig(c))
 
 		// Select which block numbers to sample
-		blockNumbers := selectBlockNumbers(latestBlockNum-100, sampleSize, sampleRange)
+		blockNumbers := selectBlockNumbers(referenceBlockNum, sampleSize, sampleRange)
 
 		logger.Info("Starting parallel block processing", "blocks", len(blockNumbers), "workers", numWorkers, "client", clientType)
 
