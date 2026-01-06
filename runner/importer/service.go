@@ -375,8 +375,8 @@ func (s *Service) MergeMetadata(srcMetadata, destMetadata *benchmark.RunGroup, s
 	srcRuns = s.markRunsAsComplete(srcRuns)
 
 	// Apply tags to source and destination runs
-	srcRuns = s.ApplyTags(srcRuns, srcTag)                          // Apply destination tag to imported runs
-	destRuns := s.FillMissingSourceTags(destMetadata.Runs, destTag) // Fill missing source tags without overwriting
+	srcRuns = s.ApplyTags(srcRuns, destTag)   // Apply destination tag to imported runs
+	destRuns := s.FillMissingSourceTags(destMetadata.Runs, srcTag) // Fill missing source tags on existing runs without overwriting
 
 	// Apply BenchmarkRun strategy to imported runs
 	srcRuns, err := s.applyBenchmarkRunStrategy(srcRuns, destMetadata, benchmarkRunOpt)
