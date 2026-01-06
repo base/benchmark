@@ -13,6 +13,7 @@ type ThresholdConfig struct {
 // TestPlan represents a list of test runs to be executed.
 type TestPlan struct {
 	Runs         []TestRun
+	Datadir      *DatadirConfig
 	Snapshot     *SnapshotDefinition
 	ProofProgram *ProofProgramOptions
 	Thresholds   *ThresholdConfig
@@ -37,6 +38,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *Benchm
 
 	return &TestPlan{
 		Runs:         testRuns,
+		Datadir:      c.Datadir,
 		Snapshot:     c.Snapshot,
 		ProofProgram: proofProgram,
 		Thresholds:   c.Metrics,

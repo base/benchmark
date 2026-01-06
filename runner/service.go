@@ -73,7 +73,7 @@ func readBenchmarkConfig(path string) (*benchmark.BenchmarkConfig, error) {
 	return config, err
 }
 
-func (s *service) setupInternalDirectories(testDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string) (*config.InternalClientOptions, error) {
+func (s *service) setupInternalDirectories(testDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, role string, datadirsConfig *benchmark.DatadirConfig) (*config.InternalClientOptions, error) {
 	err := os.MkdirAll(testDir, 0755)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create test directory")
@@ -102,7 +102,7 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 	isSnapshot := snapshot != nil && snapshot.Command != ""
 	if isSnapshot {
 		// if we have a snapshot, restore it if needed or reuse from a previous test
-		snapshotDir, err := s.dataDirState.EnsureSnapshot(*snapshot, params.NodeType, role)
+		snapshotDir, err := s.dataDirState.EnsureSnapshot(datadirsConfig, *snapshot, params.NodeType, role)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to ensure snapshot")
 		}
@@ -291,18 +291,18 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 	return genesis, nil
 }
 
-func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
+func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, datadirsConfig *benchmark.DatadirConfig) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
 	// create temp directory for this test
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
 	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
 
-	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, genesis, snapshot, "sequencer")
+	sequencerOptions, err := s.setupInternalDirectories(sequencerTestDir, params, genesis, snapshot, "sequencer", datadirsConfig)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
 	}
 
-	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator")
+	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator", datadirsConfig)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
 	}
@@ -320,7 +320,7 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition) (*benchmark.RunResult, error) {
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
@@ -336,7 +336,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
 
 	// setup data directories (restore from snapshot if needed)
-	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig)
+	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig, datadirsConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup data dirs")
 	}
@@ -566,7 +566,7 @@ outerLoop:
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID])
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir)
 			if err != nil {
 				log.Error("Failed to run test", "err", err)
 				metricSummary = &benchmark.RunResult{

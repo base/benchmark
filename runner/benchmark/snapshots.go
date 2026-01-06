@@ -12,7 +12,7 @@ type SnapshotManager interface {
 	// EnsureSnapshot ensures that a snapshot exists for the given node type and
 	// role. If it does not exist, it will create it using the given snapshot
 	// definition. It returns the path to the snapshot.
-	EnsureSnapshot(definition SnapshotDefinition, nodeType string, role string) (string, error)
+	EnsureSnapshot(datadirsConfig *DatadirConfig, definition SnapshotDefinition, nodeType string, role string) (string, error)
 }
 
 type snapshotStoragePath struct {
@@ -58,7 +58,7 @@ func NewSnapshotManager(snapshotsDir string) SnapshotManager {
 	}
 }
 
-func (b *benchmarkDatadirState) EnsureSnapshot(definition SnapshotDefinition, nodeType string, role string) (string, error) {
+func (b *benchmarkDatadirState) EnsureSnapshot(datadirsConfig *DatadirConfig, definition SnapshotDefinition, nodeType string, role string) (string, error) {
 	snapshotDatadir := snapshotStoragePath{
 		nodeType: nodeType,
 		role:     role,
@@ -69,10 +69,15 @@ func (b *benchmarkDatadirState) EnsureSnapshot(definition SnapshotDefinition, no
 		return datadir, nil
 	}
 
-	hashCommand := sha256.New().Sum([]byte(definition.Command))
-
-	snapshotPath := filepath.Join(b.snapshotsDir, fmt.Sprintf("%s_%s_%x", nodeType, role, hashCommand[:12]))
-
+	var snapshotPath string
+	if datadirsConfig != nil && role == "validator" && datadirsConfig.Validator != nil {
+		snapshotPath = *datadirsConfig.Validator
+	} else if datadirsConfig != nil && role == "sequencer" && datadirsConfig.Sequencer != nil {
+		snapshotPath = *datadirsConfig.Sequencer
+	} else {
+		hashCommand := sha256.New().Sum([]byte(definition.Command))
+		snapshotPath = filepath.Join(b.snapshotsDir, fmt.Sprintf("%s_%s_%x", nodeType, role, hashCommand[:12]))
+	}
 	// Create a new datadir for this snapshot.
 	err := definition.CreateSnapshot(nodeType, snapshotPath)
 	if err != nil {
