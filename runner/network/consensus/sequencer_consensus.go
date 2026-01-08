@@ -26,6 +26,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/pkg/errors"
+	"golang.org/x/sync/errgroup"
 )
 
 // SequencerConsensusClient is a fake consensus client that generates blocks on a timer.
@@ -208,28 +209,42 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	sendCallsPerBatch := 100
 	batches := (len(sendTxs) + sendCallsPerBatch - 1) / sendCallsPerBatch
 
-	for i := 0; i < batches; i++ {
-		batch := sendTxs[i*sendCallsPerBatch : min((i+1)*sendCallsPerBatch, len(sendTxs))]
-		results := make([]interface{}, len(batch))
+	// Process batches in parallel, 4 at a time
+	parallelBatches := 4
+	for i := 0; i < batches; i += parallelBatches {
+		g, gCtx := errgroup.WithContext(ctx)
 
-		batchCall := make([]rpc.BatchElem, len(batch))
-		for j, tx := range batch {
-			batchCall[j] = rpc.BatchElem{
-				Method: "eth_sendRawTransaction",
-				Args:   []interface{}{hexutil.Encode(tx)},
-				Result: &results[j],
-			}
+		for j := 0; j < parallelBatches && i+j < batches; j++ {
+			batchIdx := i + j
+			g.Go(func() error {
+				batch := sendTxs[batchIdx*sendCallsPerBatch : min((batchIdx+1)*sendCallsPerBatch, len(sendTxs))]
+				results := make([]interface{}, len(batch))
+
+				batchCall := make([]rpc.BatchElem, len(batch))
+				for k, tx := range batch {
+					batchCall[k] = rpc.BatchElem{
+						Method: "eth_sendRawTransaction",
+						Args:   []interface{}{hexutil.Encode(tx)},
+						Result: &results[k],
+					}
+				}
+
+				err := f.client.Client().BatchCallContext(gCtx, batchCall)
+				if err != nil {
+					return errors.Wrap(err, "failed to send transactions")
+				}
+
+				for _, tx := range batchCall {
+					if tx.Error != nil {
+						return errors.Wrapf(tx.Error, "failed to send transaction %#v", tx.Args[0])
+					}
+				}
+				return nil
+			})
 		}
 
-		err := f.client.Client().BatchCallContext(ctx, batchCall)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to send transactions")
-		}
-
-		for _, tx := range batchCall {
-			if tx.Error != nil {
-				return nil, errors.Wrapf(tx.Error, "failed to send transaction %#v", tx.Args[0])
-			}
+		if err := g.Wait(); err != nil {
+			return nil, err
 		}
 	}
 
