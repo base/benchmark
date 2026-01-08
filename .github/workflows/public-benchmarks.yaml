@@ -48,6 +48,7 @@ jobs:
       - name: Download geth and reth
         if: steps.cache-bin.outputs.cache-hit != 'true'
         run: |
+          unset CI
           mkdir -p ${{ runner.temp }}/bin
 
           git clone https://github.com/paradigmxyz/reth
