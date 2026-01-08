@@ -3,6 +3,7 @@ package rbuilder
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/ethereum-optimism/optimism/op-service/client"
 	"github.com/ethereum/go-ethereum/log"
@@ -20,14 +21,8 @@ type RbuilderClient struct {
 	logger  log.Logger
 	options *config.InternalClientOptions
 
-	// client          *ethclient.Client
-	// clientURL       string
-	// authClient      client.RPC
-	// rbuilderProcess *exec.Cmd
-
-	// stdout io.WriteCloser
-	// stderr io.WriteCloser
-	// ports    portmanager.PortManager
+	ports         portmanager.PortManager
+	websocketPort uint64
 
 	elClient types.ExecutionClient
 
@@ -43,13 +38,18 @@ func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions,
 		logger:   logger,
 		options:  options,
 		elClient: rethClient,
+		ports:    ports,
 	}
 }
 
 // Run runs the reth client with the given runtime config.
 func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
+	r.websocketPort = r.ports.AcquirePort("rbuilder", portmanager.FlashblocksWebsocketPortPurpose)
+
 	cfg2 := *cfg
 	cfg2.Args = append(cfg2.Args, "--flashblocks.enabled")
+	cfg2.Args = append(cfg2.Args, "--flashblocks.port", fmt.Sprintf("%d", r.websocketPort))
+	cfg2.Args = append(cfg2.Args, "--flashblocks.fixed")
 	err := r.elClient.Run(ctx, &cfg2)
 	if err != nil {
 		return err
@@ -68,6 +68,7 @@ func (r *RbuilderClient) MetricsCollector() metrics.Collector {
 
 // Stop stops the reth client.
 func (r *RbuilderClient) Stop() {
+	r.ports.ReleasePort(r.websocketPort)
 	r.elClient.Stop()
 }
 

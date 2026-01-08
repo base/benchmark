@@ -37,7 +37,7 @@ func newValidatorBenchmark(log log.Logger, config benchtypes.TestConfig, validat
 	}
 }
 
-func (vb *validatorBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, l1Chain fakel1.L1Chain, batcherKey *ecdsa.PrivateKey) error {
+func (vb *validatorBenchmark) benchmarkFaultProofProgram(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64, l1Chain fakel1.L1Chain, batcherKey *ecdsa.PrivateKey) error {
 	version := vb.proofConfig.Version
 	if version == "" {
 		return fmt.Errorf("proof_program.version is not set")
@@ -51,10 +51,10 @@ func (vb *validatorBenchmark) benchmarkFaultProofProgram(ctx context.Context, pa
 
 	opProgramBenchmark := NewOPProgramBenchmark(&vb.config.Genesis, vb.log, binaryPath, vb.validatorClient.ClientURL(), l1Chain, batcherKey)
 
-	return opProgramBenchmark.Run(ctx, payloads, firstTestBlock)
+	return opProgramBenchmark.Run(ctx, payloads, lastSetupBlock)
 }
 
-func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64, metricsCollector metrics.Collector) error {
+func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64, metricsCollector metrics.Collector) error {
 	headBlockHeader, err := vb.validatorClient.Client().HeaderByNumber(ctx, nil)
 	if err != nil {
 		vb.log.Warn("failed to get head block header", "err", err)
@@ -67,7 +67,7 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 		BlockTime: vb.config.Params.BlockTime,
 	}, headBlockHash, headBlockNumber)
 
-	err = consensusClient.Start(ctx, payloads, metricsCollector, firstTestBlock)
+	err = consensusClient.Start(ctx, payloads, metricsCollector, lastSetupBlock)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return err
@@ -85,7 +85,7 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 		return fmt.Errorf("l1 chain should be setup if fault proof program is enabled")
 	}
 
-	err = vb.benchmarkFaultProofProgram(ctx, payloads, firstTestBlock, vb.l1Chain.chain, &vb.config.BatcherKey)
+	err = vb.benchmarkFaultProofProgram(ctx, payloads, lastSetupBlock, vb.l1Chain.chain, &vb.config.BatcherKey)
 	if err != nil {
 		return fmt.Errorf("failed to run fault proof program: %w", err)
 	}

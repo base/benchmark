@@ -38,6 +38,7 @@ type RethClient struct {
 	ports       portmanager.PortManager
 	metricsPort uint64
 	rpcPort     uint64
+	p2pPort     uint64
 	authRPCPort uint64
 
 	stdout io.WriteCloser
@@ -79,6 +80,7 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--datadir", r.options.DataDirPath)
 
 	r.rpcPort = r.ports.AcquirePort("reth", portmanager.ELPortPurpose)
+	r.p2pPort = r.ports.AcquirePort("reth", portmanager.P2PPortPurpose)
 	r.authRPCPort = r.ports.AcquirePort("reth", portmanager.AuthELPortPurpose)
 	r.metricsPort = r.ports.AcquirePort("reth", portmanager.ELMetricsPortPurpose)
 
@@ -90,6 +92,8 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--authrpc.jwtsecret", r.options.JWTSecretPath)
 	args = append(args, "--metrics", fmt.Sprintf("%d", r.metricsPort))
 	args = append(args, "--engine.state-provider-metrics")
+	args = append(args, "--disable-discovery")
+	args = append(args, "--port", fmt.Sprintf("%d", r.p2pPort))
 	args = append(args, "-vvv")
 
 	// increase mempool size
@@ -200,6 +204,7 @@ func (r *RethClient) Stop() {
 	r.ports.ReleasePort(r.rpcPort)
 	r.ports.ReleasePort(r.authRPCPort)
 	r.ports.ReleasePort(r.metricsPort)
+	r.ports.ReleasePort(r.p2pPort)
 
 	r.stdout = nil
 	r.stderr = nil

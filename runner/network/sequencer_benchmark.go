@@ -168,8 +168,6 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		close(setupComplete)
 	}()
 
-	var lastSetupBlock uint64
-
 	headBlockHeader, err := sequencerClient.Client().HeaderByNumber(ctx, nil)
 	if err != nil {
 		nb.log.Warn("failed to get head block header", "err", err)
@@ -195,13 +193,12 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	setupLoop:
 		for {
 			_blockMetrics := metrics.NewBlockMetrics()
-			payload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics, true)
+			_, err := consensusClient.Propose(benchmarkCtx, _blockMetrics, true)
 			if err != nil {
 				errChan <- err
 				return
 			}
 
-			payloads = append(payloads, *payload)
 			select {
 			case <-setupComplete:
 				break setupLoop
@@ -212,13 +209,11 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		}
 
-		lastSetupBlock = payloads[len(payloads)-1].Number
-		nb.log.Info("Last setup block", "block", lastSetupBlock)
 		blockMetrics := metrics.NewBlockMetrics()
 
 		// run for a few blocks
 		for i := 0; i < params.NumBlocks; i++ {
-			blockMetrics.SetBlockNumber(uint64(i))
+			blockMetrics.SetBlockNumber(uint64(i) + 1)
 			err := transactionWorker.SendTxs(benchmarkCtx)
 			if err != nil {
 				nb.log.Warn("failed to send transactions", "err", err)
@@ -258,6 +253,6 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	case err := <-errChan:
 		return nil, 0, err
 	case payloads := <-payloadResult:
-		return payloads, lastSetupBlock + 1, nil
+		return payloads, payloads[0].Number - 1, nil
 	}
 }
