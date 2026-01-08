@@ -45,10 +45,11 @@ type NetworkBenchmark struct {
 
 	transactionPayload payload.Definition
 	ports              portmanager.PortManager
+	replayConfig       *benchmark.ReplayConfig
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
-func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager, replayConfig *benchmark.ReplayConfig) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
 		log:                log,
 		sequencerOptions:   sequencerOptions,
@@ -57,6 +58,7 @@ func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequence
 		proofConfig:        proofConfig,
 		transactionPayload: transactionPayload,
 		ports:              ports,
+		replayConfig:       replayConfig,
 	}, nil
 }
 
@@ -107,15 +109,35 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 		}
 	}()
 
-	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain, nb.transactionPayload)
-	executionData, lastBlock, err := benchmark.Run(ctx, metricsCollector)
+	var executionData []engine.ExecutableData
+	var lastBlock uint64
+
+	// Use replay benchmark if replay config is provided
+	if nb.replayConfig != nil {
+		nb.log.Info("Using replay sequencer benchmark",
+			"source_rpc", nb.replayConfig.SourceRPCURL,
+			"start_block", nb.replayConfig.StartBlock,
+		)
+		replayBenchmark := NewReplaySequencerBenchmark(
+			nb.log,
+			*nb.testConfig,
+			sequencerClient,
+			l1Chain,
+			nb.replayConfig.SourceRPCURL,
+			nb.replayConfig.StartBlock,
+		)
+		executionData, lastBlock, err = replayBenchmark.Run(ctx, metricsCollector)
+	} else {
+		benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain, nb.transactionPayload)
+		executionData, lastBlock, err = benchmark.Run(ctx, metricsCollector)
+	}
 
 	if err != nil {
 		sequencerClient.Stop()
-		return nil, 0, nil, fmt.Errorf("failed to run sequencer benchmark: %w", err)
+		return nil, 0, nil, err
 	}
 
-	return executionData, lastBlock, sequencerClient, nil
+	return executionData, lastBlock, sequencerClient, err
 }
 
 func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
