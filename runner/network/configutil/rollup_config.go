@@ -50,7 +50,7 @@ func GetRollupConfig(genesis *core.Genesis, chain fakel1.L1Chain, batcherAddr co
 				}),
 			},
 		},
-		BlockTime:               1,
+		BlockTime:               2,
 		MaxSequencerDrift:       20,
 		SeqWindowSize:           24,
 		L1ChainID:               big.NewInt(1),
