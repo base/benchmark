@@ -65,7 +65,7 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 	}
 
 	if !filepath.IsAbs(outputDir) {
-	outputDir = path.Join(currentDir, outputDir)
+		outputDir = path.Join(currentDir, outputDir)
 	}
 
 	var cmdBin string
