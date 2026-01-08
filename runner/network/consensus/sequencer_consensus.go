@@ -184,6 +184,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 
 	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
 
+	minBaseFee := uint64(1)
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),
 		PrevRandao:            eth.Bytes32{},
@@ -194,6 +195,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		ParentBeaconBlockRoot: &root,
 		NoTxPool:              false,
 		EIP1559Params:         &b8,
+		MinBaseFee:            &minBaseFee,
 	}
 
 	return payloadAttrs, &root, nil
