@@ -10,6 +10,7 @@ jobs:
     env:
       RETH_VERSION: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
       GETH_VERSION: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
+      RBUILDER_VERSION: a8bb38693ece585e7fa98d52f51290e7dcececff
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
@@ -36,7 +37,7 @@ jobs:
         id: cache-bin
         with:
           path: ${{ runner.temp }}/bin
-          key: ${{ runner.os }}-binaries-reth-${{ env.RETH_VERSION }}-geth-${{ env.GETH_VERSION }}
+          key: ${{ runner.os }}-binaries-reth-${{ env.RETH_VERSION }}-geth-${{ env.GETH_VERSION }}-rbuilder-${{ env.RBUILDER_VERSION }}
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
@@ -45,29 +46,25 @@ jobs:
         run: |
           forge build --force
 
-      - name: Download geth and reth
+      - name: Build client binaries
         if: steps.cache-bin.outputs.cache-hit != 'true'
         run: |
           unset CI
           mkdir -p ${{ runner.temp }}/bin
 
-          git clone https://github.com/paradigmxyz/reth
-          git -C reth checkout --force ${{ env.RETH_VERSION }}
+          # Build reth
+          cd clients
+          RETH_VERSION=${{ env.RETH_VERSION }} OUTPUT_DIR="${{ runner.temp }}/bin" ./build-reth.sh
+          # Rename op-reth to reth for consistency
+          [ -f "${{ runner.temp }}/bin/op-reth" ] && mv "${{ runner.temp }}/bin/op-reth" "${{ runner.temp }}/bin/reth" || true
 
-          pushd reth
-          cargo build --features asm-keccak,jemalloc --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
-          cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
-          popd
-          chmod +x ${{ runner.temp }}/bin/reth
+          # Build geth
+          GETH_VERSION=${{ env.GETH_VERSION }} OUTPUT_DIR="${{ runner.temp }}/bin" ./build-geth.sh
 
-          git clone https://github.com/ethereum-optimism/op-geth
-          git -C op-geth checkout --force ${{ env.GETH_VERSION }}
-
-          pushd op-geth
-          make geth
-          cp ./build/bin/geth ${{ runner.temp }}/bin/geth
-          chmod +x ${{ runner.temp }}/bin/geth
-          popd
+          # Build rbuilder
+          RBUILDER_VERSION=${{ env.RBUILDER_VERSION }} OUTPUT_DIR="${{ runner.temp }}/bin" ./build-rbuilder.sh
+          # Rename op-rbuilder to rbuilder for consistency
+          [ -f "${{ runner.temp }}/bin/op-rbuilder" ] && mv "${{ runner.temp }}/bin/op-rbuilder" "${{ runner.temp }}/bin/rbuilder" || true
 
           echo "binaries compiled:"
           ls -la ${{ runner.temp }}/bin

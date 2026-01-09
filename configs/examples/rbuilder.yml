@@ -1,0 +1,20 @@
+name: Rbuilder transfer throughput test
+description: Test rbuilder transfer throughput with different number of hot accounts (meant to stress test parallelism)
+payloads:
+  - name: Transfer Only
+    type: transfer-only
+    id: transfer-only
+
+benchmarks:
+  - variables:
+      - type: payload
+        values:
+          - transfer-only
+      - type: node_type
+        values:
+          - rbuilder
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 1000000000
