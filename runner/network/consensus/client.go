@@ -21,6 +21,10 @@ type ConsensusClientOptions struct {
 	GasLimit uint64
 	// GasLimitSetup is the gas limit for the setup payload
 	GasLimitSetup uint64
+	// AllowTxFailures allows transactions to fail without stopping the benchmark.
+	// When true, failed transactions are logged as warnings instead of errors.
+	// Useful for replay mode where some transactions may fail due to state differences.
+	AllowTxFailures bool
 }
 
 // BaseConsensusClient contains common functionality shared between different consensus client implementations.

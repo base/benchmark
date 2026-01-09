@@ -17,6 +17,7 @@ type TestPlan struct {
 	Snapshot     *SnapshotDefinition
 	ProofProgram *ProofProgramOptions
 	Thresholds   *ThresholdConfig
+	Replay       *ReplayConfig
 }
 
 func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *BenchmarkConfig) (*TestPlan, error) {
@@ -42,6 +43,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *Benchm
 		Snapshot:     c.Snapshot,
 		ProofProgram: proofProgram,
 		Thresholds:   c.Metrics,
+		Replay:       c.Replay,
 	}, nil
 }
 
