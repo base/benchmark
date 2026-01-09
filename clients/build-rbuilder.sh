@@ -5,13 +5,13 @@ set -e
 # Source versions if available, otherwise use defaults
 if [ -f "versions.env" ]; then
     source versions.env
-else
-    # Default values
-    RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/base/op-rbuilder}"
-    RBUILDER_VERSION="${RBUILDER_VERSION:-main}"
-    BUILD_DIR="${BUILD_DIR:-./build}"
-    OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 fi
+
+# Default values
+RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/base/op-rbuilder}"
+RBUILDER_VERSION="${RBUILDER_VERSION:-main}"
+BUILD_DIR="${BUILD_DIR:-./build}"
+OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
 echo "Building op-rbuilder binary..."
 echo "Repository: $RBUILDER_REPO"
@@ -67,4 +67,4 @@ else
     exit 1
 fi
 
-echo "op-rbuilder binary built successfully and placed in $OUTPUT_DIR/op-rbuilder" 
+echo "op-rbuilder binary built successfully and placed in $FINAL_OUTPUT_DIR/op-rbuilder" 

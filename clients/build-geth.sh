@@ -5,13 +5,12 @@ set -e
 # Source versions if available, otherwise use defaults
 if [ -f "versions.env" ]; then
     source versions.env
-else
-    # Default values
-    GETH_REPO="${GETH_REPO:-https://github.com/ethereum-optimism/op-geth/}"
-    GETH_VERSION="${GETH_VERSION:-optimism}"
-    BUILD_DIR="${BUILD_DIR:-./build}"
-    OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 fi
+# Default values
+GETH_REPO="${GETH_REPO:-https://github.com/ethereum-optimism/op-geth/}"
+GETH_VERSION="${GETH_VERSION:-optimism}"
+BUILD_DIR="${BUILD_DIR:-./build}"
+OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
 echo "Building op-geth binary..."
 echo "Repository: $GETH_REPO"
@@ -68,4 +67,4 @@ else
     exit 1
 fi
 
-echo "op-geth binary built successfully and placed in $OUTPUT_DIR/geth" 
+echo "op-geth binary built successfully and placed in $FINAL_OUTPUT_DIR/geth" 

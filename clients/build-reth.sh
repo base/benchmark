@@ -5,13 +5,13 @@ set -e
 # Source versions if available, otherwise use defaults
 if [ -f "versions.env" ]; then
     source versions.env
-else
-    # Default values
-    RETH_REPO="${RETH_REPO:-https://github.com/paradigmxyz/reth/}"
-    RETH_VERSION="${RETH_VERSION:-main}"
-    BUILD_DIR="${BUILD_DIR:-./build}"
-    OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 fi
+
+# Default values
+RETH_REPO="${RETH_REPO:-https://github.com/paradigmxyz/reth/}"
+RETH_VERSION="${RETH_VERSION:-main}"
+BUILD_DIR="${BUILD_DIR:-./build}"
+OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
 echo "Building reth binary..."
 echo "Repository: $RETH_REPO"
