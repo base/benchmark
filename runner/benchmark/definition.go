@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/base/base-bench/runner/payload"
@@ -63,7 +64,9 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 		return fmt.Errorf("failed to get absolute path of outputDir: %w", err)
 	}
 
-	outputDir = path.Join(currentDir, outputDir)
+	if !filepath.IsAbs(outputDir) {
+		outputDir = path.Join(currentDir, outputDir)
+	}
 
 	var cmdBin string
 	var args []string

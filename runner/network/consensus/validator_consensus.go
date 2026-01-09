@@ -33,7 +33,7 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 
 	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(1).Bytes())
 
-	f.log.Info("Validate payload", "payload_index", payload.Number)
+	f.log.Info("Validate payload", "payload_index", payload.Number, "num_txs", len(payload.Transactions))
 	startTime := time.Now()
 	err := f.newPayload(ctx, payload, root)
 	if err != nil {
