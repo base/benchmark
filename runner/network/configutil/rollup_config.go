@@ -63,6 +63,7 @@ func GetRollupConfig(genesis *core.Genesis, chain fakel1.L1Chain, batcherAddr co
 		GraniteTime:             genesis.Config.GraniteTime,
 		HoloceneTime:            genesis.Config.HoloceneTime,
 		IsthmusTime:             genesis.Config.IsthmusTime,
+		JovianTime:              genesis.Config.JovianTime,
 		InteropTime:             genesis.Config.InteropTime,
 		BatchInboxAddress:       common.Address{1},
 		DepositContractAddress:  common.Address{1},

@@ -64,7 +64,7 @@ func (f *SequencerConsensusClient) Stop(ctx context.Context) error {
 
 // marshalBinaryWithSignature creates the call data for an L1Info transaction.
 func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]byte, error) {
-	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoIsthmusLen))
+	w := bytes.NewBuffer(make([]byte, 0, derive.L1InfoJovianLen))
 	if err := solabi.WriteSignature(w, signature); err != nil {
 		return nil, err
 	}
@@ -106,6 +106,9 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 	if err := binary.Write(w, binary.BigEndian, info.OperatorFeeConstant); err != nil {
 		return nil, err
 	}
+	if err := binary.Write(w, binary.BigEndian, info.DAFootprintGasScalar); err != nil {
+		return nil, err
+	}
 	return w.Bytes(), nil
 }
 
@@ -136,17 +139,18 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	}
 
 	l1BlockInfo := &derive.L1BlockInfo{
-		Number:              number,
-		Time:                time,
-		BaseFee:             baseFee,
-		BlockHash:           blockHash,
-		SequenceNumber:      f.headBlockNumber,
-		BatcherAddr:         f.batcherAddr,
-		BlobBaseFee:         big.NewInt(1),
-		BaseFeeScalar:       1,
-		BlobBaseFeeScalar:   1,
-		OperatorFeeScalar:   0,
-		OperatorFeeConstant: 0,
+		Number:               number,
+		Time:                 time,
+		BaseFee:              baseFee,
+		BlockHash:            blockHash,
+		SequenceNumber:       f.headBlockNumber,
+		BatcherAddr:          f.batcherAddr,
+		BlobBaseFee:          big.NewInt(1),
+		BaseFeeScalar:        1,
+		BlobBaseFeeScalar:    1,
+		OperatorFeeScalar:    0,
+		OperatorFeeConstant:  0,
+		DAFootprintGasScalar: 400,
 	}
 
 	source := derive.L1InfoDepositSource{
@@ -154,7 +158,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		SeqNumber:   l1BlockInfo.SequenceNumber,
 	}
 
-	data, err := marshalBinaryWithSignature(l1BlockInfo, derive.L1InfoFuncIsthmusBytes4)
+	data, err := marshalBinaryWithSignature(l1BlockInfo, derive.L1InfoFuncJovianBytes4)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -185,6 +189,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 
 	root := crypto.Keccak256Hash([]byte("fake-beacon-block-root"), big.NewInt(int64(1)).Bytes())
 
+	minBaseFee := uint64(1)
 	payloadAttrs := &eth.PayloadAttributes{
 		Timestamp:             eth.Uint64Quantity(timestamp),
 		PrevRandao:            eth.Bytes32{},
@@ -195,6 +200,7 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		ParentBeaconBlockRoot: &root,
 		NoTxPool:              false,
 		EIP1559Params:         &b8,
+		MinBaseFee:            &minBaseFee,
 	}
 
 	return payloadAttrs, &root, nil

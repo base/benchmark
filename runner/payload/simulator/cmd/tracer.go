@@ -51,7 +51,7 @@ func (t *opcodeTracer) OnOpcode(pc uint64, op byte, gas, cost uint64, scope trac
 	if opcode == vm.CALL || opcode == vm.CALLCODE || opcode == vm.DELEGATECALL || opcode == vm.STATICCALL || opcode == vm.EXTSTATICCALL {
 		addressBig := scope.StackData()[0]
 		addr := common.BigToAddress(addressBig.ToBig())
-		precompiles := vm.PrecompiledContractsIsthmus
+		precompiles := vm.PrecompiledContractsJovian
 		if precompiles[addr] != nil {
 			t.precompileStats[simulatorstats.PrecompileAddressToName[addr]]++
 		}

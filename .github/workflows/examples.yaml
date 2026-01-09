@@ -8,8 +8,8 @@ jobs:
   example-benchmarks:
     runs-on: ubuntu-latest
     env:
-      RETH_VERSION: 9d56da53ec0ad60e229456a0c70b338501d923a5
-      GETH_VERSION: 4bc345b22fbee14d3162becd197373a9565b7c6d
+      RETH_VERSION: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
+      GETH_VERSION: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
@@ -48,6 +48,7 @@ jobs:
       - name: Download geth and reth
         if: steps.cache-bin.outputs.cache-hit != 'true'
         run: |
+          unset CI
           mkdir -p ${{ runner.temp }}/bin
 
           git clone https://github.com/paradigmxyz/reth
