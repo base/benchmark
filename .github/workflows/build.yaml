@@ -115,11 +115,21 @@ jobs:
           echo "binaries compiled:"
           ls -la ${{ runner.temp }}/bin
 
-      - name: Run examples
-        id: op-program
+      - name: Build op-program
         run: |
           curl https://mise.run | sh
           pushd op-program
           mise x -- ./build.sh
           popd
+          
+          # Copy op-program binary to temp bin directory
+          # The build script outputs to versions/v1.6.1-rc.1/op-program
+          cp op-program/versions/v1.6.1-rc.1/op-program ${{ runner.temp }}/bin/
+          echo "op-program binary copied to bin directory"
+          ls -la ${{ runner.temp }}/bin
+
+      - name: Run examples
+        run: |
+          mkdir -p op-program/versions/v1.6.1-rc.1
+          cp ${{ runner.temp }}/bin/op-program op-program/versions/v1.6.1-rc.1/
           ./.github/scripts/run-example-benchmarks.sh ${{ runner.temp }}
