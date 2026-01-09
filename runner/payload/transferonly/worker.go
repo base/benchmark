@@ -28,6 +28,7 @@ import (
 
 type TransferOnlyPayloadDefinition struct {
 	CreateAccounts *bool `yaml:"create_accounts"`
+	NumAccounts    *int  `yaml:"num_accounts"`
 }
 
 type transferOnlyPayloadWorker struct {
@@ -51,7 +52,7 @@ type transferOnlyPayloadWorker struct {
 	mempool *mempool.StaticWorkloadMempool
 }
 
-const numAccounts = 1000
+const defaultNumAccounts = 1000
 
 func NewTransferPayloadWorker(ctx context.Context, log log.Logger, elRPCURL string, params benchtypes.RunParams, prefundedPrivateKey ecdsa.PrivateKey, prefundAmount *big.Int, genesis *core.Genesis, definition any) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log, genesis.Config.ChainID)
@@ -93,7 +94,15 @@ func (t *transferOnlyPayloadWorker) Mempool() mempool.FakeMempool {
 	return t.mempool
 }
 
+func (t *transferOnlyPayloadWorker) numAccounts() int {
+	if t.payloadParams.NumAccounts != nil {
+		return *t.payloadParams.NumAccounts
+	}
+	return defaultNumAccounts
+}
+
 func (t *transferOnlyPayloadWorker) generateAccounts(ctx context.Context) error {
+	numAccounts := t.numAccounts()
 	t.privateKeys = make([]*ecdsa.PrivateKey, 0, numAccounts)
 	t.addresses = make([]common.Address, 0, numAccounts)
 	t.nextNonce = make(map[common.Address]uint64)
@@ -148,6 +157,8 @@ func (t *transferOnlyPayloadWorker) Stop(ctx context.Context) error {
 }
 
 func (t *transferOnlyPayloadWorker) Setup(ctx context.Context) error {
+	numAccounts := int64(t.numAccounts())
+
 	// check balance > prefundAmount
 	balance, err := t.client.BalanceAt(ctx, crypto.PubkeyToAddress(t.prefundedAccount.PublicKey), nil)
 	log.Info("Prefunded account balance", "balance", balance.String())
@@ -218,7 +229,7 @@ func (t *transferOnlyPayloadWorker) Setup(ctx context.Context) error {
 	t.log.Debug("Prefunded accounts", "numAccounts", len(t.addresses), "perAccount", perAccount)
 
 	// update account amounts
-	for i := 0; i < numAccounts; i++ {
+	for i := int64(0); i < numAccounts; i++ {
 		t.balance[t.addresses[i]] = perAccount
 	}
 
@@ -236,6 +247,7 @@ func (t *transferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 }
 
 func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
+	numAccounts := t.numAccounts()
 	gasUsed := uint64(0)
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0

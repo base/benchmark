@@ -131,6 +131,9 @@ type StatsConfig struct {
 	Opcodes            *OpcodeStats `yaml:"opcodes"`
 	Precompiles        *OpcodeStats `yaml:"precompiles"`
 	AvgGasUsed         *float64     `yaml:"avg_gas_used"`
+	// NumCallers is the number of caller accounts to distribute transactions across.
+	// Defaults to 1 if not specified.
+	NumCallers *int `yaml:"num_callers"`
 }
 
 func (s *StatsConfig) ToStats() *Stats {

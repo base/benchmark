@@ -26,7 +26,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-const maxAccounts = 2
+const defaultNumCallers = 1
 
 type Bytecode struct {
 	Object string `json:"object"`
@@ -60,41 +60,52 @@ type simulatorPayloadWorker struct {
 	numCalls        uint64
 	contractBackend *backendWithTrackedNonce
 
-	transactor     *bind.TransactOpts
+	// Caller accounts for distributing transactions across multiple senders
+	callerKeys     []*ecdsa.PrivateKey
+	callerAddrs    []common.Address
+	transactors    []*bind.TransactOpts
 	callTransactor *bind.CallOpts
+	currCallerIdx  int
+
+	// setupTransactor is used for deployment and initialization (uses prefunded account)
+	setupTransactor *bind.TransactOpts
 
 	numCallsPerBlock uint64
+	numCallers       int
 }
 
+// backendWithTrackedNonce wraps a ContractBackend and tracks nonces locally
+// for multiple addresses, avoiding repeated RPC calls for nonce fetching.
 type backendWithTrackedNonce struct {
 	bind.ContractBackend
-	trackedAddr common.Address
-	nonce       uint64
+	nonces map[common.Address]uint64
 }
 
-func newBackendWithTrackedNonce(transactor bind.ContractBackend, trackedAddr common.Address) (*backendWithTrackedNonce, error) {
-	nonce, err := transactor.PendingNonceAt(context.Background(), trackedAddr)
-	if err != nil {
-		return nil, err
+func newBackendWithTrackedNonce(backend bind.ContractBackend, addresses []common.Address) (*backendWithTrackedNonce, error) {
+	nonces := make(map[common.Address]uint64, len(addresses))
+	for _, addr := range addresses {
+		nonce, err := backend.PendingNonceAt(context.Background(), addr)
+		if err != nil {
+			return nil, err
+		}
+		nonces[addr] = nonce
 	}
 
 	return &backendWithTrackedNonce{
-		ContractBackend: transactor,
-		trackedAddr:     trackedAddr,
-		nonce:           nonce,
+		ContractBackend: backend,
+		nonces:          nonces,
 	}, nil
 }
 
-func (t *backendWithTrackedNonce) incrementNonce() {
-	t.nonce++
+func (t *backendWithTrackedNonce) incrementNonce(addr common.Address) {
+	t.nonces[addr]++
 }
 
 func (t *backendWithTrackedNonce) PendingNonceAt(ctx context.Context, account common.Address) (uint64, error) {
-	if account != t.trackedAddr {
-		return t.ContractBackend.PendingNonceAt(ctx, account)
+	if nonce, ok := t.nonces[account]; ok {
+		return nonce, nil
 	}
-
-	return t.nonce, nil
+	return t.ContractBackend.PendingNonceAt(ctx, account)
 }
 
 var _ bind.ContractBackend = &backendWithTrackedNonce{}
@@ -118,16 +129,40 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 		return nil, errors.New("Simulator payload params are not valid")
 	}
 
-	contractBackend, err := newBackendWithTrackedNonce(client, crypto.PubkeyToAddress(prefundedPrivateKey.PublicKey))
+	numCallers := defaultNumCallers
+	if simulatorParams.NumCallers != nil && *simulatorParams.NumCallers > 0 {
+		numCallers = *simulatorParams.NumCallers
+	}
+
+	// Generate caller accounts deterministically from prefunded account
+	callerKeys, callerAddrs := generateCallerAccounts(&prefundedPrivateKey, numCallers)
+
+	// Create transactors for each caller
+	transactors := make([]*bind.TransactOpts, numCallers)
+	for i, key := range callerKeys {
+		transactor, err := bind.NewKeyedTransactorWithChainID(key, chainID)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to create transactor for caller %d", i)
+		}
+		transactor.NoSend = true
+		transactors[i] = transactor
+	}
+
+	// Initialize nonce tracker with prefunded account (used for deployment/setup)
+	// Caller accounts will be added after funding in Setup
+	contractBackend, err := newBackendWithTrackedNonce(client, []common.Address{
+		crypto.PubkeyToAddress(prefundedPrivateKey.PublicKey),
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	transactor, err := bind.NewKeyedTransactorWithChainID(&prefundedPrivateKey, chainID)
+	// Setup transactor for deployment and initialization
+	setupTransactor, err := bind.NewKeyedTransactorWithChainID(&prefundedPrivateKey, chainID)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create transactor")
+		return nil, errors.Wrap(err, "failed to create setup transactor")
 	}
-	transactor.NoSend = true
+	setupTransactor.NoSend = true
 
 	callTransactor := &bind.CallOpts{
 		From:    crypto.PubkeyToAddress(prefundedPrivateKey.PublicKey),
@@ -149,13 +184,41 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 		prefundAmount:    prefundAmount,
 		payloadParams:    simulatorParams.ToStats(),
 		contractBackend:  contractBackend,
-		transactor:       transactor,
+		callerKeys:       callerKeys,
+		callerAddrs:      callerAddrs,
+		transactors:      transactors,
+		setupTransactor:  setupTransactor,
 		callTransactor:   callTransactor,
 		scaleFactor:      scaleFactor,
 		actualNumConfig:  simulatorstats.NewStats(),
+		numCallers:       numCallers,
 	}
 
 	return t, nil
+}
+
+// generateCallerAccounts derives caller accounts deterministically from the prefunded account.
+// If numCallers is 1, it returns the prefunded account itself.
+func generateCallerAccounts(prefundedKey *ecdsa.PrivateKey, numCallers int) ([]*ecdsa.PrivateKey, []common.Address) {
+	if numCallers == 1 {
+		return []*ecdsa.PrivateKey{prefundedKey}, []common.Address{crypto.PubkeyToAddress(prefundedKey.PublicKey)}
+	}
+
+	// Use deterministic random source seeded from prefunded key
+	seed := int64(prefundedKey.D.Uint64())
+	src := rand.New(rand.NewSource(seed))
+
+	keys := make([]*ecdsa.PrivateKey, numCallers)
+	addrs := make([]common.Address, numCallers)
+	for i := 0; i < numCallers; i++ {
+		key, err := ecdsa.GenerateKey(crypto.S256(), src)
+		if err != nil {
+			panic(fmt.Sprintf("failed to generate caller key: %v", err))
+		}
+		keys[i] = key
+		addrs[i] = crypto.PubkeyToAddress(key.PublicKey)
+	}
+	return keys, addrs
 }
 
 func (t *simulatorPayloadWorker) Mempool() mempool.FakeMempool {
@@ -183,11 +246,13 @@ func (t *simulatorPayloadWorker) mineAndConfirm(ctx context.Context, txs []*type
 }
 
 func (t *simulatorPayloadWorker) deployContract(ctx context.Context) (*abi.Simulator, error) {
+	prefundAddr := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
+
 	contractAddr, contractDeploymentTx, err := t.createDeployTx(t.prefundedAccount)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create contract deployment transaction")
 	}
-	t.contractBackend.incrementNonce()
+	t.contractBackend.incrementNonce(prefundAddr)
 
 	t.log.Debug("Contract address", "address", contractAddr.Hex())
 	t.contractAddr = *contractAddr
@@ -206,6 +271,8 @@ func (t *simulatorPayloadWorker) deployContract(ctx context.Context) (*abi.Simul
 
 // testForBlocks runs the test over 5 blocks and collects max tx gas usage
 func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *abi.Simulator) error {
+	prefundAddr := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
+
 	// estimate storage slot usage
 	contractConfig, err := t.payloadParams.Mul(float64(t.params.NumBlocks)).ToConfig()
 	if err != nil {
@@ -237,11 +304,11 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 	storageChunks := uint64(math.Ceil(float64(storageSlotsNeeded.Int64()-currentStorageSlots.Int64()) / 100))
 	log.Info("Initializing test storage chunks", "storageChunks", storageChunks)
 	for i := uint64(0); i < storageChunks; i++ {
-		storageChunkTx, err := simulator.InitializeStorageChunk(t.transactor)
+		storageChunkTx, err := simulator.InitializeStorageChunk(t.setupTransactor)
 		if err != nil {
 			return errors.Wrap(err, "failed to initialize storage chunk")
 		}
-		t.contractBackend.incrementNonce()
+		t.contractBackend.incrementNonce(prefundAddr)
 
 		sendCalls = append(sendCalls, storageChunkTx)
 	}
@@ -249,11 +316,11 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 	accountChunks := uint64(math.Ceil(float64(accountSlotsNeeded.Int64()-currentAccounts.Int64()) / 100))
 	log.Info("Initializing test account chunks", "accountChunks", accountChunks)
 	for i := uint64(0); i < accountChunks; i++ {
-		accountChunkTx, err := simulator.InitializeAddressChunk(t.transactor)
+		accountChunkTx, err := simulator.InitializeAddressChunk(t.setupTransactor)
 		if err != nil {
 			return errors.Wrap(err, "failed to initialize account chunk")
 		}
-		t.contractBackend.incrementNonce()
+		t.contractBackend.incrementNonce(prefundAddr)
 
 		sendCalls = append(sendCalls, accountChunkTx)
 	}
@@ -271,7 +338,7 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	log.Info("Estimating gas for test run", "run", contractConfig)
 
-	tx, err := simulator.Run(t.transactor, *contractConfig)
+	tx, err := simulator.Run(t.setupTransactor, *contractConfig)
 	if err != nil {
 		return errors.Wrap(err, "failed to run contract")
 	}
@@ -327,11 +394,11 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 	accountChunks = uint64(math.Ceil(float64(accountSlotsNeeded.Int64()-currentAccounts.Int64()) / 100))
 	log.Info("Initializing test account chunks", "accountChunks", accountChunks)
 	for i := uint64(0); i < accountChunks; i++ {
-		accountChunkTx, err := simulator.InitializeAddressChunk(t.transactor)
+		accountChunkTx, err := simulator.InitializeAddressChunk(t.setupTransactor)
 		if err != nil {
 			return errors.Wrap(err, "failed to initialize account chunk")
 		}
-		t.contractBackend.incrementNonce()
+		t.contractBackend.incrementNonce(prefundAddr)
 
 		sendCalls = append(sendCalls, accountChunkTx)
 	}
@@ -340,11 +407,11 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	additionalStorage := uint64(math.Ceil(float64(storageSlotsNeeded.Int64()-numExistingStorageSlots.Int64()) / 100))
 	for i := uint64(0); i < additionalStorage; i++ {
-		storageChunkTx, err := simulator.InitializeStorageChunk(t.transactor)
+		storageChunkTx, err := simulator.InitializeStorageChunk(t.setupTransactor)
 		if err != nil {
 			return errors.Wrap(err, "failed to initialize storage chunk")
 		}
-		t.contractBackend.incrementNonce()
+		t.contractBackend.incrementNonce(prefundAddr)
 
 		sendCalls = append(sendCalls, storageChunkTx)
 	}
@@ -386,6 +453,97 @@ func (t *simulatorPayloadWorker) Setup(ctx context.Context) error {
 		return errors.Wrap(err, "failed to test for blocks")
 	}
 
+	// Fund caller accounts if using multiple callers
+	if err := t.fundCallerAccounts(ctx); err != nil {
+		return errors.Wrap(err, "failed to fund caller accounts")
+	}
+
+	return nil
+}
+
+// fundCallerAccounts distributes funds from the prefunded account to caller accounts
+// and initializes nonce tracking for all callers.
+func (t *simulatorPayloadWorker) fundCallerAccounts(ctx context.Context) error {
+	prefundAddr := crypto.PubkeyToAddress(t.prefundedAccount.PublicKey)
+
+	// If using just the prefunded account, no funding transfer needed
+	if t.numCallers == 1 && t.callerAddrs[0] == prefundAddr {
+		t.log.Info("Using single caller (prefunded account)", "address", prefundAddr.Hex())
+		return nil
+	}
+
+	t.log.Info("Funding caller accounts", "numCallers", t.numCallers)
+
+	// Get current balance of prefunded account
+	balance, err := t.client.BalanceAt(ctx, prefundAddr, nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to get prefunded account balance")
+	}
+
+	// Reserve some funds for gas costs (21000 gas per transfer * gas price)
+	gasCostPerTransfer := new(big.Int).Mul(big.NewInt(21000), big.NewInt(1e9)) // 21000 * 1 gwei
+	totalGasCost := new(big.Int).Mul(gasCostPerTransfer, big.NewInt(int64(t.numCallers)))
+
+	// Distribute remaining balance equally among callers
+	distributableBalance := new(big.Int).Sub(balance, totalGasCost)
+	if distributableBalance.Sign() <= 0 {
+		return fmt.Errorf("insufficient balance to fund caller accounts: balance=%s, gasCost=%s",
+			balance.String(), totalGasCost.String())
+	}
+
+	perCallerAmount := new(big.Int).Div(distributableBalance, big.NewInt(int64(t.numCallers)))
+	t.log.Info("Funding each caller", "amount", perCallerAmount.String(), "numCallers", t.numCallers)
+
+	// Create funding transactions
+	fundingTxs := make([]*types.Transaction, 0, t.numCallers)
+	nonce := t.contractBackend.nonces[prefundAddr]
+
+	signer := types.NewPragueSigner(t.chainID)
+	for _, callerAddr := range t.callerAddrs {
+		// Skip if caller is the prefunded account
+		if callerAddr == prefundAddr {
+			continue
+		}
+
+		txData := &types.DynamicFeeTx{
+			ChainID:   t.chainID,
+			Nonce:     nonce,
+			To:        &callerAddr,
+			Gas:       21000,
+			GasFeeCap: new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1)), // 1 gwei
+			GasTipCap: big.NewInt(2),
+			Value:     perCallerAmount,
+		}
+		tx := types.MustSignNewTx(t.prefundedAccount, signer, txData)
+		fundingTxs = append(fundingTxs, tx)
+		nonce++
+	}
+
+	if len(fundingTxs) == 0 {
+		return nil
+	}
+
+	// Mine and confirm funding transactions
+	if err := t.mineAndConfirm(ctx, fundingTxs); err != nil {
+		return errors.Wrap(err, "failed to mine and confirm funding transactions")
+	}
+
+	// Update nonce tracker for prefunded account
+	t.contractBackend.nonces[prefundAddr] = nonce
+
+	// Initialize nonce tracking for all caller accounts
+	for _, callerAddr := range t.callerAddrs {
+		if callerAddr == prefundAddr {
+			continue
+		}
+		callerNonce, err := t.client.PendingNonceAt(ctx, callerAddr)
+		if err != nil {
+			return errors.Wrapf(err, "failed to get nonce for caller %s", callerAddr.Hex())
+		}
+		t.contractBackend.nonces[callerAddr] = callerNonce
+	}
+
+	t.log.Info("Successfully funded caller accounts", "numCallers", t.numCallers)
 	return nil
 }
 
@@ -400,7 +558,7 @@ func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash comm
 }
 
 func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
-	txs := make([]*types.Transaction, 0, maxAccounts)
+	txs := make([]*types.Transaction, 0, t.numCallers)
 
 	gas := t.params.GasLimit - 100_000
 
@@ -408,8 +566,12 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 		actual := t.actualNumConfig
 		expected := t.payloadParams.Mul(float64(t.numCalls+1) * t.scaleFactor)
 
+		// Round-robin across callers
+		callerIdx := t.currCallerIdx
+		t.currCallerIdx = (t.currCallerIdx + 1) % t.numCallers
+
 		blockCounts := expected.Sub(actual).Round()
-		transferTx, err := t.createCallTx(t.transactor, t.prefundedAccount, blockCounts)
+		transferTx, err := t.createCallTx(t.transactors[callerIdx], t.callerKeys[callerIdx], blockCounts)
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
 			return err
@@ -421,7 +583,7 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 			break
 		}
 
-		t.contractBackend.incrementNonce()
+		t.contractBackend.incrementNonce(t.callerAddrs[callerIdx])
 
 		gas -= gasUsed
 
