@@ -278,3 +278,8 @@ func (r *RethClient) SetHead(ctx context.Context, blockNumber uint64) error {
 	r.logger.Info("Successfully reset blockchain head", "blockNumber", blockNumber, "blockHex", blockHex)
 	return nil
 }
+
+// FlashblocksClient returns nil as reth does not support flashblocks.
+func (r *RethClient) FlashblocksClient() types.FlashblocksClient {
+	return nil
+}

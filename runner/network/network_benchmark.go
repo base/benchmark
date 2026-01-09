@@ -108,14 +108,14 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	}()
 
 	benchmark := newSequencerBenchmark(nb.log, *nb.testConfig, sequencerClient, l1Chain, nb.transactionPayload)
-	executionData, lastBlock, err := benchmark.Run(ctx, metricsCollector)
+	payloadResult, lastBlock, err := benchmark.Run(ctx, metricsCollector)
 
 	if err != nil {
 		sequencerClient.Stop()
 		return nil, 0, nil, fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
 
-	return executionData, lastBlock, sequencerClient, nil
+	return payloadResult.ExecutablePayloads, lastBlock, sequencerClient, nil
 }
 
 func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
