@@ -39,6 +39,7 @@ type GethClient struct {
 	metricsPort uint64
 	rpcPort     uint64
 	authRPCPort uint64
+	p2pPort     uint64
 
 	stdout io.WriteCloser
 	stderr io.WriteCloser
@@ -98,6 +99,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	g.rpcPort = g.ports.AcquirePort("geth", portmanager.ELPortPurpose)
 	g.authRPCPort = g.ports.AcquirePort("geth", portmanager.AuthELPortPurpose)
 	g.metricsPort = g.ports.AcquirePort("geth", portmanager.ELMetricsPortPurpose)
+	g.p2pPort = g.ports.AcquirePort("geth", portmanager.P2PPortPurpose)
 
 	// TODO: allocate these dynamically eventually
 	args = append(args, "--http.port", fmt.Sprintf("%d", g.rpcPort))
@@ -105,6 +107,7 @@ func (g *GethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--metrics")
 	args = append(args, "--metrics.addr", "localhost")
 	args = append(args, "--metrics.port", fmt.Sprintf("%d", g.metricsPort))
+	args = append(args, "--port", fmt.Sprintf("%d", g.p2pPort))
 
 	// Set mempool size to 100x default
 	args = append(args, "--txpool.globalslots", "10000000")

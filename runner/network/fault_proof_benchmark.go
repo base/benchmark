@@ -30,7 +30,7 @@ import (
 )
 
 type ProofProgramBenchmark interface {
-	Run(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error
+	Run(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64) error
 }
 
 type opProgramBenchmark struct {
@@ -58,11 +58,11 @@ func NewOPProgramBenchmark(genesis *core.Genesis, log log.Logger, opProgramBin s
 	}
 }
 
-func (o *opProgramBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, firstTestBlock uint64) error {
+func (o *opProgramBenchmark) Run(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64) error {
 	// Split payloads into setup and test groups
-	setupPayloads := make([]engine.ExecutableData, firstTestBlock)
-	copy(setupPayloads, payloads[:firstTestBlock])
-	testPayloads := payloads[firstTestBlock:]
+	setupPayloads := make([]engine.ExecutableData, lastSetupBlock)
+	copy(setupPayloads, payloads[:lastSetupBlock+1])
+	testPayloads := payloads[lastSetupBlock+1:]
 
 	// Process batches
 	if err := o.processBatches(setupPayloads, testPayloads); err != nil {
