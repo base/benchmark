@@ -10,7 +10,7 @@ jobs:
     env:
       RETH_VERSION: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
       GETH_VERSION: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
-      RBUILDER_VERSION: a8bb38693ece585e7fa98d52f51290e7dcececff
+      RBUILDER_VERSION: 23f42c8e78ba3abb45a8840df7037a27e196e601
 
     steps:
       - name: Harden the runner (Audit all outbound calls)
