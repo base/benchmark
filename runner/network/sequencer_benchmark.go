@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"sync"
 	"time"
 
 	"github.com/base/base-bench/runner/clients/types"
@@ -122,7 +123,7 @@ func (nb *sequencerBenchmark) fundTestAccount(ctx context.Context, mempool mempo
 	return nil
 }
 
-func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.Collector) ([]engine.ExecutableData, uint64, error) {
+func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.Collector) (*benchtypes.PayloadResult, uint64, error) {
 	transactionWorker, err := payload.NewPayloadWorker(ctx, nb.log, &nb.config, nb.sequencerClient, nb.transactionPayload)
 	if err != nil {
 		return nil, 0, err
@@ -147,6 +148,26 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 	setupComplete := make(chan struct{})
 	chainReady := make(chan struct{})
+
+	// Check if client supports flashblocks and start collection if available
+	var flashblockCollector *flashblockCollector
+	flashblocksClient := sequencerClient.FlashblocksClient()
+	if flashblocksClient != nil {
+		nb.log.Info("Starting flashblocks collection")
+		flashblockCollector = newFlashblockCollector()
+		flashblocksClient.AddListener(flashblockCollector)
+
+		if err := flashblocksClient.Start(benchmarkCtx); err != nil {
+			nb.log.Warn("Failed to start flashblocks client", "err", err)
+			// Don't fail the benchmark if flashblocks collection fails
+		} else {
+			defer func() {
+				if err := flashblocksClient.Stop(); err != nil {
+					nb.log.Warn("Failed to stop flashblocks client", "err", err)
+				}
+			}()
+		}
+	}
 
 	go func() {
 		// allow one block to pass before sending txs to set the gas limit
@@ -253,6 +274,48 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	case err := <-errChan:
 		return nil, 0, err
 	case payloads := <-payloadResult:
-		return payloads, payloads[0].Number - 1, nil
+		// Collect flashblocks if available
+		var flashblocks []types.FlashblocksPayloadV1
+		if flashblockCollector != nil {
+			flashblocks = flashblockCollector.GetFlashblocks()
+			nb.log.Info("Collected flashblocks", "count", len(flashblocks))
+		}
+
+		result := &benchtypes.PayloadResult{
+			ExecutablePayloads: payloads,
+			Flashblocks:        flashblocks,
+		}
+		return result, payloads[0].Number - 1, nil
 	}
+}
+
+// flashblockCollector implements FlashblockListener to collect flashblocks.
+type flashblockCollector struct {
+	flashblocks []types.FlashblocksPayloadV1
+	mu          sync.Mutex
+}
+
+// newFlashblockCollector creates a new flashblock collector.
+func newFlashblockCollector() *flashblockCollector {
+	return &flashblockCollector{
+		flashblocks: make([]types.FlashblocksPayloadV1, 0),
+	}
+}
+
+// OnFlashblock implements FlashblockListener.
+func (c *flashblockCollector) OnFlashblock(flashblock types.FlashblocksPayloadV1) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.flashblocks = append(c.flashblocks, flashblock)
+}
+
+// GetFlashblocks returns all collected flashblocks.
+func (c *flashblockCollector) GetFlashblocks() []types.FlashblocksPayloadV1 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	// Return a copy to avoid race conditions
+	result := make([]types.FlashblocksPayloadV1, len(c.flashblocks))
+	copy(result, c.flashblocks)
+	return result
 }

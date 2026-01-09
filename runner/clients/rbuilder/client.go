@@ -24,7 +24,8 @@ type RbuilderClient struct {
 	ports         portmanager.PortManager
 	websocketPort uint64
 
-	elClient types.ExecutionClient
+	elClient          types.ExecutionClient
+	flashblocksClient types.FlashblocksClient
 
 	metricsCollector metrics.Collector
 }
@@ -59,6 +60,10 @@ func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) erro
 	if r.metricsCollector == nil {
 		return errors.New("failed to create metrics collector")
 	}
+
+	// Create flashblocks client
+	r.flashblocksClient = NewFlashblocksClient(r.logger, r.websocketPort)
+
 	return nil
 }
 
@@ -68,6 +73,13 @@ func (r *RbuilderClient) MetricsCollector() metrics.Collector {
 
 // Stop stops the reth client.
 func (r *RbuilderClient) Stop() {
+	// Stop flashblocks client if it exists
+	if r.flashblocksClient != nil {
+		if err := r.flashblocksClient.Stop(); err != nil {
+			r.logger.Warn("Failed to stop flashblocks client", "err", err)
+		}
+	}
+
 	r.ports.ReleasePort(r.websocketPort)
 	r.elClient.Stop()
 }
@@ -101,4 +113,9 @@ func (r *RbuilderClient) GetVersion(ctx context.Context) (string, error) {
 func (r *RbuilderClient) SetHead(ctx context.Context, blockNumber uint64) error {
 	// Rbuilder is based on reth, so delegate to the underlying reth client
 	return r.elClient.SetHead(ctx, blockNumber)
+}
+
+// FlashblocksClient returns the flashblocks websocket client for collecting flashblock payloads.
+func (r *RbuilderClient) FlashblocksClient() types.FlashblocksClient {
+	return r.flashblocksClient
 }

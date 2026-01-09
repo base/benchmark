@@ -270,3 +270,8 @@ func (g *GethClient) SetHead(ctx context.Context, blockNumber uint64) error {
 	g.logger.Info("Successfully reset blockchain head", "blockNumber", blockNumber, "blockHex", blockHex)
 	return nil
 }
+
+// FlashblocksClient returns nil as geth does not support flashblocks.
+func (g *GethClient) FlashblocksClient() types.FlashblocksClient {
+	return nil
+}
