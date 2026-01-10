@@ -215,8 +215,11 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	sendCallsPerBatch := 100
 	batches := (len(sendTxs) + sendCallsPerBatch - 1) / sendCallsPerBatch
 
-	// Process batches in parallel, 4 at a time
-	parallelBatches := 4
+	// Process batches in parallel
+	parallelBatches := f.options.ParallelTxBatches
+	if parallelBatches <= 0 {
+		parallelBatches = 4 // default
+	}
 	for i := 0; i < batches; i += parallelBatches {
 		g, gCtx := errgroup.WithContext(ctx)
 

@@ -25,6 +25,7 @@ const (
 	MachineProviderFlagName = "machine-provider"
 	MachineRegionFlagName   = "machine-region"
 	FileSystemFlagName      = "file-system"
+	ParallelTxBatchesFlagName = "parallel-tx-batches"
 )
 
 // TxFuzz defaults
@@ -98,6 +99,13 @@ var (
 		Value:   "ext4",
 		EnvVars: prefixEnvVars("FILE_SYSTEM"),
 	}
+
+	ParallelTxBatchesFlag = &cli.IntFlag{
+		Name:    ParallelTxBatchesFlagName,
+		Usage:   "Number of parallel batches for sending transactions",
+		Value:   4,
+		EnvVars: prefixEnvVars("PARALLEL_TX_BATCHES"),
+	}
 )
 
 // Flags contains the list of configuration options available to the binary.
@@ -114,6 +122,7 @@ var RunFlags = []cli.Flag{
 	MachineProviderFlag,
 	MachineRegionFlag,
 	FileSystemFlag,
+	ParallelTxBatchesFlag,
 }
 
 func init() {

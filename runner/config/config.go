@@ -26,6 +26,7 @@ type Config interface {
 	MachineProvider() string
 	MachineRegion() string
 	FileSystem() string
+	ParallelTxBatches() int
 }
 
 type config struct {
@@ -41,6 +42,7 @@ type config struct {
 	machineProvider string
 	machineRegion   string
 	fileSystem      string
+	parallelTxBatches int
 }
 
 func NewConfig(ctx *cli.Context) Config {
@@ -56,6 +58,7 @@ func NewConfig(ctx *cli.Context) Config {
 		machineProvider: ctx.String(appFlags.MachineProviderFlagName),
 		machineRegion:   ctx.String(appFlags.MachineRegionFlagName),
 		fileSystem:      ctx.String(appFlags.FileSystemFlagName),
+		parallelTxBatches: ctx.Int(appFlags.ParallelTxBatchesFlagName),
 		clientOptions:   ReadClientOptions(ctx),
 	}
 }
@@ -127,4 +130,8 @@ func (c *config) MachineRegion() string {
 
 func (c *config) FileSystem() string {
 	return c.fileSystem
+}
+
+func (c *config) ParallelTxBatches() int {
+	return c.parallelTxBatches
 }
