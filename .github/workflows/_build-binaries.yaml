@@ -41,13 +41,12 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
-
       - name: Cache Forge artifacts
         uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
         with:
           path: |
-            out
-            cache
+            contracts/out
+            contracts/cache
           key: ${{ runner.os }}-forge-${{ hashFiles('**/foundry.toml', '**/*.sol') }}
           restore-keys: |
             ${{ runner.os }}-forge-
@@ -60,7 +59,7 @@ jobs:
         uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
         with:
           name: contracts
-          path: out/
+          path: contracts/out/
           retention-days: 1
 
   build-reth:
