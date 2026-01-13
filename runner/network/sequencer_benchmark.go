@@ -207,6 +207,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			BlockTime:     params.BlockTime,
 			GasLimit:      params.GasLimit,
 			GasLimitSetup: 1e9, // 1G gas
+			ParallelTxBatches: nb.config.Config.ParallelTxBatches(),
 		}, headBlockHash, headBlockNumber, l1Chain, nb.config.BatcherAddr())
 
 		payloads := make([]engine.ExecutableData, 0)

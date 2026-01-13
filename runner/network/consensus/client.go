@@ -21,6 +21,8 @@ type ConsensusClientOptions struct {
 	GasLimit uint64
 	// GasLimitSetup is the gas limit for the setup payload
 	GasLimitSetup uint64
+	// ParallelTxBatches is the number of parallel batches for sending transactions
+	ParallelTxBatches int
 }
 
 // BaseConsensusClient contains common functionality shared between different consensus client implementations.
