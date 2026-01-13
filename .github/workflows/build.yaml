@@ -121,7 +121,7 @@ jobs:
           pushd op-program
           mise x -- ./build.sh
           popd
-          
+
           # Copy op-program binary to temp bin directory
           # The build script outputs to versions/v1.6.1-rc.1/op-program
           cp op-program/versions/v1.6.1-rc.1/op-program ${{ runner.temp }}/bin/
@@ -132,4 +132,5 @@ jobs:
         run: |
           mkdir -p op-program/versions/v1.6.1-rc.1
           cp ${{ runner.temp }}/bin/op-program op-program/versions/v1.6.1-rc.1/
+          du -h -d 2 .
           ./.github/scripts/run-example-benchmarks.sh ${{ runner.temp }}
