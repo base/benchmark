@@ -64,6 +64,9 @@ jobs:
 
   # Call the reusable workflow that builds all binaries in parallel
   build-binaries:
+    permissions:
+      contents: read
+      actions: write # Required for reusable workflow to upload artifacts
     uses: ./.github/workflows/_build-binaries.yaml
     with:
       reth_version: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
