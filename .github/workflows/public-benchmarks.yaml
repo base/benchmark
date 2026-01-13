@@ -4,13 +4,28 @@ on:
   push:
     branches: ["main"]
 
+# Set minimal permissions for all jobs by default
+permissions:
+  contents: read
+
 jobs:
+  # Call the reusable workflow that builds all binaries in parallel
+  build-binaries:
+    permissions:
+      contents: read
+      actions: write # Required for reusable workflow to upload artifacts
+    uses: ./.github/workflows/_build-binaries.yaml
+    with:
+      reth_version: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
+      geth_version: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
+      rbuilder_version: 23f42c8e78ba3abb45a8840df7037a27e196e601
+
   basic-benchmarks:
     runs-on: ubuntu-latest
-    env:
-      RETH_VERSION: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
-      GETH_VERSION: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
-
+    needs: build-binaries
+    permissions:
+      contents: read
+      actions: write # Required for artifact download and upload
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
@@ -24,52 +39,32 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
 
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
-
       - name: Install project dependencies
         run: |
           go mod download
 
-      - name: Cache binaries
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
-        id: cache-bin
+      - name: Download contract artifacts
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          path: ${{ runner.temp }}/bin
-          key: ${{ runner.os }}-binaries-reth-${{ env.RETH_VERSION }}-geth-${{ env.GETH_VERSION }}
+          name: contracts
+          path: contracts/out/
 
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@82dee4ba654bd2146511f85f0d013af94670c4de # v1.4.0
+      - name: Download reth binary
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: reth
+          path: ${{ runner.temp }}/bin/
 
-      - name: Build Contracts
+      - name: Download geth binary
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: geth
+          path: ${{ runner.temp }}/bin/
+
+      - name: Make binaries executable
         run: |
-          forge build --force
-
-      - name: Download geth and reth
-        if: steps.cache-bin.outputs.cache-hit != 'true'
-        run: |
-          unset CI
-          mkdir -p ${{ runner.temp }}/bin
-
-          git clone https://github.com/paradigmxyz/reth
-          git -C reth checkout --force ${{ env.RETH_VERSION }}
-
-          pushd reth
-          cargo build --features asm-keccak,jemalloc --profile release --bin op-reth --manifest-path crates/optimism/bin/Cargo.toml
-          cp ./target/release/op-reth ${{ runner.temp }}/bin/reth
-          popd
-          chmod +x ${{ runner.temp }}/bin/reth
-
-          git clone https://github.com/ethereum-optimism/op-geth
-          git -C op-geth checkout --force ${{ env.GETH_VERSION }}
-
-          pushd op-geth
-          make geth
-          cp ./build/bin/geth ${{ runner.temp }}/bin/geth
-          chmod +x ${{ runner.temp }}/bin/geth
-          popd
-
-          echo "binaries compiled:"
+          chmod +x ${{ runner.temp }}/bin/*
+          echo "Downloaded binaries:"
           ls -la ${{ runner.temp }}/bin
 
       - name: Run Basic Benchmarks

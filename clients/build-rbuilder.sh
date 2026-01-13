@@ -5,13 +5,13 @@ set -e
 # Source versions if available, otherwise use defaults
 if [ -f "versions.env" ]; then
     source versions.env
-else
-    # Default values
-    RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/haardikk21/op-rbuilder}"
-    RBUILDER_VERSION="${RBUILDER_VERSION:-main}"
-    BUILD_DIR="${BUILD_DIR:-./build}"
-    OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 fi
+
+# Default values
+RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/base/op-rbuilder}"
+RBUILDER_VERSION="${RBUILDER_VERSION:-main}"
+BUILD_DIR="${BUILD_DIR:-./build}"
+OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
 echo "Building op-rbuilder binary..."
 echo "Repository: $RBUILDER_REPO"
@@ -27,6 +27,9 @@ cd "$BUILD_DIR"
 if [ -d "op-rbuilder" ]; then
     echo "Updating existing op-rbuilder repository..."
     cd op-rbuilder
+
+    # ensure remote matches the repository
+    git remote set-url origin "$RBUILDER_REPO"
     git fetch origin
 else
     echo "Cloning op-rbuilder repository..."
@@ -36,24 +39,32 @@ fi
 
 # Checkout specified version/commit
 echo "Checking out version: $RBUILDER_VERSION"
-git checkout "$RBUILDER_VERSION"
+git checkout -f "$RBUILDER_VERSION"
 
 # Build the binary using cargo
 echo "Building op-rbuilder with cargo..."
-cargo build --release
+cargo build -p op-rbuilder --bin op-rbuilder --release
 
 # Copy binary to output directory
 echo "Copying binary to output directory..."
-mkdir -p "../../$OUTPUT_DIR"
+# Handle absolute paths correctly
+if [[ "$OUTPUT_DIR" == /* ]]; then
+    # Absolute path - use directly
+    FINAL_OUTPUT_DIR="$OUTPUT_DIR"
+else
+    # Relative path - resolve from current location (clients/build/op-rbuilder)
+    FINAL_OUTPUT_DIR="../../$OUTPUT_DIR"
+fi
+mkdir -p "$FINAL_OUTPUT_DIR"
 
 # Find the built binary and copy it
 if [ -f "target/release/op-rbuilder" ]; then
-    cp target/release/op-rbuilder "../../$OUTPUT_DIR/"
+    cp target/release/op-rbuilder "$FINAL_OUTPUT_DIR/"
 elif [ -f "target/release/rbuilder" ]; then
-    cp target/release/rbuilder "../../$OUTPUT_DIR/op-rbuilder"
+    cp target/release/rbuilder "$FINAL_OUTPUT_DIR/op-rbuilder"
 else
-    echo "Looking for rbuilder binary..."
-    find target/release -name "*rbuilder*" -type f -executable | head -1 | xargs -I {} cp {} "../../$OUTPUT_DIR/op-rbuilder"
+    echo "No op-rbuilder binary found"
+    exit 1
 fi
 
-echo "op-rbuilder binary built successfully and placed in $OUTPUT_DIR/op-rbuilder" 
+echo "op-rbuilder binary built successfully and placed in $FINAL_OUTPUT_DIR/op-rbuilder" 

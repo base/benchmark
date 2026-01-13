@@ -24,8 +24,8 @@ Builds the op-geth binary from the Ethereum Optimism op-geth repository using ju
 Builds the op-rbuilder binary from the op-rbuilder repository using Cargo.
 
 **Default Configuration:**
-- Repository: `https://github.com/haardikk21/op-rbuilder`
-- Version: `a8bb38693ece585e7fa98d52f51290e7dcececff`
+- Repository: `https://github.com/base/op-rbuilder`
+- Version: `main`
 - Build tool: `cargo`
 
 ## Usage
@@ -108,7 +108,7 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 
 #### For op-rbuilder (build-rbuilder.sh):
 - `RBUILDER_REPO`: Git repository URL (default: https://github.com/haardikk21/op-rbuilder)
-- `RBUILDER_VERSION`: Git branch, tag, or commit hash (default: a8bb38693ece585e7fa98d52f51290e7dcececff)
+- `RBUILDER_VERSION`: Git branch, tag, or commit hash (default: main)
 - `BUILD_DIR`: Directory for source code (default: ./build)
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 
