@@ -283,3 +283,9 @@ func (r *RethClient) SetHead(ctx context.Context, blockNumber uint64) error {
 func (r *RethClient) FlashblocksClient() types.FlashblocksClient {
 	return nil
 }
+
+// SupportsFlashblocks returns true if the client supports receiving flashblock payloads.
+// Reth supports flashblocks when configured with the appropriate flags.
+func (r *RethClient) SupportsFlashblocks() bool {
+	return true
+}

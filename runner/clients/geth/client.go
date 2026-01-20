@@ -275,3 +275,8 @@ func (g *GethClient) SetHead(ctx context.Context, blockNumber uint64) error {
 func (g *GethClient) FlashblocksClient() types.FlashblocksClient {
 	return nil
 }
+
+// SupportsFlashblocks returns false as geth does not support receiving flashblock payloads.
+func (g *GethClient) SupportsFlashblocks() bool {
+	return false
+}

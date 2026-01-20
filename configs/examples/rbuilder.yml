@@ -13,6 +13,9 @@ benchmarks:
       - type: node_type
         values:
           - rbuilder
+      - type: validator_node_type
+        values:
+          - reth
       - type: num_blocks
         value: 10
       - type: gas_limit

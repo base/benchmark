@@ -28,4 +28,5 @@ type ExecutionClient interface {
 	GetVersion(ctx context.Context) (string, error)
 	SetHead(ctx context.Context, blockNumber uint64) error
 	FlashblocksClient() FlashblocksClient // returns nil for clients that don't support flashblocks
+	SupportsFlashblocks() bool            // returns true if the client supports receiving flashblock payloads
 }
