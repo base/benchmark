@@ -10,9 +10,10 @@ import (
 )
 
 type RuntimeConfig struct {
-	Stdout io.WriteCloser
-	Stderr io.WriteCloser
-	Args   []string
+	Stdout         io.WriteCloser
+	Stderr         io.WriteCloser
+	Args           []string
+	FlashblocksURL *string // Optional URL for flashblocks websocket server (only used by clients that support it)
 }
 
 // ExecutionClient is an abstraction over the different clients that can be used to run the chain like

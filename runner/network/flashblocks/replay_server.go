@@ -196,13 +196,13 @@ func (s *ReplayServer) groupFlashblocksByBlock() map[uint64][]types.FlashblocksP
 	}
 
 	for blockNum := range groups {
-		s.sortByIndex(groups[blockNum])
+		sortByIndex(groups[blockNum])
 	}
 
 	return groups
 }
 
-func (s *ReplayServer) sortByIndex(flashblocks []types.FlashblocksPayloadV1) {
+func sortByIndex(flashblocks []types.FlashblocksPayloadV1) {
 	for i := 1; i < len(flashblocks); i++ {
 		j := i
 		for j > 0 && flashblocks[j-1].Index > flashblocks[j].Index {

@@ -285,15 +285,16 @@ func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params ben
 	args := make([]string, len(options.NodeArgs))
 	copy(args, options.NodeArgs)
 
-	if flashblockServerURL != "" && client.SupportsFlashblocks() {
-		l.Info("Configuring client with flashblocks websocket URL", "url", flashblockServerURL)
-		args = append(args, "--flashblocks-url", flashblockServerURL)
+	var flashblocksURLPtr *string
+	if flashblockServerURL != "" {
+		flashblocksURLPtr = &flashblockServerURL
 	}
 
 	runtimeConfig := &types.RuntimeConfig{
-		Stdout: stdoutLogger,
-		Stderr: stderrLogger,
-		Args:   args,
+		Stdout:         stdoutLogger,
+		Stderr:         stderrLogger,
+		Args:           args,
+		FlashblocksURL: flashblocksURLPtr,
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {

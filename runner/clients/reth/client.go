@@ -105,6 +105,12 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--db.read-transaction-timeout", "0")
 	args = append(args, cfg.Args...)
 
+	// Add flashblocks URL if provided
+	if cfg.FlashblocksURL != nil && *cfg.FlashblocksURL != "" {
+		r.logger.Info("Configuring reth with flashblocks websocket URL", "url", *cfg.FlashblocksURL)
+		args = append(args, "--flashblocks-url", *cfg.FlashblocksURL)
+	}
+
 	// delete datadir/txpool-transactions-backup.rlp if it exists
 	txpoolBackupPath := fmt.Sprintf("%s/txpool-transactions-backup.rlp", r.options.DataDirPath)
 	if _, err := os.Stat(txpoolBackupPath); err == nil {
