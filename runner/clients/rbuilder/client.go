@@ -119,3 +119,8 @@ func (r *RbuilderClient) SetHead(ctx context.Context, blockNumber uint64) error 
 func (r *RbuilderClient) FlashblocksClient() types.FlashblocksClient {
 	return r.flashblocksClient
 }
+
+// SupportsFlashblocks returns false as rbuilder doesn't support receiving flashblock payloads.
+func (r *RbuilderClient) SupportsFlashblocks() bool {
+	return false
+}

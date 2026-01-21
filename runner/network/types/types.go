@@ -56,6 +56,9 @@ type RunParams struct {
 	// NodeType is the type of node that's being benchmarked. Examples: geth, reth, nethermined, etc.
 	NodeType string
 
+	// ValidatorNodeType is the type of node used for validation. If empty, defaults to NodeType.
+	ValidatorNodeType string
+
 	// GasLimit is the gas limit for the benchmark run which is the maximum gas that the sequencer will include per block.
 	GasLimit uint64
 
@@ -95,6 +98,11 @@ func (p RunParams) ToConfig() map[string]interface{} {
 		"BenchmarkRun":          p.BenchmarkRunID,
 		"BlockTimeMilliseconds": p.BlockTime.Milliseconds(),
 		"NodeArgs":              strings.Join(p.NodeArgs, " "),
+	}
+
+	// Include ValidatorNodeType if it's set and different from NodeType
+	if p.ValidatorNodeType != "" && p.ValidatorNodeType != p.NodeType {
+		params["ValidatorNodeType"] = p.ValidatorNodeType
 	}
 
 	for k, v := range p.Tags {

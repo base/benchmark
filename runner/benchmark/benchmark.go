@@ -54,6 +54,12 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 			} else {
 				return nil, fmt.Errorf("invalid node type %s", v)
 			}
+		case "validator_node_type":
+			if vStr, ok := v.(string); ok {
+				params.ValidatorNodeType = vStr
+			} else {
+				return nil, fmt.Errorf("invalid validator node type %s", v)
+			}
 		case "gas_limit":
 			if vInt, ok := v.(int); ok {
 				params.GasLimit = uint64(vInt)

@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/metrics"
 	"github.com/base/base-bench/runner/network/consensus"
+	"github.com/base/base-bench/runner/network/flashblocks"
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	benchtypes "github.com/base/base-bench/runner/network/types"
 
@@ -20,20 +22,22 @@ import (
 )
 
 type validatorBenchmark struct {
-	log             log.Logger
-	validatorClient types.ExecutionClient
-	config          benchtypes.TestConfig
-	proofConfig     *benchmark.ProofProgramOptions
-	l1Chain         *l1Chain
+	log              log.Logger
+	validatorClient  types.ExecutionClient
+	config           benchtypes.TestConfig
+	proofConfig      *benchmark.ProofProgramOptions
+	l1Chain          *l1Chain
+	flashblockServer *flashblocks.ReplayServer
 }
 
-func newValidatorBenchmark(log log.Logger, config benchtypes.TestConfig, validatorClient types.ExecutionClient, l1Chain *l1Chain, proofConfig *benchmark.ProofProgramOptions) *validatorBenchmark {
+func newValidatorBenchmark(log log.Logger, config benchtypes.TestConfig, validatorClient types.ExecutionClient, l1Chain *l1Chain, proofConfig *benchmark.ProofProgramOptions, flashblockServer *flashblocks.ReplayServer) *validatorBenchmark {
 	return &validatorBenchmark{
-		log:             log,
-		config:          config,
-		validatorClient: validatorClient,
-		proofConfig:     proofConfig,
-		l1Chain:         l1Chain,
+		log:              log,
+		config:           config,
+		validatorClient:  validatorClient,
+		proofConfig:      proofConfig,
+		l1Chain:          l1Chain,
+		flashblockServer: flashblockServer,
 	}
 }
 
@@ -62,6 +66,28 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 	}
 	headBlockHash := headBlockHeader.Hash()
 	headBlockNumber := headBlockHeader.Number.Uint64()
+
+	// If flashblock server is available and client supports flashblocks, wait for connection
+	// and start replaying flashblocks in the background
+	if vb.flashblockServer != nil && vb.validatorClient.SupportsFlashblocks() {
+		vb.log.Info("Waiting for validator to connect to flashblock server")
+
+		// Wait for the validator client to connect to the flashblock server
+		if err := vb.flashblockServer.WaitForConnection(ctx, 30*time.Second); err != nil {
+			vb.log.Warn("Validator did not connect to flashblock server, continuing without flashblock replay", "err", err)
+		} else {
+			vb.log.Info("Validator connected to flashblock server, starting flashblock replay")
+
+			// Start replaying flashblocks in a goroutine
+			go func() {
+				if err := vb.flashblockServer.ReplayFlashblocks(ctx); err != nil {
+					if !errors.Is(err, context.Canceled) {
+						vb.log.Warn("Error replaying flashblocks", "err", err)
+					}
+				}
+			}()
+		}
+	}
 
 	consensusClient := consensus.NewSyncingConsensusClient(vb.log, vb.validatorClient.Client(), vb.validatorClient.AuthClient(), consensus.ConsensusClientOptions{
 		BlockTime: vb.config.Params.BlockTime,

@@ -10,9 +10,10 @@ import (
 )
 
 type RuntimeConfig struct {
-	Stdout io.WriteCloser
-	Stderr io.WriteCloser
-	Args   []string
+	Stdout         io.WriteCloser
+	Stderr         io.WriteCloser
+	Args           []string
+	FlashblocksURL *string // Optional URL for flashblocks websocket server (only used by clients that support it)
 }
 
 // ExecutionClient is an abstraction over the different clients that can be used to run the chain like
@@ -28,4 +29,5 @@ type ExecutionClient interface {
 	GetVersion(ctx context.Context) (string, error)
 	SetHead(ctx context.Context, blockNumber uint64) error
 	FlashblocksClient() FlashblocksClient // returns nil for clients that don't support flashblocks
+	SupportsFlashblocks() bool            // returns true if the client supports receiving flashblock payloads
 }

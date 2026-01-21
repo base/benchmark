@@ -12,6 +12,7 @@ import (
 	"github.com/base/base-bench/runner/clients"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
+	"github.com/base/base-bench/runner/network/flashblocks"
 	"github.com/base/base-bench/runner/payload"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -73,21 +74,21 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	}
 
 	// Benchmark the sequencer first to build payloads
-	payloads, lastSetupBlock, sequencerClient, err := nb.benchmarkSequencer(ctx, l1Chain)
+	payloadResult, lastSetupBlock, sequencerClient, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
 
 	// Benchmark the validator to sync the payloads
-	if err := nb.benchmarkValidator(ctx, payloads, lastSetupBlock, l1Chain, sequencerClient); err != nil {
+	if err := nb.benchmarkValidator(ctx, payloadResult, lastSetupBlock, l1Chain, sequencerClient); err != nil {
 		return fmt.Errorf("failed to run validator benchmark: %w", err)
 	}
 
 	return nil
 }
 
-func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) ([]engine.ExecutableData, uint64, types.ExecutionClient, error) {
-	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.sequencerOptions, nb.ports)
+func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) (*benchtypes.PayloadResult, uint64, types.ExecutionClient, error) {
+	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params.NodeType, nb.testConfig.Params, nb.sequencerOptions, nb.ports, "")
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to setup sequencer node: %w", err)
 	}
@@ -115,11 +116,49 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 		return nil, 0, nil, fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
 
-	return payloadResult.ExecutablePayloads, lastBlock, sequencerClient, nil
+	return payloadResult, lastBlock, sequencerClient, nil
 }
 
-func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []engine.ExecutableData, lastSetupBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
-	validatorClient, err := setupNode(ctx, nb.log, nb.testConfig.Params, nb.validatorOptions, nb.ports)
+func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloadResult *benchtypes.PayloadResult, lastSetupBlock uint64, l1Chain *l1Chain, sequencerClient types.ExecutionClient) error {
+	payloads := payloadResult.ExecutablePayloads
+
+	var flashblockServer *flashblocks.ReplayServer
+	var flashblockServerURL string
+
+	if payloadResult.HasFlashblocks() {
+		flashblockPort := nb.ports.AcquirePort("flashblocks", portmanager.FlashblocksWebsocketPortPurpose)
+
+		flashblockServer = flashblocks.NewReplayServer(
+			nb.log,
+			flashblockPort,
+			payloadResult.Flashblocks,
+			nb.testConfig.Params.BlockTime,
+		)
+
+		if err := flashblockServer.Start(ctx); err != nil {
+			nb.ports.ReleasePort(flashblockPort)
+			sequencerClient.Stop()
+			return fmt.Errorf("failed to start flashblock replay server: %w", err)
+		}
+
+		flashblockServerURL = flashblockServer.URL()
+		nb.log.Info("Started flashblock replay server", "url", flashblockServerURL, "num_flashblocks", len(payloadResult.Flashblocks))
+
+		defer func() {
+			if err := flashblockServer.Stop(); err != nil {
+				nb.log.Warn("Failed to stop flashblock replay server", "err", err)
+			}
+			nb.ports.ReleasePort(flashblockPort)
+		}()
+	}
+
+	// Use ValidatorNodeType if specified, otherwise fall back to NodeType
+	validatorNodeType := nb.testConfig.Params.ValidatorNodeType
+	if validatorNodeType == "" {
+		validatorNodeType = nb.testConfig.Params.NodeType
+	}
+
+	validatorClient, err := setupNode(ctx, nb.log, validatorNodeType, nb.testConfig.Params, nb.validatorOptions, nb.ports, flashblockServerURL)
 	if err != nil {
 		sequencerClient.Stop()
 		return fmt.Errorf("failed to setup validator node: %w", err)
@@ -197,7 +236,7 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloads []e
 		}
 	}()
 
-	benchmark := newValidatorBenchmark(nb.log, *nb.testConfig, validatorClient, l1Chain, nb.proofConfig)
+	benchmark := newValidatorBenchmark(nb.log, *nb.testConfig, validatorClient, l1Chain, nb.proofConfig, flashblockServer)
 	return benchmark.Run(ctx, payloads, lastSetupBlock, metricsCollector)
 }
 
@@ -214,13 +253,13 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 	}, nil
 }
 
-func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager) (types.ExecutionClient, error) {
+func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager, flashblockServerURL string) (types.ExecutionClient, error) {
 	if options == nil {
 		return nil, errors.New("client options cannot be nil")
 	}
 
 	var nodeType clients.Client
-	switch params.NodeType {
+	switch nodeTypeStr {
 	case "geth":
 		nodeType = clients.Geth
 	case "reth":
@@ -228,10 +267,10 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	case "rbuilder":
 		nodeType = clients.Rbuilder
 	default:
-		return nil, fmt.Errorf("unsupported node type: %s", params.NodeType)
+		return nil, fmt.Errorf("unsupported node type: %s", nodeTypeStr)
 	}
 
-	clientLogger := l.With("nodeType", params.NodeType)
+	clientLogger := l.With("nodeType", nodeTypeStr)
 	client := clients.NewClient(nodeType, clientLogger, options, portManager)
 
 	logPath := path.Join(options.TestDirPath, ExecutionLayerLogFileName)
@@ -243,10 +282,19 @@ func setupNode(ctx context.Context, l log.Logger, params benchtypes.RunParams, o
 	stdoutLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 	stderrLogger := logger.NewMultiWriterCloser(logger.NewLogWriter(clientLogger), fileWriter)
 
+	args := make([]string, len(options.NodeArgs))
+	copy(args, options.NodeArgs)
+
+	var flashblocksURLPtr *string
+	if flashblockServerURL != "" {
+		flashblocksURLPtr = &flashblockServerURL
+	}
+
 	runtimeConfig := &types.RuntimeConfig{
-		Stdout: stdoutLogger,
-		Stderr: stderrLogger,
-		Args:   options.NodeArgs,
+		Stdout:         stdoutLogger,
+		Stderr:         stderrLogger,
+		Args:           args,
+		FlashblocksURL: flashblocksURLPtr,
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {
