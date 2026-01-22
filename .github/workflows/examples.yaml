@@ -19,6 +19,7 @@ jobs:
       reth_version: 27a8c0f5a6dfb27dea84c5751776ecabdd069646
       geth_version: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
       rbuilder_version: 23f42c8e78ba3abb45a8840df7037a27e196e601
+      base_reth_node_version: main
 
   example-benchmarks:
     runs-on: ubuntu-latest
@@ -65,6 +66,12 @@ jobs:
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: rbuilder
+          path: ${{ runner.temp }}/bin/
+
+      - name: Download base-reth-node binary
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: base-reth-node
           path: ${{ runner.temp }}/bin/
 
       - name: Make binaries executable

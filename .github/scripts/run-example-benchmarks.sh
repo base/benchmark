@@ -10,6 +10,7 @@ BENCHMARK_CONFIGS=(
     configs/examples/simulator.yml
     configs/examples/sload.yml
     configs/examples/rbuilder.yml
+    configs/examples/base-reth-node.yml
     configs/examples/sstore.yml
     # configs/examples/snapshot.yml
     # configs/examples/tx-fuzz-geth.yml
@@ -28,5 +29,6 @@ for config in "${BENCHMARK_CONFIGS[@]}"; do
         --output-dir $TEMP_DIR/output \
         --reth-bin $TEMP_DIR/bin/reth \
         --geth-bin $TEMP_DIR/bin/geth \
-        --rbuilder-bin $TEMP_DIR/bin/rbuilder
+        --rbuilder-bin $TEMP_DIR/bin/rbuilder \
+        --base-reth-node-bin $TEMP_DIR/bin/base-reth-node
 done

@@ -266,6 +266,8 @@ func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params ben
 		nodeType = clients.Reth
 	case "rbuilder":
 		nodeType = clients.Rbuilder
+	case "base-reth-node":
+		nodeType = clients.BaseRethNode
 	default:
 		return nil, fmt.Errorf("unsupported node type: %s", nodeTypeStr)
 	}

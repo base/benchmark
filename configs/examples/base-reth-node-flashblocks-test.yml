@@ -1,0 +1,23 @@
+name: Base Reth Node flashblocks metrics test
+description: Test base-reth-node flashblock metrics collection with rbuilder as sequencer and base-reth-node as validator
+payloads:
+  - name: Transfer Only
+    type: transfer-only
+    id: transfer-only
+
+benchmarks:
+  - variables:
+      - type: payload
+        values:
+          - transfer-only
+      - type: node_type
+        values:
+          - rbuilder
+      - type: validator_node_type
+        values:
+          - base-reth-node
+      - type: num_blocks
+        value: 5
+      - type: gas_limit
+        values:
+          - 1000000000

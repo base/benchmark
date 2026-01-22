@@ -4,6 +4,7 @@ import (
 	"github.com/urfave/cli/v2"
 
 	"github.com/base/base-bench/runner/benchmark/portmanager"
+	baserethnode "github.com/base/base-bench/runner/clients/baserethnode/options"
 	gethoptions "github.com/base/base-bench/runner/clients/geth/options"
 	rbuilderoptions "github.com/base/base-bench/runner/clients/rbuilder/options"
 	rethoptions "github.com/base/base-bench/runner/clients/reth/options"
@@ -16,6 +17,7 @@ type ClientOptions struct {
 	rethoptions.RethOptions
 	gethoptions.GethOptions
 	rbuilderoptions.RbuilderOptions
+	baserethnode.BaseRethNodeOptions
 	PortOverrides PortOverrides
 }
 
@@ -57,6 +59,9 @@ func ReadClientOptions(ctx *cli.Context) ClientOptions {
 		},
 		RbuilderOptions: rbuilderoptions.RbuilderOptions{
 			RbuilderBin: ctx.String(flags.RbuilderBin),
+		},
+		BaseRethNodeOptions: baserethnode.BaseRethNodeOptions{
+			BaseRethNodeBin: ctx.String(flags.BaseRethNodeBin),
 		},
 	}
 
