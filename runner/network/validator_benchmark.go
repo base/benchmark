@@ -103,7 +103,7 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 		BlockTime: vb.config.Params.BlockTime,
 	}, headBlockHash, headBlockNumber)
 
-	err = consensusClient.Start(ctx, payloads, metricsCollector, lastSetupBlock, startedBlockSignal)
+	err = consensusClient.Start(ctx, payloads, metricsCollector, lastSetupBlock + 1, startedBlockSignal)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return err

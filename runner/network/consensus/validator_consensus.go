@@ -69,7 +69,7 @@ func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.Ex
 	m := metrics.NewBlockMetrics()
 
 	for i := 0; i < len(payloads); i++ {
-		m.SetBlockNumber(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock))))
+		m.SetBlockNumber(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock)+1)))
 		f.log.Info("Proposing payload", "payload_index", i)
 
 		startTime := time.Now()
