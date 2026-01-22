@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	RethBin     = "reth-bin"
-	RbuilderBin = "rbuilder-bin"
-	GethBin     = "geth-bin"
+	RethBin         = "reth-bin"
+	RbuilderBin     = "rbuilder-bin"
+	GethBin         = "geth-bin"
+	BaseRethNodeBin = "base-reth-node-bin"
 )
 
 func CLIFlags(envPrefix string) []cli.Flag {
@@ -31,6 +32,12 @@ func CLIFlags(envPrefix string) []cli.Flag {
 			Usage:   "Rbuilder binary path",
 			Value:   "rbuilder",
 			EnvVars: opservice.PrefixEnvVar(envPrefix, "RBUILDER_BIN"),
+		},
+		&cli.StringFlag{
+			Name:    BaseRethNodeBin,
+			Usage:   "Base Reth Node binary path",
+			Value:   "base-reth-node",
+			EnvVars: opservice.PrefixEnvVar(envPrefix, "BASE_RETH_NODE_BIN"),
 		},
 	}
 }

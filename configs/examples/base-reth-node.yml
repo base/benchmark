@@ -1,0 +1,23 @@
+name: Base Reth Node transfer throughput test
+description: Test base-reth-node transfer throughput using flashblocks
+payloads:
+  - name: Transfer Only
+    type: transfer-only
+    id: transfer-only
+
+benchmarks:
+  - variables:
+      - type: payload
+        values:
+          - transfer-only
+      - type: node_type
+        values:
+          - base-reth-node
+      - type: validator_node_type
+        values:
+          - reth
+      - type: num_blocks
+        value: 10
+      - type: gas_limit
+        values:
+          - 1000000000

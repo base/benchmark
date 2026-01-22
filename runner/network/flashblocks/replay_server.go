@@ -225,7 +225,8 @@ func (s *ReplayServer) broadcastFlashblock(flashblock types.FlashblocksPayloadV1
 
 	var lastErr error
 	for _, conn := range connections {
-		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+		// Use BinaryMessage - base-reth-node requires binary websocket messages
+		if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
 			s.log.Warn("Failed to send flashblock to client", "err", err)
 			lastErr = err
 		}
