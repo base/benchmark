@@ -64,16 +64,23 @@ func (f *SyncingConsensusClient) propose(ctx context.Context, payload *engine.Ex
 }
 
 // Start starts the fake consensus client.
-func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.Collector, firstTestBlock uint64) error {
+func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.ExecutableData, metricsCollector metrics.Collector, firstTestBlock uint64, startedBlockSignal chan uint64) error {
 	f.log.Info("Starting sync benchmark", "num_payloads", len(payloads))
 	m := metrics.NewBlockMetrics()
+
 	for i := 0; i < len(payloads); i++ {
 		m.SetBlockNumber(uint64(max(0, int(payloads[i].Number)-int(firstTestBlock))))
 		f.log.Info("Proposing payload", "payload_index", i)
+
+		startTime := time.Now()
 		err := f.propose(ctx, &payloads[i], m)
 		if err != nil {
 			return err
 		}
+
+		startedBlockSignal <- payloads[i].Number + 1
+
+		time.Sleep(time.Until(startTime.Add(f.options.BlockTime)))
 
 		if payloads[i].Number >= firstTestBlock {
 			err = metricsCollector.Collect(ctx, m)
@@ -81,6 +88,7 @@ func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.Ex
 				f.log.Error("Failed to collect metrics", "error", err)
 			}
 		}
+
 	}
 	return nil
 }

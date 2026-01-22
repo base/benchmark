@@ -154,7 +154,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	flashblocksClient := sequencerClient.FlashblocksClient()
 	if flashblocksClient != nil {
 		nb.log.Info("Starting flashblocks collection")
-		flashblockCollector = newFlashblockCollector()
+		flashblockCollector = newFlashblockCollector(nb.log)
 		flashblocksClient.AddListener(flashblockCollector)
 
 		if err := flashblocksClient.Start(benchmarkCtx); err != nil {
@@ -204,22 +204,25 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 	go func() {
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
-			BlockTime:     params.BlockTime,
-			GasLimit:      params.GasLimit,
-			GasLimitSetup: 1e9, // 1G gas
+			BlockTime:         params.BlockTime,
+			GasLimit:          params.GasLimit,
+			GasLimitSetup:     1e9, // 1G gas
 			ParallelTxBatches: nb.config.Config.ParallelTxBatches(),
 		}, headBlockHash, headBlockNumber, l1Chain, nb.config.BatcherAddr())
 
 		payloads := make([]engine.ExecutableData, 0)
 
+		var lastSetupPayload *engine.ExecutableData
 	setupLoop:
 		for {
 			_blockMetrics := metrics.NewBlockMetrics()
-			_, err := consensusClient.Propose(benchmarkCtx, _blockMetrics, true)
+			setupPayload, err := consensusClient.Propose(benchmarkCtx, _blockMetrics, true)
 			if err != nil {
 				errChan <- err
 				return
 			}
+
+			lastSetupPayload = setupPayload
 
 			select {
 			case <-setupComplete:
@@ -230,6 +233,8 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			}
 
 		}
+
+		payloads = append(payloads, *lastSetupPayload)
 
 		blockMetrics := metrics.NewBlockMetrics()
 
@@ -276,7 +281,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		return nil, 0, err
 	case payloads := <-payloadResult:
 		// Collect flashblocks if available
-		var flashblocks []types.FlashblocksPayloadV1
+		var flashblocks map[uint64][]types.FlashblocksPayloadV1
 		if flashblockCollector != nil {
 			flashblocks = flashblockCollector.GetFlashblocks()
 			nb.log.Info("Collected flashblocks", "count", len(flashblocks))
@@ -286,20 +291,23 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			ExecutablePayloads: payloads,
 			Flashblocks:        flashblocks,
 		}
-		return result, payloads[0].Number - 1, nil
+		return result, payloads[0].Number, nil
 	}
 }
 
 // flashblockCollector implements FlashblockListener to collect flashblocks.
 type flashblockCollector struct {
-	flashblocks []types.FlashblocksPayloadV1
-	mu          sync.Mutex
+	log              log.Logger
+	flashblocks      map[uint64][]types.FlashblocksPayloadV1
+	currentBaseBlock *uint64
+	mu               sync.Mutex
 }
 
 // newFlashblockCollector creates a new flashblock collector.
-func newFlashblockCollector() *flashblockCollector {
+func newFlashblockCollector(log log.Logger) *flashblockCollector {
 	return &flashblockCollector{
-		flashblocks: make([]types.FlashblocksPayloadV1, 0),
+		flashblocks: make(map[uint64][]types.FlashblocksPayloadV1),
+		log:         log,
 	}
 }
 
@@ -307,16 +315,26 @@ func newFlashblockCollector() *flashblockCollector {
 func (c *flashblockCollector) OnFlashblock(flashblock types.FlashblocksPayloadV1) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.flashblocks = append(c.flashblocks, flashblock)
+	if flashblock.Base != nil {
+		baseBlock := uint64(flashblock.Base.BlockNumber)
+		c.currentBaseBlock = &baseBlock
+	} else if c.currentBaseBlock == nil {
+		c.log.Warn("received flashblock without base block number")
+		return
+	}
+	c.log.Info("Collected flashblock", "block_number", *c.currentBaseBlock, "index", flashblock.Index, "tx_count", len(flashblock.Diff.Transactions))
+	c.flashblocks[*c.currentBaseBlock] = append(c.flashblocks[*c.currentBaseBlock], flashblock)
 }
 
 // GetFlashblocks returns all collected flashblocks.
-func (c *flashblockCollector) GetFlashblocks() []types.FlashblocksPayloadV1 {
+func (c *flashblockCollector) GetFlashblocks() map[uint64][]types.FlashblocksPayloadV1 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// Return a copy to avoid race conditions
-	result := make([]types.FlashblocksPayloadV1, len(c.flashblocks))
-	copy(result, c.flashblocks)
+	result := make(map[uint64][]types.FlashblocksPayloadV1)
+	for blockNumber, flashblocks := range c.flashblocks {
+		result[blockNumber] = append([]types.FlashblocksPayloadV1{}, flashblocks...)
+	}
 	return result
 }

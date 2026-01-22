@@ -17,7 +17,7 @@ import (
 type ReplayServer struct {
 	log         log.Logger
 	port        uint64
-	flashblocks []types.FlashblocksPayloadV1
+	flashblocks map[uint64][]types.FlashblocksPayloadV1
 	blockTime   time.Duration
 
 	server   *http.Server
@@ -30,7 +30,7 @@ type ReplayServer struct {
 	stopOnce    sync.Once
 }
 
-func NewReplayServer(log log.Logger, port uint64, flashblocks []types.FlashblocksPayloadV1, blockTime time.Duration) *ReplayServer {
+func NewReplayServer(log log.Logger, port uint64, flashblocks map[uint64][]types.FlashblocksPayloadV1, blockTime time.Duration) *ReplayServer {
 	return &ReplayServer{
 		log:         log,
 		port:        port,
@@ -117,100 +117,53 @@ func (s *ReplayServer) removeConnection(conn *websocket.Conn) {
 }
 
 // ReplayFlashblocks replays flashblocks to connected clients at evenly spaced intervals.
-func (s *ReplayServer) ReplayFlashblocks(ctx context.Context) error {
+func (s *ReplayServer) ReplayFlashblock(ctx context.Context, blockNumber uint64) error {
 	if len(s.flashblocks) == 0 {
 		s.log.Info("No flashblocks to replay")
 		return nil
 	}
 
-	blockGroups := s.groupFlashblocksByBlock()
+	flashblocks, ok := s.flashblocks[blockNumber]
+	if !ok {
+		s.log.Info("No flashblocks to replay for block", "block_number", blockNumber)
+		return nil
+	}
 
 	s.log.Info("Starting flashblock replay",
-		"total_flashblocks", len(s.flashblocks),
-		"num_blocks", len(blockGroups),
+		"flashblocks", len(flashblocks),
 	)
 
-	for blockNum, flashblocks := range blockGroups {
+	numIntervals := 1
+	if len(flashblocks) > 1 {
+		numIntervals = len(flashblocks)
+	}
+
+	interval := s.blockTime / time.Duration(numIntervals)
+
+	s.log.Debug("Replaying flashblocks for block",
+		"block_number", blockNumber,
+		"num_flashblocks", len(flashblocks),
+		"interval", interval,
+	)
+
+	for i, flashblock := range flashblocks {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		if len(flashblocks) == 0 {
-			continue
+		if err := s.broadcastFlashblock(flashblock); err != nil {
+			s.log.Warn("Error broadcasting flashblock", "err", err, "index", i)
 		}
 
-		interval := s.blockTime / time.Duration(len(flashblocks)+1)
-
-		s.log.Debug("Replaying flashblocks for block",
-			"block_number", blockNum,
-			"num_flashblocks", len(flashblocks),
-			"interval", interval,
-		)
-
-		for i, flashblock := range flashblocks {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			time.Sleep(interval)
-
-			if err := s.broadcastFlashblock(flashblock); err != nil {
-				s.log.Warn("Error broadcasting flashblock", "err", err, "index", i)
-			}
-		}
-
-		remainingTime := s.blockTime - interval*time.Duration(len(flashblocks))
-		if remainingTime > 0 {
-			time.Sleep(remainingTime)
-		}
+		time.Sleep(interval)
 	}
 
 	s.log.Info("Flashblock replay complete")
 	return nil
 }
 
-// groupFlashblocksByBlock groups flashblocks by block number, sorted by index.
-func (s *ReplayServer) groupFlashblocksByBlock() map[uint64][]types.FlashblocksPayloadV1 {
-	groups := make(map[uint64][]types.FlashblocksPayloadV1)
-
-	// Build PayloadID -> blockNum mapping from flashblocks with Base
-	payloadIDToBlockNum := make(map[types.PayloadID]uint64)
-	for _, fb := range s.flashblocks {
-		if fb.Base != nil {
-			payloadIDToBlockNum[fb.PayloadID] = uint64(fb.Base.BlockNumber)
-		}
-	}
-
-	for _, fb := range s.flashblocks {
-		var blockNum uint64
-		if fb.Base != nil {
-			blockNum = uint64(fb.Base.BlockNumber)
-		} else if bn, ok := payloadIDToBlockNum[fb.PayloadID]; ok {
-			blockNum = bn
-		}
-		groups[blockNum] = append(groups[blockNum], fb)
-	}
-
-	for blockNum := range groups {
-		sortByIndex(groups[blockNum])
-	}
-
-	return groups
-}
-
-func sortByIndex(flashblocks []types.FlashblocksPayloadV1) {
-	for i := 1; i < len(flashblocks); i++ {
-		j := i
-		for j > 0 && flashblocks[j-1].Index > flashblocks[j].Index {
-			flashblocks[j-1], flashblocks[j] = flashblocks[j], flashblocks[j-1]
-			j--
-		}
-	}
-}
 
 func (s *ReplayServer) broadcastFlashblock(flashblock types.FlashblocksPayloadV1) error {
 	data, err := json.Marshal(flashblock)
@@ -232,9 +185,15 @@ func (s *ReplayServer) broadcastFlashblock(flashblock types.FlashblocksPayloadV1
 		}
 	}
 
+	blockNumber := 0
+	if flashblock.Base != nil {
+		blockNumber = int(flashblock.Base.BlockNumber)
+	}
+
 	s.log.Debug("Broadcasted flashblock",
 		"payload_id", fmt.Sprintf("%x", flashblock.PayloadID),
 		"index", flashblock.Index,
+		"block_number", blockNumber,
 		"num_clients", len(connections),
 	)
 

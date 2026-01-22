@@ -12,7 +12,7 @@ type PayloadResult struct {
 	ExecutablePayloads []engine.ExecutableData
 
 	// Flashblocks are the flashblock payloads collected during the benchmark (if available)
-	Flashblocks []clientTypes.FlashblocksPayloadV1
+	Flashblocks map[uint64][]clientTypes.FlashblocksPayloadV1
 }
 
 // HasFlashblocks returns true if flashblock payloads were collected.
