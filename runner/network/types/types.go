@@ -134,13 +134,18 @@ func getAverage(metrics []metrics.BlockMetrics, metricName string) float64 {
 }
 
 const (
-	UpdateForkChoiceLatencyMetric = "latency/update_fork_choice"
-	NewPayloadLatencyMetric       = "latency/new_payload"
-	GetPayloadLatencyMetric       = "latency/get_payload"
-	SendTxsLatencyMetric          = "latency/send_txs"
-	GasPerBlockMetric             = "gas/per_block"
-	GasPerSecondMetric            = "gas/per_second"
-	TransactionsPerBlockMetric    = "transactions/per_block"
+	UpdateForkChoiceLatencyMetric      = "latency/update_fork_choice"
+	NewPayloadLatencyMetric            = "latency/new_payload"
+	GetPayloadLatencyMetric            = "latency/get_payload"
+	SendTxsLatencyMetric               = "latency/send_txs"
+	GasPerBlockMetric                  = "gas/per_block"
+	GasPerSecondMetric                 = "gas/per_second"
+	TransactionsPerBlockMetric         = "transactions/per_block"
+	FlashblockProcessingDurationMetric = "reth_flashblocks_block_processing_duration"
+	FlashblockSenderRecoveryMetric     = "reth_flashblocks_sender_recovery_duration"
+	FlashblocksInBlockMetric           = "reth_flashblocks_flashblocks_in_block"
+	FlashblockUpstreamMessagesMetric   = "reth_flashblocks_upstream_messages"
+	FlashblockBundleStateCloneDuration = "reth_flashblocks_bundle_state_clone_duration"
 )
 
 type SequencerKeyMetrics struct {
@@ -152,7 +157,9 @@ type SequencerKeyMetrics struct {
 
 type ValidatorKeyMetrics struct {
 	CommonKeyMetrics
-	AverageNewPayloadLatency float64 `json:"newPayload"`
+	AverageNewPayloadLatency            float64 `json:"newPayload"`
+	AverageFlashblockProcessingDuration float64 `json:"flashblockProcessingDuration,omitempty"`
+	AverageFlashblocksInBlock           float64 `json:"flashblocksInBlock,omitempty"`
 }
 
 type CommonKeyMetrics struct {
@@ -163,9 +170,13 @@ type CommonKeyMetrics struct {
 func BlockMetricsToValidatorSummary(metrics []metrics.BlockMetrics) *ValidatorKeyMetrics {
 	averageNewPayloadLatency := getAverage(metrics, NewPayloadLatencyMetric)
 	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
+	averageFlashblockProcessingDuration := getAverage(metrics, FlashblockProcessingDurationMetric)
+	averageFlashblocksInBlock := getAverage(metrics, FlashblocksInBlockMetric)
 
 	return &ValidatorKeyMetrics{
-		AverageNewPayloadLatency: averageNewPayloadLatency,
+		AverageNewPayloadLatency:            averageNewPayloadLatency,
+		AverageFlashblockProcessingDuration: averageFlashblockProcessingDuration,
+		AverageFlashblocksInBlock:           averageFlashblocksInBlock,
 		CommonKeyMetrics: CommonKeyMetrics{
 			AverageGasPerSecond: averageGasPerSecond,
 		},
