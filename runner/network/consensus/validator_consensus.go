@@ -78,7 +78,10 @@ func (f *SyncingConsensusClient) Start(ctx context.Context, payloads []engine.Ex
 			return err
 		}
 
-		startedBlockSignal <- payloads[i].Number + 1
+		select {
+		case startedBlockSignal <- payloads[i].Number + 1:
+		default:
+		}
 
 		time.Sleep(time.Until(startTime.Add(f.options.BlockTime)))
 
