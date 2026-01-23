@@ -183,10 +183,10 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloadResul
 
 	nb.log.Info("Validator header", "number", validatorHeader.Number.Uint64(), "lastSetupBlock", lastSetupBlock)
 
-	if validatorHeader.Number.Cmp(big.NewInt(int64(lastSetupBlock))) < 0 {
+	if validatorHeader.Number.Cmp(big.NewInt(int64(lastSetupBlock)-1)) < 0 {
 		nb.log.Info("Validator is behind first test block, catching up", "validator_block", validatorHeader.Number.Uint64(), "last_setup_block", lastSetupBlock)
 		// fetch all blocks the validator node is missing
-		for i := validatorHeader.Number.Uint64() + 1; i <= lastSetupBlock; i++ {
+		for i := validatorHeader.Number.Uint64() + 1; i < lastSetupBlock; i++ {
 			block, err := sequencerClient.Client().BlockByNumber(ctx, big.NewInt(int64(i)))
 			if err != nil {
 				sequencerClient.Stop()

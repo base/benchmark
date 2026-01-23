@@ -67,6 +67,8 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 	headBlockHash := headBlockHeader.Hash()
 	headBlockNumber := headBlockHeader.Number.Uint64()
 
+	startedBlockSignal := make(chan uint64)
+
 	// If flashblock server is available and client supports flashblocks, wait for connection
 	// and start replaying flashblocks in the background
 	if vb.flashblockServer != nil && vb.validatorClient.SupportsFlashblocks() {
@@ -80,9 +82,17 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 
 			// Start replaying flashblocks in a goroutine
 			go func() {
-				if err := vb.flashblockServer.ReplayFlashblocks(ctx); err != nil {
-					if !errors.Is(err, context.Canceled) {
-						vb.log.Warn("Error replaying flashblocks", "err", err)
+				for {
+					select {
+					case <-ctx.Done():
+						return
+					case blockNumber := <-startedBlockSignal:
+						vb.log.Info("Replaying flashblocks for block", "block_number", blockNumber)
+						if err := vb.flashblockServer.ReplayFlashblock(ctx, blockNumber); err != nil {
+							if !errors.Is(err, context.Canceled) {
+								vb.log.Warn("Error replaying flashblocks", "err", err)
+							}
+						}
 					}
 				}
 			}()
@@ -93,7 +103,7 @@ func (vb *validatorBenchmark) Run(ctx context.Context, payloads []engine.Executa
 		BlockTime: vb.config.Params.BlockTime,
 	}, headBlockHash, headBlockNumber)
 
-	err = consensusClient.Start(ctx, payloads, metricsCollector, lastSetupBlock)
+	err = consensusClient.Start(ctx, payloads, metricsCollector, lastSetupBlock + 1, startedBlockSignal)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return err
