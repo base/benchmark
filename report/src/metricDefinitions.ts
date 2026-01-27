@@ -210,6 +210,39 @@ export const CHART_CONFIG = {
     description: "Shows the 90th percentile latency for account loads",
     unit: "s",
   },
+  reth_reth_flashblocks_block_processing_duration: {
+    type: "line",
+    title: "Flashblock Processing Duration",
+    description: "Shows the time taken to process flashblocks on the validator",
+    unit: "s",
+  },
+  reth_reth_flashblocks_flashblocks_in_block: {
+    type: "line",
+    title: "Flashblocks per Block",
+    description: "Shows the number of flashblocks received per block",
+    unit: "count",
+  },
+  reth_reth_flashblocks_sender_recovery_duration: {
+    type: "line",
+    title: "Flashblock Sender Recovery Duration",
+    description:
+      "Shows the time taken to recover senders from flashblock transactions",
+    unit: "s",
+  },
+  reth_reth_flashblocks_upstream_messages: {
+    type: "line",
+    title: "Flashblock Upstream Messages",
+    description:
+      "Shows the number of upstream messages received from the flashblock stream",
+    unit: "count",
+  },
+  reth_reth_flashblocks_bundle_state_clone_duration: {
+    type: "line",
+    title: "Flashblock Bundle State Clone Duration",
+    description:
+      "Shows the time taken to clone the bundle state for flashblock processing",
+    unit: "s",
+  },
 } satisfies Record<string, ChartConfig>;
 
 const CHART_CONFIG_ORDER: (keyof typeof CHART_CONFIG)[] = [
