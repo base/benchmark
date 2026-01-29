@@ -97,7 +97,7 @@ func (s *Service) downloadOutputFiles(baseURL, runID, runOutputDir string) error
 		// Try to download the file
 		err := s.downloadFile(fileURL, localFilePath)
 		if err != nil {
-			if !slices.Contains(requiredFiles, fileName) {
+			if slices.Contains(requiredFiles, fileName) {
 				return errors.Wrap(err, "failed to download file")
 			}
 			s.log.Warn("Failed to download file (continuing)", "file", fileName, "url", fileURL, "error", err)
