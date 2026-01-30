@@ -107,7 +107,7 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 
 #### For op-rbuilder (build-rbuilder.sh):
-- `RBUILDER_REPO`: Git repository URL (default: https://github.com/haardikk21/op-rbuilder)
+- `RBUILDER_REPO`: Git repository URL (default: https://github.com/base/op-rbuilder)
 - `RBUILDER_VERSION`: Git branch, tag, or commit hash (default: main)
 - `BUILD_DIR`: Directory for source code (default: ./build)
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
