@@ -169,7 +169,6 @@ func RunInteractive(summary *ImportSummary, destMetadata *benchmark.RunGroup) (*
 
 	// Run the remaining forms
 	for _, form := range forms {
-		fmt.Printf("Running form: %v\n", form)
 		if err := form.Run(); err != nil {
 			return nil, nil, BenchmarkRunCreateNew, false, fmt.Errorf("form cancelled: %w", err)
 		}
