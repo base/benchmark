@@ -48,7 +48,6 @@ func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) erro
 	r.websocketPort = r.ports.AcquirePort("rbuilder", portmanager.FlashblocksWebsocketPortPurpose)
 
 	cfg2 := *cfg
-	cfg2.Args = append(cfg2.Args, "--flashblocks.enabled")
 	cfg2.Args = append(cfg2.Args, "--flashblocks.port", fmt.Sprintf("%d", r.websocketPort))
 	cfg2.Args = append(cfg2.Args, "--flashblocks.fixed")
 	err := r.elClient.Run(ctx, &cfg2)
