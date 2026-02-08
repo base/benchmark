@@ -1,4 +1,4 @@
-package rbuilder
+package builder
 
 import (
 	"bytes"

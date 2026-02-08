@@ -5,8 +5,8 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark/portmanager"
 	"github.com/base/base-bench/runner/clients/baserethnode"
+	"github.com/base/base-bench/runner/clients/builder"
 	"github.com/base/base-bench/runner/clients/geth"
-	"github.com/base/base-bench/runner/clients/rbuilder"
 	"github.com/base/base-bench/runner/clients/reth"
 	"github.com/base/base-bench/runner/clients/types"
 	"github.com/base/base-bench/runner/config"
@@ -19,8 +19,8 @@ func NewClient(client Client, logger log.Logger, options *config.InternalClientO
 		return reth.NewRethClient(logger, options, portManager)
 	case Geth:
 		return geth.NewGethClient(logger, options, portManager)
-	case Rbuilder:
-		return rbuilder.NewRbuilderClient(logger, options, portManager)
+	case Builder:
+		return builder.NewBuilderClient(logger, options, portManager)
 	case BaseRethNode:
 		return baserethnode.NewBaseRethNodeClient(logger, options, portManager)
 	default:
@@ -34,6 +34,6 @@ type Client uint
 const (
 	Reth Client = iota
 	Geth
-	Rbuilder
+	Builder
 	BaseRethNode
 )

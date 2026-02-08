@@ -20,8 +20,8 @@ Builds the op-geth binary from the Ethereum Optimism op-geth repository using ju
 - Version: `optimism`
 - Build tool: `go run build/ci.go install`
 
-### build-rbuilder.sh
-Builds the op-rbuilder binary from the op-rbuilder repository using Cargo.
+### build-builder.sh
+Builds the builder binary from the op-rbuilder repository using Cargo.
 
 **Default Configuration:**
 - Repository: `https://github.com/base/op-rbuilder`
@@ -42,8 +42,8 @@ make build-reth
 # Build only geth
 make build-geth
 
-# Build only op-rbuilder
-make build-rbuilder
+# Build only builder
+make build-builder
 ```
 
 ### Direct Script Execution
@@ -56,8 +56,8 @@ cd clients
 # Build geth with defaults
 ./build-geth.sh
 
-# Build op-rbuilder with defaults
-./build-rbuilder.sh
+# Build builder with defaults
+./build-builder.sh
 ```
 
 ## Version Management
@@ -75,7 +75,7 @@ Modify the `versions.env` file to change defaults for all builds:
 # Edit versions.env to update default versions
 RETH_VERSION="v0.2.0-beta.5"
 GETH_VERSION="v1.13.0"
-RBUILDER_VERSION="your-commit-hash"
+BUILDER_VERSION="your-commit-hash"
 ```
 
 #### 2. Environment Variables
@@ -88,8 +88,8 @@ RETH_REPO="https://github.com/paradigmxyz/reth/" RETH_VERSION="v0.1.0" ./build-r
 # Build geth from a fork
 GETH_REPO="https://github.com/your-fork/op-geth/" GETH_VERSION="your-branch" ./build-geth.sh
 
-# Build op-rbuilder from a different commit
-RBUILDER_VERSION="main" ./build-rbuilder.sh
+# Build builder from a different commit
+BUILDER_VERSION="main" ./build-builder.sh
 ```
 
 ### Available Environment Variables
@@ -106,9 +106,9 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 - `BUILD_DIR`: Directory for source code (default: ./build)
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 
-#### For op-rbuilder (build-rbuilder.sh):
-- `RBUILDER_REPO`: Git repository URL (default: https://github.com/haardikk21/op-rbuilder)
-- `RBUILDER_VERSION`: Git branch, tag, or commit hash (default: main)
+#### For builder (build-builder.sh):
+- `BUILDER_REPO`: Git repository URL (default: https://github.com/base/op-rbuilder)
+- `BUILDER_VERSION`: Git branch, tag, or commit hash (default: main)
 - `BUILD_DIR`: Directory for source code (default: ./build)
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 
@@ -122,7 +122,7 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 - Go toolchain
 - Git
 
-### For op-rbuilder:
+### For builder:
 - Rust and Cargo installed
 - Git
 
@@ -131,4 +131,4 @@ RBUILDER_VERSION="main" ./build-rbuilder.sh
 Built binaries will be placed in the `bin/` directory at the project root:
 - `bin/reth` - The reth binary
 - `bin/geth` - The op-geth binary
-- `bin/op-rbuilder` - The op-rbuilder binary 
+- `bin/op-rbuilder` - The builder binary

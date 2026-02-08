@@ -8,14 +8,14 @@ if [ -f "versions.env" ]; then
 fi
 
 # Default values
-RBUILDER_REPO="${RBUILDER_REPO:-https://github.com/base/op-rbuilder}"
-RBUILDER_VERSION="${RBUILDER_VERSION:-main}"
+BUILDER_REPO="${BUILDER_REPO:-https://github.com/base/op-rbuilder}"
+BUILDER_VERSION="${BUILDER_VERSION:-main}"
 BUILD_DIR="${BUILD_DIR:-./build}"
 OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
-echo "Building op-rbuilder binary..."
-echo "Repository: $RBUILDER_REPO"
-echo "Version/Commit: $RBUILDER_VERSION"
+echo "Building builder binary..."
+echo "Repository: $BUILDER_REPO"
+echo "Version/Commit: $BUILDER_VERSION"
 echo "Build directory: $BUILD_DIR"
 echo "Output directory: $OUTPUT_DIR"
 
@@ -29,17 +29,17 @@ if [ -d "op-rbuilder" ]; then
     cd op-rbuilder
 
     # ensure remote matches the repository
-    git remote set-url origin "$RBUILDER_REPO"
+    git remote set-url origin "$BUILDER_REPO"
     git fetch origin
 else
     echo "Cloning op-rbuilder repository..."
-    git clone "$RBUILDER_REPO" op-rbuilder
+    git clone "$BUILDER_REPO" op-rbuilder
     cd op-rbuilder
 fi
 
 # Checkout specified version/commit
-echo "Checking out version: $RBUILDER_VERSION"
-git checkout -f "$RBUILDER_VERSION"
+echo "Checking out version: $BUILDER_VERSION"
+git checkout -f "$BUILDER_VERSION"
 
 # Build the binary using cargo
 echo "Building op-rbuilder with cargo..."
@@ -67,4 +67,4 @@ else
     exit 1
 fi
 
-echo "op-rbuilder binary built successfully and placed in $FINAL_OUTPUT_DIR/op-rbuilder" 
+echo "Builder binary built successfully and placed in $FINAL_OUTPUT_DIR/op-rbuilder"

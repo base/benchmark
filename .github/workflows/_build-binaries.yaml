@@ -1,5 +1,5 @@
 # Reusable workflow for building all binaries
-# This workflow is called by other workflows to build reth, geth, rbuilder, op-program, and contracts
+# This workflow is called by other workflows to build reth, geth, builder, op-program, and contracts
 name: Build Binaries
 
 on:
@@ -15,8 +15,8 @@ on:
         required: false
         type: string
         default: "6cbfcd5161083bcd4052edc3022d9f99c6fe40e0"
-      rbuilder_version:
-        description: "Rbuilder version to build"
+      builder_version:
+        description: "Builder version to build"
         required: false
         type: string
         default: "23f42c8e78ba3abb45a8840df7037a27e196e601"
@@ -145,7 +145,7 @@ jobs:
           path: ~/bin/geth
           retention-days: 1
 
-  build-rbuilder:
+  build-builder:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -161,28 +161,28 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
 
-      - name: Cache rbuilder binary
+      - name: Cache builder binary
         uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
-        id: cache-rbuilder
+        id: cache-builder
         with:
-          path: ~/bin/rbuilder
-          key: ${{ runner.os }}-rbuilder-${{ inputs.rbuilder_version }}
+          path: ~/bin/builder
+          key: ${{ runner.os }}-builder-${{ inputs.builder_version }}
 
-      - name: Build rbuilder
-        if: steps.cache-rbuilder.outputs.cache-hit != 'true'
+      - name: Build builder
+        if: steps.cache-builder.outputs.cache-hit != 'true'
         run: |
           unset CI
           mkdir -p ~/bin
           cd clients
-          RBUILDER_VERSION=${{ inputs.rbuilder_version }} OUTPUT_DIR=~/bin ./build-rbuilder.sh
-          # Rename op-rbuilder to rbuilder for consistency
-          [ -f ~/bin/op-rbuilder ] && mv ~/bin/op-rbuilder ~/bin/rbuilder || true
+          BUILDER_VERSION=${{ inputs.builder_version }} OUTPUT_DIR=~/bin ./build-builder.sh
+          # Rename op-rbuilder to builder for consistency
+          [ -f ~/bin/op-rbuilder ] && mv ~/bin/op-rbuilder ~/bin/builder || true
 
-      - name: Upload rbuilder artifact
+      - name: Upload builder artifact
         uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
         with:
-          name: rbuilder
-          path: ~/bin/rbuilder
+          name: builder
+          path: ~/bin/builder
           retention-days: 1
 
   build-base-reth-node:

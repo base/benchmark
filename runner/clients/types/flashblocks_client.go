@@ -9,7 +9,7 @@ type FlashblockListener interface {
 }
 
 // FlashblocksClient is an interface for collecting flashblock payloads from a websocket connection.
-// Only clients that support flashblocks (e.g., rbuilder) will provide a non-nil implementation.
+// Only clients that support flashblocks (e.g., builder) will provide a non-nil implementation.
 // It uses a broadcast pattern where listeners can subscribe to receive flashblock updates.
 type FlashblocksClient interface {
 	// Start begins collecting flashblocks from the websocket connection

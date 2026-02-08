@@ -264,8 +264,8 @@ func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params ben
 		nodeType = clients.Geth
 	case "reth":
 		nodeType = clients.Reth
-	case "rbuilder":
-		nodeType = clients.Rbuilder
+	case "builder":
+		nodeType = clients.Builder
 	case "base-reth-node":
 		nodeType = clients.BaseRethNode
 	default:
