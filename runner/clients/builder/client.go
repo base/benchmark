@@ -1,4 +1,4 @@
-package rbuilder
+package builder
 
 import (
 	"context"
@@ -16,8 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// RbuilderClient handles the lifecycle of a reth client.
-type RbuilderClient struct {
+// BuilderClient handles the lifecycle of a builder client.
+type BuilderClient struct {
 	logger  log.Logger
 	options *config.InternalClientOptions
 
@@ -30,12 +30,12 @@ type RbuilderClient struct {
 	metricsCollector metrics.Collector
 }
 
-// NewRbuilderClient creates a new client for reth.
-func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager) types.ExecutionClient {
+// NewBuilderClient creates a new builder client.
+func NewBuilderClient(logger log.Logger, options *config.InternalClientOptions, ports portmanager.PortManager) types.ExecutionClient {
 	// only support reth for now
-	rethClient := reth.NewRethClientWithBin(logger, options, ports, options.RbuilderBin)
+	rethClient := reth.NewRethClientWithBin(logger, options, ports, options.BuilderBin)
 
-	return &RbuilderClient{
+	return &BuilderClient{
 		logger:   logger,
 		options:  options,
 		elClient: rethClient,
@@ -43,9 +43,9 @@ func NewRbuilderClient(logger log.Logger, options *config.InternalClientOptions,
 	}
 }
 
-// Run runs the reth client with the given runtime config.
-func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
-	r.websocketPort = r.ports.AcquirePort("rbuilder", portmanager.FlashblocksWebsocketPortPurpose)
+// Run runs the builder client with the given runtime config.
+func (r *BuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
+	r.websocketPort = r.ports.AcquirePort("builder", portmanager.FlashblocksWebsocketPortPurpose)
 
 	cfg2 := *cfg
 	cfg2.Args = append(cfg2.Args, "--flashblocks.port", fmt.Sprintf("%d", r.websocketPort))
@@ -66,12 +66,12 @@ func (r *RbuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) erro
 	return nil
 }
 
-func (r *RbuilderClient) MetricsCollector() metrics.Collector {
+func (r *BuilderClient) MetricsCollector() metrics.Collector {
 	return r.metricsCollector
 }
 
-// Stop stops the reth client.
-func (r *RbuilderClient) Stop() {
+// Stop stops the builder client.
+func (r *BuilderClient) Stop() {
 	// Stop flashblocks client if it exists
 	if r.flashblocksClient != nil {
 		if err := r.flashblocksClient.Stop(); err != nil {
@@ -84,42 +84,42 @@ func (r *RbuilderClient) Stop() {
 }
 
 // Client returns the ethclient client.
-func (r *RbuilderClient) Client() *ethclient.Client {
+func (r *BuilderClient) Client() *ethclient.Client {
 	return r.elClient.Client()
 }
 
 // ClientURL returns the raw client URL for transaction generators.
-func (r *RbuilderClient) ClientURL() string {
+func (r *BuilderClient) ClientURL() string {
 	return r.elClient.ClientURL()
 }
 
 // AuthClient returns the auth client used for CL communication.
-func (r *RbuilderClient) AuthClient() client.RPC {
+func (r *BuilderClient) AuthClient() client.RPC {
 	return r.elClient.AuthClient()
 }
 
-func (r *RbuilderClient) MetricsPort() int {
+func (r *BuilderClient) MetricsPort() int {
 	return r.elClient.MetricsPort()
 }
 
-// GetVersion returns the version of the Rbuilder client
-func (r *RbuilderClient) GetVersion(ctx context.Context) (string, error) {
-	// Rbuilder is based on reth, so delegate to the underlying reth client
+// GetVersion returns the version of the builder client
+func (r *BuilderClient) GetVersion(ctx context.Context) (string, error) {
+	// Builder is based on reth, so delegate to the underlying reth client
 	return r.elClient.GetVersion(ctx)
 }
 
 // SetHead resets the blockchain to a specific block using debug.setHead
-func (r *RbuilderClient) SetHead(ctx context.Context, blockNumber uint64) error {
-	// Rbuilder is based on reth, so delegate to the underlying reth client
+func (r *BuilderClient) SetHead(ctx context.Context, blockNumber uint64) error {
+	// Builder is based on reth, so delegate to the underlying reth client
 	return r.elClient.SetHead(ctx, blockNumber)
 }
 
 // FlashblocksClient returns the flashblocks websocket client for collecting flashblock payloads.
-func (r *RbuilderClient) FlashblocksClient() types.FlashblocksClient {
+func (r *BuilderClient) FlashblocksClient() types.FlashblocksClient {
 	return r.flashblocksClient
 }
 
-// SupportsFlashblocks returns false as rbuilder doesn't support receiving flashblock payloads.
-func (r *RbuilderClient) SupportsFlashblocks() bool {
+// SupportsFlashblocks returns false as builder doesn't support receiving flashblock payloads.
+func (r *BuilderClient) SupportsFlashblocks() bool {
 	return false
 }

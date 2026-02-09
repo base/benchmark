@@ -1,5 +1,5 @@
-name: Rbuilder transfer throughput test
-description: Test rbuilder transfer throughput with different number of hot accounts (meant to stress test parallelism)
+name: Builder transfer throughput test
+description: Test builder transfer throughput with different number of hot accounts (meant to stress test parallelism)
 payloads:
   - name: Transfer Only
     type: transfer-only
@@ -12,7 +12,7 @@ benchmarks:
           - transfer-only
       - type: node_type
         values:
-          - rbuilder
+          - builder
       - type: validator_node_type
         values:
           - reth

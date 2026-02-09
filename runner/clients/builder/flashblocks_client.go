@@ -1,4 +1,4 @@
-package rbuilder
+package builder
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 )
 
 // flashblocksClient implements the FlashblocksClient interface for collecting
-// flashblock payloads from rbuilder via websocket and broadcasting them to listeners.
+// flashblock payloads from the builder via websocket and broadcasting them to listeners.
 type flashblocksClient struct {
 	log       log.Logger
 	port      uint64
