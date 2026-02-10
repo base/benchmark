@@ -88,6 +88,9 @@ type RunParams struct {
 
 	// NodeArgs are the arguments to be passed to the node binary.
 	NodeArgs []string
+
+	// ClientBinPath is an optional override for the client binary path.
+	ClientBinPath string
 }
 
 func (p RunParams) ToConfig() map[string]interface{} {
@@ -115,6 +118,18 @@ func (p RunParams) ToConfig() map[string]interface{} {
 // ClientOptions applies any client customization options to the given client options.
 func (p RunParams) ClientOptions(prevClientOptions config.ClientOptions) config.ClientOptions {
 	prevClientOptions.NodeArgs = p.NodeArgs
+	if p.ClientBinPath != "" {
+		switch p.NodeType {
+		case "reth":
+			prevClientOptions.RethBin = p.ClientBinPath
+		case "geth":
+			prevClientOptions.GethBin = p.ClientBinPath
+		case "builder":
+			prevClientOptions.BuilderBin = p.ClientBinPath
+		case "base-reth-node":
+			prevClientOptions.BaseRethNodeBin = p.ClientBinPath
+		}
+	}
 	return prevClientOptions
 }
 

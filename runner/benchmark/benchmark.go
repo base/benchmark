@@ -54,6 +54,12 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 			} else {
 				return nil, fmt.Errorf("invalid node type %s", v)
 			}
+		case "client_bin":
+			if vStr, ok := v.(string); ok {
+				params.ClientBinPath = vStr
+			} else {
+				return nil, fmt.Errorf("invalid client bin %s", v)
+			}
 		case "validator_node_type":
 			if vStr, ok := v.(string); ok {
 				params.ValidatorNodeType = vStr
