@@ -8,14 +8,14 @@ if [ -f "versions.env" ]; then
 fi
 
 # Default values
-RETH_REPO="${RETH_REPO:-https://github.com/ethereum-optimism/optimism/}"
-RETH_VERSION="${RETH_VERSION:-develop}"
+OPTIMISM_REPO="${OPTIMISM_REPO:-https://github.com/ethereum-optimism/optimism/}"
+OPTIMISM_VERSION="${OPTIMISM_VERSION:-develop}"
 BUILD_DIR="${BUILD_DIR:-./build}"
 OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
 echo "Building op-reth binary..."
-echo "Repository: $RETH_REPO"
-echo "Version/Commit: $RETH_VERSION"
+echo "Repository: $OPTIMISM_REPO"
+echo "Version/Commit: $OPTIMISM_VERSION"
 echo "Build directory: $BUILD_DIR"
 echo "Output directory: $OUTPUT_DIR"
 
@@ -30,17 +30,17 @@ if [ -d "optimism" ]; then
     git fetch origin
 
     # ensure remote matches the repository
-    git remote set-url origin "$RETH_REPO"
+    git remote set-url origin "$OPTIMISM_REPO"
     git fetch origin
 else
     echo "Cloning optimism repository..."
-    git clone "$RETH_REPO" optimism
+    git clone "$OPTIMISM_REPO" optimism
     cd optimism
 fi
 
 # Checkout specified version/commit
-echo "Checking out version: $RETH_VERSION"
-git checkout -f "$RETH_VERSION"
+echo "Checking out version: $OPTIMISM_VERSION"
+git checkout -f "$OPTIMISM_VERSION"
 
 pushd rust
 

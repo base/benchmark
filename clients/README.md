@@ -73,7 +73,7 @@ Modify the `versions.env` file to change defaults for all builds:
 
 ```bash
 # Edit versions.env to update default versions
-RETH_VERSION="v0.2.0-beta.5"
+OPTIMISM_VERSION="v0.2.0-beta.5"
 GETH_VERSION="v1.13.0"
 BUILDER_VERSION="your-commit-hash"
 ```
@@ -83,7 +83,7 @@ Override specific builds with environment variables:
 
 ```bash
 # Build reth from a specific commit
-RETH_REPO="https://github.com/paradigmxyz/reth/" RETH_VERSION="v0.1.0" ./build-reth.sh
+OPTIMISM_REPO="https://github.com/ethereum-optimism/optimism/" OPTIMISM_VERSION="v0.1.0" ./build-reth.sh
 
 # Build geth from a fork
 GETH_REPO="https://github.com/your-fork/op-geth/" GETH_VERSION="your-branch" ./build-geth.sh
@@ -95,8 +95,8 @@ BUILDER_VERSION="main" ./build-builder.sh
 ### Available Environment Variables
 
 #### For reth (build-reth.sh):
-- `RETH_REPO`: Git repository URL (default: https://github.com/paradigmxyz/reth/)
-- `RETH_VERSION`: Git branch, tag, or commit hash (default: main)
+- `OPTIMISM_REPO`: Git repository URL (default: https://github.com/ethereum-optimism/optimism/)
+- `OPTIMISM_VERSION`: Git branch, tag, or commit hash (default: develop)
 - `BUILD_DIR`: Directory for source code (default: ./build)
 - `OUTPUT_DIR`: Directory for built binaries (default: ../bin)
 

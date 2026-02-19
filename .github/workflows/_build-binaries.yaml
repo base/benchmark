@@ -5,11 +5,11 @@ name: Build Binaries
 on:
   workflow_call:
     inputs:
-      reth_version:
-        description: "Reth version to build"
+      optimism_version:
+        description: "Optimism version to build"
         required: false
         type: string
-        default: "564ffa586845fa4a8bb066f0c7b015ff36b26c08"
+        default: "3019251e80aa248e91743addd3e833190acb26f1"
       geth_version:
         description: "Geth version to build"
         required: false
@@ -85,10 +85,10 @@ jobs:
 
       - name: Cache reth binary
         uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
-        id: cache-reth
+        id: cache-optimism
         with:
           path: ~/bin/reth
-          key: ${{ runner.os }}-reth-${{ inputs.reth_version }}
+          key: ${{ runner.os }}-reth-${{ inputs.optimism_version }}
 
       - name: Build reth
         if: steps.cache-reth.outputs.cache-hit != 'true'
@@ -96,14 +96,14 @@ jobs:
           unset CI
           mkdir -p ~/bin
           cd clients
-          RETH_VERSION=${{ inputs.reth_version }} OUTPUT_DIR=~/bin ./build-reth.sh
+          OPTIMISM_VERSION=${{ inputs.optimism_version }} OUTPUT_DIR=~/bin ./build-reth.sh
           # Rename op-reth to reth for consistency
           [ -f ~/bin/op-reth ] && mv ~/bin/op-reth ~/bin/reth || true
 
       - name: Upload reth artifact
         uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
         with:
-          name: reth
+          name: optimism
           path: ~/bin/reth
           retention-days: 1
 
