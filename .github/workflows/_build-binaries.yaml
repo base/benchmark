@@ -9,7 +9,7 @@ on:
         description: "Reth version to build"
         required: false
         type: string
-        default: "27a8c0f5a6dfb27dea84c5751776ecabdd069646"
+        default: "564ffa586845fa4a8bb066f0c7b015ff36b26c08"
       geth_version:
         description: "Geth version to build"
         required: false
