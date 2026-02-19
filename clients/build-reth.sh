@@ -8,12 +8,12 @@ if [ -f "versions.env" ]; then
 fi
 
 # Default values
-RETH_REPO="${RETH_REPO:-https://github.com/paradigmxyz/reth/}"
-RETH_VERSION="${RETH_VERSION:-main}"
+RETH_REPO="${RETH_REPO:-https://github.com/ethereum-optimism/optimism/}"
+RETH_VERSION="${RETH_VERSION:-develop}"
 BUILD_DIR="${BUILD_DIR:-./build}"
 OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
-echo "Building reth binary..."
+echo "Building op-reth binary..."
 echo "Repository: $RETH_REPO"
 echo "Version/Commit: $RETH_VERSION"
 echo "Build directory: $BUILD_DIR"
@@ -24,28 +24,32 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 # Clone or update repository
-if [ -d "reth" ]; then
-    echo "Updating existing reth repository..."
-    cd reth
+if [ -d "optimism" ]; then
+    echo "Updating existing optimism repository..."
+    cd optimism
     git fetch origin
 
     # ensure remote matches the repository
     git remote set-url origin "$RETH_REPO"
     git fetch origin
 else
-    echo "Cloning reth repository..."
-    git clone "$RETH_REPO" reth
-    cd reth
+    echo "Cloning optimism repository..."
+    git clone "$RETH_REPO" optimism
+    cd optimism
 fi
 
 # Checkout specified version/commit
 echo "Checking out version: $RETH_VERSION"
 git checkout -f "$RETH_VERSION"
 
+pushd rust
+
 # Build the binary using cargo
-echo "Building reth with cargo..."
+echo "Building op-reth with cargo..."
 # Build with performance features matching CI workflow
-cargo build --features asm-keccak,jemalloc --bin op-reth --profile maxperf --manifest-path crates/optimism/bin/Cargo.toml
+cargo build --features asm-keccak,jemalloc --bin op-reth --profile maxperf --manifest-path op-reth/bin/Cargo.toml
+
+popd
 
 # Copy binary to output directory
 echo "Copying binary to output directory..."
@@ -58,6 +62,6 @@ else
     FINAL_OUTPUT_DIR="../../$OUTPUT_DIR"
 fi
 mkdir -p "$FINAL_OUTPUT_DIR"
-cp target/maxperf/op-reth "$FINAL_OUTPUT_DIR/"
+cp rust/target/maxperf/op-reth "$FINAL_OUTPUT_DIR/"
 
-echo "reth binary built successfully and placed in $FINAL_OUTPUT_DIR/op-reth" 
+echo "op-reth binary built successfully and placed in $FINAL_OUTPUT_DIR/op-reth" 
