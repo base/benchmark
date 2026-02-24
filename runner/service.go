@@ -320,7 +320,7 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig) (*benchmark.RunResult, error) {
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig, flashblocksBlockTime string) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
@@ -384,7 +384,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	}
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState, flashblocksBlockTime)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
@@ -567,7 +567,7 @@ outerLoop:
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir)
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir, config.FlashblocksBlockTime())
 			if err != nil {
 				log.Error("Failed to run test", "err", err)
 				metricSummary = &benchmark.RunResult{
