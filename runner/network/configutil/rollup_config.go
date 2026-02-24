@@ -12,8 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
-// GetRollupConfig creates a rollup configuration for the given genesis and chain
-func GetRollupConfig(genesis *core.Genesis, chain fakel1.L1Chain, batcherAddr common.Address) *rollup.Config {
+// GetRollupConfig creates a rollup configuration for the given genesis, chain, and block time (in seconds).
+func GetRollupConfig(genesis *core.Genesis, chain fakel1.L1Chain, batcherAddr common.Address, blockTimeSec uint64) *rollup.Config {
 	var eipParams eth.Bytes8
 	copy(eipParams[:], eip1559.EncodeHolocene1559Params(50, 1))
 
@@ -50,7 +50,7 @@ func GetRollupConfig(genesis *core.Genesis, chain fakel1.L1Chain, batcherAddr co
 				}),
 			},
 		},
-		BlockTime:               1,
+		BlockTime:               blockTimeSec,
 		MaxSequencerDrift:       20,
 		SeqWindowSize:           24,
 		L1ChainID:               big.NewInt(1),

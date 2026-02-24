@@ -289,6 +289,7 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	blockMetrics.AddExecutionMetric(networktypes.UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID
+	f.log.Info("Waiting for block time", "block_time", f.options.BlockTime)
 	// wait block time
 	time.Sleep(f.options.BlockTime)
 

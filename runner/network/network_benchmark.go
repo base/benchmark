@@ -44,20 +44,22 @@ type NetworkBenchmark struct {
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
 
-	transactionPayload payload.Definition
-	ports              portmanager.PortManager
+	transactionPayload     payload.Definition
+	ports                  portmanager.PortManager
+	flashblocksBlockTime   string
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
-func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager, flashblocksBlockTime string) (*NetworkBenchmark, error) {
 	return &NetworkBenchmark{
-		log:                log,
-		sequencerOptions:   sequencerOptions,
-		validatorOptions:   validatorOptions,
-		testConfig:         config,
-		proofConfig:        proofConfig,
-		transactionPayload: transactionPayload,
-		ports:              ports,
+		log:                  log,
+		sequencerOptions:     sequencerOptions,
+		validatorOptions:     validatorOptions,
+		testConfig:           config,
+		proofConfig:          proofConfig,
+		transactionPayload:   transactionPayload,
+		ports:                ports,
+		flashblocksBlockTime: flashblocksBlockTime,
 	}, nil
 }
 
@@ -88,7 +90,7 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 }
 
 func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1Chain) (*benchtypes.PayloadResult, uint64, types.ExecutionClient, error) {
-	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params.NodeType, nb.testConfig.Params, nb.sequencerOptions, nb.ports, "")
+	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params.NodeType, nb.testConfig.Params, nb.sequencerOptions, nb.ports, "", nb.flashblocksBlockTime)
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to setup sequencer node: %w", err)
 	}
@@ -158,7 +160,7 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloadResul
 		validatorNodeType = nb.testConfig.Params.NodeType
 	}
 
-	validatorClient, err := setupNode(ctx, nb.log, validatorNodeType, nb.testConfig.Params, nb.validatorOptions, nb.ports, flashblockServerURL)
+	validatorClient, err := setupNode(ctx, nb.log, validatorNodeType, nb.testConfig.Params, nb.validatorOptions, nb.ports, flashblockServerURL, nb.flashblocksBlockTime)
 	if err != nil {
 		sequencerClient.Stop()
 		return fmt.Errorf("failed to setup validator node: %w", err)
@@ -253,7 +255,7 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 	}, nil
 }
 
-func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager, flashblockServerURL string) (types.ExecutionClient, error) {
+func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager, flashblockServerURL string, flashblocksBlockTime string) (types.ExecutionClient, error) {
 	if options == nil {
 		return nil, errors.New("client options cannot be nil")
 	}
@@ -293,10 +295,12 @@ func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params ben
 	}
 
 	runtimeConfig := &types.RuntimeConfig{
-		Stdout:         stdoutLogger,
-		Stderr:         stderrLogger,
-		Args:           args,
-		FlashblocksURL: flashblocksURLPtr,
+		Stdout:               stdoutLogger,
+		Stderr:               stderrLogger,
+		Args:                 args,
+		FlashblocksURL:       flashblocksURLPtr,
+		FlashblocksBlockTime: flashblocksBlockTime,
+		BlockTimeMs:          uint64(params.BlockTime.Milliseconds()),
 	}
 
 	if err := client.Run(ctx, runtimeConfig); err != nil {
