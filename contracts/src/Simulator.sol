@@ -319,26 +319,33 @@ contract Simulator {
 
     function run_blake2f(uint256 num_iterations) private {
         bytes32[2] memory h;
-        h[0] = 0x48c9bdf267e6096a3ba7ca8485ae67bb2bf894fe72f36e3cf1361d5f3af54fa5;
-        h[1] = 0xd182e6ad7f520e511f6c3e2b8c68059b6bbd41fbabd9831f79217e1319cde05b;
+        h[0] = 0xa1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8;
+        h[1] = 0xa1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8a1b2c3d4e5f6a7b8;
 
         bytes32[4] memory m;
-        m[0] = 0x6162630000000000000000000000000000000000000000000000000000000000;
-        m[1] = 0x0000000000000000000000000000000000000000000000000000000000000000;
-        m[2] = 0x0000000000000000000000000000000000000000000000000000000000000000;
-        m[3] = 0x0000000000000000000000000000000000000000000000000000000000000000;
+        m[0] = 0xc3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2;
+        m[1] = 0xc3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2;
+        m[2] = 0xc3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2;
+        m[3] = 0xc3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2c3d4e5f6a7b8c1d2;
 
         bytes8[2] memory t;
-        t[0] = 0x0300000000000000;
-        t[1] = 0x0000000000000000;
+        t[0] = 0x0000000000000000;
+        t[1] = 0x0000000000ff00ff;
 
         bool f = true;
 
         for (uint256 i = 0; i < num_iterations; i++) {
-            uint32 rounds = uint32(i);
-            (bool ok,) =
-                address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
-            require(ok, "Blake2f failed");
+            uint32 rounds = 0xc00;
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
+            address(9).staticcall(abi.encodePacked(rounds, h[0], h[1], m[0], m[1], m[2], m[3], t[0], t[1], f));
         }
     }
 

@@ -2,7 +2,7 @@ build: build-abi build-bin build-abi-go
 
 build-abi: src/**
 	mkdir -p abi
-	forge inspect src/Simulator.sol:Simulator abi --json > abi/Simulator.json
+	forge inspect contracts/src/Simulator.sol:Simulator abi --json > abi/Simulator.json
 
 build-bin: src/**
 	forge build --extra-output-files bin --force
