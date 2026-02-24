@@ -53,7 +53,8 @@ func (vb *validatorBenchmark) benchmarkFaultProofProgram(ctx context.Context, pa
 		return fmt.Errorf("proof program binary does not exist at %s", binaryPath)
 	}
 
-	opProgramBenchmark := NewOPProgramBenchmark(&vb.config.Genesis, vb.log, binaryPath, vb.validatorClient.ClientURL(), l1Chain, batcherKey)
+	blockTimeSec := uint64(vb.config.Params.BlockTime.Seconds())
+	opProgramBenchmark := NewOPProgramBenchmark(&vb.config.Genesis, vb.log, binaryPath, vb.validatorClient.ClientURL(), l1Chain, batcherKey, blockTimeSec)
 
 	return opProgramBenchmark.Run(ctx, payloads, lastSetupBlock)
 }

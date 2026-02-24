@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 	"sync/atomic"
-	"time"
 
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/ethereum/go-ethereum/core"
@@ -29,9 +28,8 @@ const (
 )
 
 var DefaultParams = &types.RunParams{
-	NodeType:  "geth",
-	GasLimit:  50e9,
-	BlockTime: 1 * time.Second,
+	NodeType: "geth",
+	GasLimit: 50e9,
 }
 
 // NewParamsFromValues constructs a new benchmark params given a config and a set of transaction payloads to run.
