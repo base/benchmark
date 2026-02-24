@@ -39,7 +39,8 @@ type Contract struct {
 type SimulatorPayloadDefinition = simulatorstats.StatsConfig
 
 type simulatorPayloadWorker struct {
-	log log.Logger
+	log          log.Logger
+	gasUsedCache map[common.Hash]uint64
 
 	params  benchtypes.RunParams
 	chainID *big.Int
@@ -139,12 +140,22 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 
 	// Create transactors for each caller
 	transactors := make([]*bind.TransactOpts, numCallers)
+
 	for i, key := range callerKeys {
 		transactor, err := bind.NewKeyedTransactorWithChainID(key, chainID)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create transactor for caller %d", i)
 		}
 		transactor.NoSend = true
+		nonce, err := client.PendingNonceAt(context.Background(), crypto.PubkeyToAddress(key.PublicKey))
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to get nonce for caller %d", i)
+		}
+		transactor.Nonce = big.NewInt(int64(nonce))
+
+		transactor.GasFeeCap = new(big.Int).Mul(big.NewInt(1e9), big.NewInt(1))
+		transactor.GasTipCap = big.NewInt(1)
+
 		transactors[i] = transactor
 	}
 
@@ -192,6 +203,7 @@ func NewSimulatorPayloadWorker(ctx context.Context, log log.Logger, elRPCURL str
 		scaleFactor:      scaleFactor,
 		actualNumConfig:  simulatorstats.NewStats(),
 		numCallers:       numCallers,
+		gasUsedCache:     make(map[common.Hash]uint64),
 	}
 
 	return t, nil
@@ -469,6 +481,11 @@ func (t *simulatorPayloadWorker) fundCallerAccounts(ctx context.Context) error {
 	// If using just the prefunded account, no funding transfer needed
 	if t.numCallers == 1 && t.callerAddrs[0] == prefundAddr {
 		t.log.Info("Using single caller (prefunded account)", "address", prefundAddr.Hex())
+		pendingNonce, err := t.client.PendingNonceAt(ctx, prefundAddr)
+		if err != nil {
+			return errors.Wrap(err, "failed to get pending nonce for prefunded account")
+		}
+		t.transactors[0].Nonce = big.NewInt(int64(pendingNonce))
 		return nil
 	}
 
@@ -562,6 +579,8 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 
 	gas := t.params.GasLimit - 100_000
 
+	sendTxsStartTime := time.Now()
+
 	for i := uint64(0); i < uint64(math.Ceil(float64(t.numCallsPerBlock)*t.scaleFactor)); i++ {
 		actual := t.actualNumConfig
 		expected := t.payloadParams.Mul(float64(t.numCalls+1) * t.scaleFactor)
@@ -569,13 +588,24 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 		// Round-robin across callers
 		callerIdx := t.currCallerIdx
 		t.currCallerIdx = (t.currCallerIdx + 1) % t.numCallers
-
 		blockCounts := expected.Sub(actual).Round()
+
+		expectedGas, ok := t.gasUsedCache[blockCounts.Hash()]
+		if ok {
+			t.transactors[callerIdx].GasLimit = expectedGas
+		} else {
+			t.transactors[callerIdx].GasLimit = 0
+		}
+
 		transferTx, err := t.createCallTx(t.transactors[callerIdx], t.callerKeys[callerIdx], blockCounts)
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
 			return err
 		}
+
+		t.gasUsedCache[blockCounts.Hash()] = transferTx.Gas()
+
+		t.transactors[callerIdx].Nonce = t.transactors[callerIdx].Nonce.Add(t.transactors[callerIdx].Nonce, big.NewInt(1))
 
 		gasUsed := transferTx.Gas()
 		if gasUsed > gas {
@@ -594,11 +624,13 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 	}
 
 	t.mempool.AddTransactions(txs)
+	sendTxsDuration := time.Since(sendTxsStartTime)
+	log.Info("Send transactions duration", "duration", sendTxsDuration, "numCalls", uint64(math.Ceil(float64(t.numCallsPerBlock)*t.scaleFactor)))
 	return nil
 }
 
 func (t *simulatorPayloadWorker) createCallTx(transactor *bind.TransactOpts, fromPriv *ecdsa.PrivateKey, config *simulatorstats.Stats) (*types.Transaction, error) {
-	simulator, err := abi.NewSimulator(t.contractAddr, t.contractBackend)
+	simulator, err := abi.NewSimulatorTransactor(t.contractAddr, t.contractBackend)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create simulator transactor")
 	}

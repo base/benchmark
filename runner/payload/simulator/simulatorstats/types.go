@@ -1,6 +1,8 @@
 package simulatorstats
 
 import (
+	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"maps"
 	"math"
@@ -220,6 +222,16 @@ type Stats struct {
 	CallsPerBlock   string
 	Opcodes         OpcodeStats
 	Precompiles     OpcodeStats
+}
+
+func (s *Stats) Hash() common.Hash {
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		panic(err)
+	}
+	hash := sha256.Sum256(data)
+	return common.Hash(hash[:])
 }
 
 func (s *Stats) ToConfig() (*abi.SimulatorConfig, error) {
