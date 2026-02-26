@@ -121,7 +121,14 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 1))
 
-	timestamp := f.lastTimestamp + 1
+	lastTimestamp := f.lastTimestamp
+
+	// if the last timestamp is more than 2 seconds in the past, set it to the current time
+	if int64(lastTimestamp)-time.Now().Unix() < -2 {
+		lastTimestamp = uint64(time.Now().Unix())
+	}
+
+	timestamp := lastTimestamp + 1
 
 	number := uint64(0)
 	time := uint64(0)
