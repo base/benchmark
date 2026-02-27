@@ -238,10 +238,12 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		blockMetrics := metrics.NewBlockMetrics()
 
+		pendingTxs := 0
+
 		// run for a few blocks
 		for i := 0; i < params.NumBlocks; i++ {
 			blockMetrics.SetBlockNumber(uint64(i) + 1)
-			err := transactionWorker.SendTxs(benchmarkCtx)
+			txsSent, err := transactionWorker.SendTxs(benchmarkCtx, pendingTxs)
 			if err != nil {
 				nb.log.Warn("failed to send transactions", "err", err)
 				errChan <- err
@@ -257,6 +259,17 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			if payload == nil {
 				errChan <- errors.New("received nil payload from consensus client")
 				return
+			}
+
+			// Track how many user txs are still pending in the node's mempool.
+			// payload.Transactions includes the L1 info deposit tx, so user txs = total - 1.
+			userTxsIncluded := len(payload.Transactions) - 1
+			if userTxsIncluded < 0 {
+				userTxsIncluded = 0
+			}
+			pendingTxs = pendingTxs + txsSent - userTxsIncluded
+			if pendingTxs < 0 {
+				pendingTxs = 0
 			}
 
 			time.Sleep(1000 * time.Millisecond)

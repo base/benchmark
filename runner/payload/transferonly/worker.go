@@ -246,13 +246,15 @@ func (t *transferOnlyPayloadWorker) waitForReceipt(ctx context.Context, txHash c
 	})
 }
 
-func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
+func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context, pendingTxs int) (int, error) {
 	numAccounts := t.numAccounts()
-	gasUsed := uint64(0)
 	txs := make([]*types.Transaction, 0, numAccounts)
 	acctIdx := 0
 
 	randomInt := rand.Uint64()
+
+	// Account for gas that pending transactions (still in the node mempool) will consume.
+	gasUsed := uint64(pendingTxs) * 21000
 
 	for gasUsed < (t.params.GasLimit - 100_000) {
 
@@ -273,7 +275,7 @@ func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 		transferTx, err := t.createTransferTx(t.privateKeys[acctIdx], t.nextNonce[t.addresses[acctIdx]], dest, big.NewInt(1))
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
-			return err
+			return 0, err
 		}
 
 		txs = append(txs, transferTx)
@@ -281,12 +283,11 @@ func (t *transferOnlyPayloadWorker) sendTxs(ctx context.Context) error {
 		gasUsed += transferTx.Gas()
 
 		t.nextNonce[t.addresses[acctIdx]]++
-		// 21000 gas per transfer
 		acctIdx = (acctIdx + 1) % numAccounts
 	}
 
 	t.mempool.AddTransactions(txs)
-	return nil
+	return len(txs), nil
 }
 
 func (t *transferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey, nonce uint64, toAddr common.Address, amount *big.Int) (*types.Transaction, error) {
@@ -305,10 +306,11 @@ func (t *transferOnlyPayloadWorker) createTransferTx(fromPriv *ecdsa.PrivateKey,
 	return tx, nil
 }
 
-func (t *transferOnlyPayloadWorker) SendTxs(ctx context.Context) error {
-	if err := t.sendTxs(ctx); err != nil {
+func (t *transferOnlyPayloadWorker) SendTxs(ctx context.Context, pendingTxs int) (int, error) {
+	n, err := t.sendTxs(ctx, pendingTxs)
+	if err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
-		return err
+		return 0, err
 	}
-	return nil
+	return n, nil
 }

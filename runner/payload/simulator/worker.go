@@ -574,14 +574,22 @@ func (t *simulatorPayloadWorker) waitForReceipt(ctx context.Context, txHash comm
 	})
 }
 
-func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
+func (t *simulatorPayloadWorker) sendTxs(ctx context.Context, pendingTxs int) (int, error) {
 	txs := make([]*types.Transaction, 0, t.numCallers)
 
 	gas := t.params.GasLimit - 100_000
 
 	sendTxsStartTime := time.Now()
 
-	for i := uint64(0); i < uint64(math.Ceil(float64(t.numCallsPerBlock)*t.scaleFactor)); i++ {
+	targetCalls := uint64(math.Ceil(float64(t.numCallsPerBlock) * t.scaleFactor))
+	var callsToSend uint64
+	if uint64(pendingTxs) >= targetCalls {
+		callsToSend = 0
+	} else {
+		callsToSend = targetCalls - uint64(pendingTxs)
+	}
+
+	for i := uint64(0); i < callsToSend; i++ {
 		actual := t.actualNumConfig
 		expected := t.payloadParams.Mul(float64(t.numCalls+1) * t.scaleFactor)
 
@@ -600,7 +608,7 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 		transferTx, err := t.createCallTx(t.transactors[callerIdx], t.callerKeys[callerIdx], blockCounts)
 		if err != nil {
 			t.log.Error("Failed to create transfer transaction", "err", err)
-			return err
+			return 0, err
 		}
 
 		t.gasUsedCache[blockCounts.Hash()] = transferTx.Gas()
@@ -625,8 +633,8 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context) error {
 
 	t.mempool.AddTransactions(txs)
 	sendTxsDuration := time.Since(sendTxsStartTime)
-	log.Info("Send transactions duration", "duration", sendTxsDuration, "numCalls", uint64(math.Ceil(float64(t.numCallsPerBlock)*t.scaleFactor)))
-	return nil
+	log.Info("Send transactions duration", "duration", sendTxsDuration, "targetCalls", targetCalls, "callsSent", len(txs), "pendingTxs", pendingTxs)
+	return len(txs), nil
 }
 
 func (t *simulatorPayloadWorker) createCallTx(transactor *bind.TransactOpts, fromPriv *ecdsa.PrivateKey, config *simulatorstats.Stats) (*types.Transaction, error) {
@@ -663,10 +671,11 @@ func (t *simulatorPayloadWorker) createDeployTx(fromPriv *ecdsa.PrivateKey) (*co
 	return &deployAddr, deployTx, nil
 }
 
-func (t *simulatorPayloadWorker) SendTxs(ctx context.Context) error {
-	if err := t.sendTxs(ctx); err != nil {
+func (t *simulatorPayloadWorker) SendTxs(ctx context.Context, pendingTxs int) (int, error) {
+	n, err := t.sendTxs(ctx, pendingTxs)
+	if err != nil {
 		t.log.Error("Failed to send transactions", "err", err)
-		return err
+		return 0, err
 	}
-	return nil
+	return n, nil
 }
