@@ -18,7 +18,6 @@ jobs:
     with:
       optimism_version: 3019251e80aa248e91743addd3e833190acb26f1
       geth_version: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
-      builder_version: 23f42c8e78ba3abb45a8840df7037a27e196e601
       base_reth_node_version: main
 
   example-benchmarks:
