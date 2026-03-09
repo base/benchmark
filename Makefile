@@ -47,12 +47,12 @@ build-reth:
 build-geth:
 	cd clients && ./build-geth.sh
 
-.PHONY: build-builder
-build-builder:
-	cd clients && ./build-builder.sh
+.PHONY: build-base-reth-node
+build-base-reth-node:
+	cd clients && ./build-base-reth-node.sh
 
 .PHONY: build-binaries
-build-binaries: build-reth build-geth build-builder
+build-binaries: build-reth build-geth build-base-reth-node
 
 .PHONY: build-frontend
 build-frontend:

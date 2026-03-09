@@ -1,5 +1,5 @@
 # Reusable workflow for building all binaries
-# This workflow is called by other workflows to build reth, geth, builder, op-program, and contracts
+# This workflow is called by other workflows to build reth, geth, base-reth-node, base-builder, op-program, and contracts
 name: Build Binaries
 
 on:
@@ -15,11 +15,6 @@ on:
         required: false
         type: string
         default: "6cbfcd5161083bcd4052edc3022d9f99c6fe40e0"
-      builder_version:
-        description: "Builder version to build"
-        required: false
-        type: string
-        default: "23f42c8e78ba3abb45a8840df7037a27e196e601"
       base_reth_node_version:
         description: "Base Reth Node version to build"
         required: false
@@ -145,46 +140,6 @@ jobs:
           path: ~/bin/geth
           retention-days: 1
 
-  build-builder:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      actions: write # Required for artifact upload
-    steps:
-      - name: Harden the runner (Audit all outbound calls)
-        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
-        with:
-          egress-policy: audit
-
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Set up Rust
-        uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
-
-      - name: Cache builder binary
-        uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
-        id: cache-builder
-        with:
-          path: ~/bin/builder
-          key: ${{ runner.os }}-builder-${{ inputs.builder_version }}
-
-      - name: Build builder
-        if: steps.cache-builder.outputs.cache-hit != 'true'
-        run: |
-          unset CI
-          mkdir -p ~/bin
-          cd clients
-          BUILDER_VERSION=${{ inputs.builder_version }} OUTPUT_DIR=~/bin ./build-builder.sh
-          # Rename op-rbuilder to builder for consistency
-          [ -f ~/bin/op-rbuilder ] && mv ~/bin/op-rbuilder ~/bin/builder || true
-
-      - name: Upload builder artifact
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
-        with:
-          name: builder
-          path: ~/bin/builder
-          retention-days: 1
-
   build-base-reth-node:
     runs-on: ubuntu-latest
     permissions:
@@ -201,26 +156,36 @@ jobs:
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
 
-      - name: Cache base-reth-node binary
+      - name: Cache base-reth-node binaries
         uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
         id: cache-base-reth-node
         with:
-          path: ~/bin/base-reth-node
-          key: ${{ runner.os }}-base-reth-node-${{ inputs.base_reth_node_version }}
+          path: |
+            ~/bin/base-reth-node
+            ~/bin/builder
+          key: ${{ runner.os }}-base-reth-node-builder-${{ inputs.base_reth_node_version }}
 
-      - name: Build base-reth-node
+      - name: Build base-reth-node and base-builder
         if: steps.cache-base-reth-node.outputs.cache-hit != 'true'
         run: |
           unset CI
           mkdir -p ~/bin
           cd clients
           BASE_RETH_NODE_VERSION=${{ inputs.base_reth_node_version }} OUTPUT_DIR=~/bin ./build-base-reth-node.sh
+          [ -f ~/bin/base-builder ] && mv ~/bin/base-builder ~/bin/builder || true
 
       - name: Upload base-reth-node artifact
         uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
         with:
           name: base-reth-node
           path: ~/bin/base-reth-node
+          retention-days: 1
+
+      - name: Upload builder artifact
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
+        with:
+          name: builder
+          path: ~/bin/builder
           retention-days: 1
 
   build-op-program:

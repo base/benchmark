@@ -13,7 +13,7 @@ BASE_RETH_NODE_VERSION="${BASE_RETH_NODE_VERSION:-main}"
 BUILD_DIR="${BUILD_DIR:-./build}"
 OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
-echo "Building base-reth-node binary..."
+echo "Building base-reth-node and base-builder binaries..."
 echo "Repository: $BASE_RETH_NODE_REPO"
 echo "Version/Commit: $BASE_RETH_NODE_VERSION"
 echo "Build directory: $BUILD_DIR"
@@ -42,13 +42,13 @@ fi
 echo "Checking out version: $BASE_RETH_NODE_VERSION"
 git checkout -f "$BASE_RETH_NODE_VERSION"
 
-# Build the binary using cargo
-echo "Building base-reth-node with cargo..."
+# Build the binaries using cargo
+echo "Building base-reth-node and base-builder with cargo..."
 # Build with maxperf profile
-cargo build --bin base-reth-node --profile maxperf
+cargo build --bin base-reth-node --bin base-builder --profile maxperf
 
-# Copy binary to output directory
-echo "Copying binary to output directory..."
+# Copy binaries to output directory
+echo "Copying binaries to output directory..."
 # Handle absolute paths correctly
 if [[ "$OUTPUT_DIR" == /* ]]; then
     # Absolute path - use directly
@@ -59,7 +59,7 @@ else
 fi
 mkdir -p "$FINAL_OUTPUT_DIR"
 
-# Find the built binary and copy it
+# Find the built binaries and copy them
 if [ -f "target/maxperf/base-reth-node" ]; then
     cp target/maxperf/base-reth-node "$FINAL_OUTPUT_DIR/"
 else
@@ -67,4 +67,11 @@ else
     exit 1
 fi
 
-echo "base-reth-node binary built successfully and placed in $FINAL_OUTPUT_DIR/base-reth-node"
+if [ -f "target/maxperf/base-builder" ]; then
+    cp target/maxperf/base-builder "$FINAL_OUTPUT_DIR/"
+else
+    echo "No base-builder binary found"
+    exit 1
+fi
+
+echo "base-reth-node and base-builder binaries built successfully and placed in $FINAL_OUTPUT_DIR/"

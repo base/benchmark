@@ -49,7 +49,6 @@ func (r *BuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error
 
 	cfg2 := *cfg
 	cfg2.Args = append(cfg2.Args, "--flashblocks.port", fmt.Sprintf("%d", r.websocketPort))
-	cfg2.Args = append(cfg2.Args, "--flashblocks.fixed")
 	err := r.elClient.Run(ctx, &cfg2)
 	if err != nil {
 		return err
