@@ -162,8 +162,8 @@ jobs:
         with:
           path: |
             ~/bin/base-reth-node
-            ~/bin/base-builder
-          key: ${{ runner.os }}-base-reth-node-${{ inputs.base_reth_node_version }}
+            ~/bin/builder
+          key: ${{ runner.os }}-base-reth-node-builder-${{ inputs.base_reth_node_version }}
 
       - name: Build base-reth-node and base-builder
         if: steps.cache-base-reth-node.outputs.cache-hit != 'true'
@@ -172,7 +172,6 @@ jobs:
           mkdir -p ~/bin
           cd clients
           BASE_RETH_NODE_VERSION=${{ inputs.base_reth_node_version }} OUTPUT_DIR=~/bin ./build-base-reth-node.sh
-          # Rename base-builder to builder for consistency
           [ -f ~/bin/base-builder ] && mv ~/bin/base-builder ~/bin/builder || true
 
       - name: Upload base-reth-node artifact
