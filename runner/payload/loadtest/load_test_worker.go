@@ -228,7 +228,7 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 	}
 
 	if _, err := tmpFile.Write(data); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return "", errors.Wrap(err, "failed to write temp config file")
 	}
 
