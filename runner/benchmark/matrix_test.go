@@ -2,6 +2,7 @@ package benchmark_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/types"
@@ -31,7 +32,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:  "geth",
 						PayloadID: "simple",
 						GasLimit:  benchmark.DefaultParams.GasLimit,
-						BlockTime: benchmark.DefaultParams.BlockTime,
+						BlockTime: 1 * time.Second,
 					},
 				},
 			},
@@ -57,7 +58,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:  "geth",
 						GasLimit:  benchmark.DefaultParams.GasLimit,
 						PayloadID: "simple",
-						BlockTime: benchmark.DefaultParams.BlockTime,
+						BlockTime: 1 * time.Second,
 					},
 				},
 				{
@@ -65,7 +66,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:  "erigon",
 						GasLimit:  benchmark.DefaultParams.GasLimit,
 						PayloadID: "simple",
-						BlockTime: benchmark.DefaultParams.BlockTime,
+						BlockTime: 1 * time.Second,
 					},
 				},
 				{
@@ -73,7 +74,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:  "geth",
 						GasLimit:  benchmark.DefaultParams.GasLimit,
 						PayloadID: "complex",
-						BlockTime: benchmark.DefaultParams.BlockTime,
+						BlockTime: 1 * time.Second,
 					},
 				},
 				{
@@ -81,7 +82,7 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						NodeType:  "erigon",
 						GasLimit:  benchmark.DefaultParams.GasLimit,
 						PayloadID: "complex",
-						BlockTime: benchmark.DefaultParams.BlockTime,
+						BlockTime: 1 * time.Second,
 					},
 				},
 			},

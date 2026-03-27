@@ -15,16 +15,16 @@ func prefixEnvVars(name string) []string {
 }
 
 const (
-	ConfigFlagName          = "config"
-	RootDirFlagName         = "root-dir"
-	OutputDirFlagName       = "output-dir"
-	TxFuzzBinFlagName       = "tx-fuzz-bin"
-	ProxyPortFlagName       = "proxy-port"
-	BenchmarkRunIDFlagName  = "benchmark-run-id"
-	MachineTypeFlagName     = "machine-type"
-	MachineProviderFlagName = "machine-provider"
-	MachineRegionFlagName   = "machine-region"
-	FileSystemFlagName      = "file-system"
+	ConfigFlagName            = "config"
+	RootDirFlagName           = "root-dir"
+	OutputDirFlagName         = "output-dir"
+	TxFuzzBinFlagName         = "tx-fuzz-bin"
+	ProxyPortFlagName         = "proxy-port"
+	BenchmarkRunIDFlagName    = "benchmark-run-id"
+	MachineTypeFlagName       = "machine-type"
+	MachineProviderFlagName   = "machine-provider"
+	MachineRegionFlagName     = "machine-region"
+	FileSystemFlagName        = "file-system"
 	ParallelTxBatchesFlagName = "parallel-tx-batches"
 )
 
@@ -42,17 +42,17 @@ var (
 	}
 
 	RootDirFlag = &cli.StringFlag{
-		Name:     RootDirFlagName,
-		Usage:    "Root Directory",
-		EnvVars:  prefixEnvVars("ROOT_DIR"),
-		Required: true,
+		Name:    RootDirFlagName,
+		Usage:   "Root Directory",
+		EnvVars: prefixEnvVars("ROOT_DIR"),
+		Value:   "./data-dir",
 	}
 
 	OutputDirFlag = &cli.StringFlag{
-		Name:     OutputDirFlagName,
-		Usage:    "Output Directory",
-		EnvVars:  prefixEnvVars("OUTPUT_DIR"),
-		Required: true,
+		Name:    OutputDirFlagName,
+		Usage:   "Output Directory",
+		Value:   "./output",
+		EnvVars: prefixEnvVars("OUTPUT_DIR"),
 	}
 
 	TxFuzzBinFlag = &cli.StringFlag{
