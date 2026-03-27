@@ -13,7 +13,7 @@ BASE_RETH_NODE_VERSION="${BASE_RETH_NODE_VERSION:-main}"
 BUILD_DIR="${BUILD_DIR:-./build}"
 OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
-echo "Building base-reth-node, base-builder, and base-load-test binaries..."
+echo "Building base-reth-node and base-builder binaries..."
 echo "Repository: $BASE_RETH_NODE_REPO"
 echo "Version/Commit: $BASE_RETH_NODE_VERSION"
 echo "Build directory: $BUILD_DIR"
@@ -80,4 +80,4 @@ else
     exit 1
 fi
 
-echo "base-reth-node, base-builder, and base-load-test binaries built successfully and placed in $FINAL_OUTPUT_DIR/"
+echo "Binaries built successfully and placed in $FINAL_OUTPUT_DIR/"

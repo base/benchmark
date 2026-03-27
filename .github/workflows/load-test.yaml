@@ -13,7 +13,7 @@ jobs:
     name: Build binaries
     uses: ./.github/workflows/_build-binaries.yaml
     with:
-      base_reth_node_version: feature/load-test-benchmark
+      base_reth_node_version: 38de4e038
 
   load-test:
     name: Run load test benchmark
