@@ -45,7 +45,7 @@ git checkout -f "$BASE_RETH_NODE_VERSION" || git checkout -f "origin/$BASE_RETH_
 
 # Build the binaries using cargo
 echo "Building base-reth-node, base-builder, and base-load-test with cargo..."
-cargo build --bin base-reth-node --bin base-builder --bin base-load-test --profile maxperf
+cargo build --bin base-reth-node --bin base-builder -p base-load-tests --bin base-load-test --profile maxperf
 
 # Copy binaries to output directory
 echo "Copying binaries to output directory..."
