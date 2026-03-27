@@ -13,7 +13,7 @@ BASE_RETH_NODE_VERSION="${BASE_RETH_NODE_VERSION:-main}"
 BUILD_DIR="${BUILD_DIR:-./build}"
 OUTPUT_DIR="${OUTPUT_DIR:-../bin}"
 
-echo "Building base-reth-node and base-builder binaries..."
+echo "Building base-reth-node, base-builder, and base-load-test binaries..."
 echo "Repository: $BASE_RETH_NODE_REPO"
 echo "Version/Commit: $BASE_RETH_NODE_VERSION"
 echo "Build directory: $BUILD_DIR"
@@ -43,9 +43,9 @@ echo "Checking out version: $BASE_RETH_NODE_VERSION"
 git checkout -f "$BASE_RETH_NODE_VERSION"
 
 # Build the binaries using cargo
-echo "Building base-reth-node and base-builder with cargo..."
+echo "Building base-reth-node, base-builder, and base-load-test with cargo..."
 # Build with maxperf profile
-cargo build --bin base-reth-node --bin base-builder --profile maxperf
+cargo build --bin base-reth-node --bin base-builder --bin base-load-test --profile maxperf
 
 # Copy binaries to output directory
 echo "Copying binaries to output directory..."
@@ -74,4 +74,11 @@ else
     exit 1
 fi
 
-echo "base-reth-node and base-builder binaries built successfully and placed in $FINAL_OUTPUT_DIR/"
+if [ -f "target/maxperf/base-load-test" ]; then
+    cp target/maxperf/base-load-test "$FINAL_OUTPUT_DIR/"
+else
+    echo "No base-load-test binary found"
+    exit 1
+fi
+
+echo "base-reth-node, base-builder, and base-load-test binaries built successfully and placed in $FINAL_OUTPUT_DIR/"
