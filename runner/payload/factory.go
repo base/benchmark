@@ -7,6 +7,7 @@ import (
 	clienttypes "github.com/base/base-bench/runner/clients/types"
 	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/contract"
+	"github.com/base/base-bench/runner/payload/loadtest"
 	"github.com/base/base-bench/runner/payload/simulator"
 	"github.com/base/base-bench/runner/payload/transferonly"
 	"github.com/base/base-bench/runner/payload/txfuzz"
@@ -31,6 +32,13 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 	case "tx-fuzz":
 		worker, err = txfuzz.NewTxFuzzPayloadWorker(
 			log, sequencerClient.ClientURL(), params, privateKey, amount, config.TxFuzzBinary(), genesis.Config.ChainID)
+	case "load-test":
+		def, _ := definition.Params.(*loadtest.LoadTestPayloadDefinition)
+		if def == nil {
+			def = &loadtest.LoadTestPayloadDefinition{}
+		}
+		worker, err = loadtest.NewLoadTestPayloadWorker(
+			log, sequencerClient.ClientURL(), params, privateKey, amount, config.LoadTestBinary(), genesis.Config.ChainID, *def)
 	case "transfer-only":
 		worker, err = transferonly.NewTransferPayloadWorker(
 			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, definition.Params)
@@ -77,6 +85,8 @@ func (t *Definition) UnmarshalYAML(node *yaml.Node) error {
 		params = &transferonly.TransferOnlyPayloadDefinition{}
 	case "tx-fuzz":
 		params = &txfuzz.TxFuzzPayloadDefinition{}
+	case "load-test":
+		params = &loadtest.LoadTestPayloadDefinition{}
 	case "contract":
 		params = &contract.ContractPayloadDefinition{}
 	case "simulator":

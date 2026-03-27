@@ -20,6 +20,7 @@ type Config interface {
 	DataDir() string
 	OutputDir() string
 	TxFuzzBinary() string
+	LoadTestBinary() string
 	ProxyPort() int
 	BenchmarkRunID() string
 	MachineType() string
@@ -30,36 +31,38 @@ type Config interface {
 }
 
 type config struct {
-	logConfig       oplog.CLIConfig
-	configPath      string
-	dataDir         string
-	outputDir       string
-	clientOptions   ClientOptions
-	txFuzzBinary    string
-	proxyPort       int
-	benchmarkRunID  string
-	machineType     string
-	machineProvider string
-	machineRegion   string
-	fileSystem      string
+	logConfig         oplog.CLIConfig
+	configPath        string
+	dataDir           string
+	outputDir         string
+	clientOptions     ClientOptions
+	txFuzzBinary      string
+	loadTestBinary    string
+	proxyPort         int
+	benchmarkRunID    string
+	machineType       string
+	machineProvider   string
+	machineRegion     string
+	fileSystem        string
 	parallelTxBatches int
 }
 
 func NewConfig(ctx *cli.Context) Config {
 	return &config{
-		logConfig:       oplog.ReadCLIConfig(ctx),
-		configPath:      ctx.String(appFlags.ConfigFlagName),
-		dataDir:         ctx.String(appFlags.RootDirFlagName),
-		outputDir:       ctx.String(appFlags.OutputDirFlagName),
-		txFuzzBinary:    ctx.String(appFlags.TxFuzzBinFlagName),
-		proxyPort:       ctx.Int(appFlags.ProxyPortFlagName),
-		benchmarkRunID:  ctx.String(appFlags.BenchmarkRunIDFlagName),
-		machineType:     ctx.String(appFlags.MachineTypeFlagName),
-		machineProvider: ctx.String(appFlags.MachineProviderFlagName),
-		machineRegion:   ctx.String(appFlags.MachineRegionFlagName),
-		fileSystem:      ctx.String(appFlags.FileSystemFlagName),
+		logConfig:         oplog.ReadCLIConfig(ctx),
+		configPath:        ctx.String(appFlags.ConfigFlagName),
+		dataDir:           ctx.String(appFlags.RootDirFlagName),
+		outputDir:         ctx.String(appFlags.OutputDirFlagName),
+		txFuzzBinary:      ctx.String(appFlags.TxFuzzBinFlagName),
+		loadTestBinary:    ctx.String(appFlags.LoadTestBinFlagName),
+		proxyPort:         ctx.Int(appFlags.ProxyPortFlagName),
+		benchmarkRunID:    ctx.String(appFlags.BenchmarkRunIDFlagName),
+		machineType:       ctx.String(appFlags.MachineTypeFlagName),
+		machineProvider:   ctx.String(appFlags.MachineProviderFlagName),
+		machineRegion:     ctx.String(appFlags.MachineRegionFlagName),
+		fileSystem:        ctx.String(appFlags.FileSystemFlagName),
 		parallelTxBatches: ctx.Int(appFlags.ParallelTxBatchesFlagName),
-		clientOptions:   ReadClientOptions(ctx),
+		clientOptions:     ReadClientOptions(ctx),
 	}
 }
 
@@ -110,6 +113,10 @@ func (c *config) ClientOptions() ClientOptions {
 
 func (c *config) TxFuzzBinary() string {
 	return c.txFuzzBinary
+}
+
+func (c *config) LoadTestBinary() string {
+	return c.loadTestBinary
 }
 
 func (c *config) BenchmarkRunID() string {
