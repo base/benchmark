@@ -48,7 +48,7 @@ func NewLogWriter(logger log.Logger) *LogWriter {
 	return &LogWriter{
 		logger: logger,
 		buffer: make([]byte, 0, maxBufferedLogLineSize),
-		level:  slog.LevelDebug,
+		level:  slog.LevelInfo,
 	}
 }
 
