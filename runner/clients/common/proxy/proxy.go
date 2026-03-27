@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type ProxyServer struct {
@@ -196,11 +195,13 @@ func (p *ProxyServer) OverrideRequest(method string, rawParams json.RawMessage) 
 			return false, nil, fmt.Errorf("failed to decode hex: %w", err)
 		}
 
-		err = rlp.DecodeBytes(rawTxBytes, &tx)
+		// Use UnmarshalBinary to support both legacy and typed (EIP-2718) transactions.
+		// The previous rlp.DecodeBytes only handled legacy transactions.
+		err = tx.UnmarshalBinary(rawTxBytes)
 
 		if err != nil {
-			p.log.Error("failed to decode RLP", "err", err)
-			return false, nil, fmt.Errorf("failed to decode RLP: %w", err)
+			p.log.Error("failed to decode transaction", "err", err)
+			return false, nil, fmt.Errorf("failed to decode transaction: %w", err)
 		}
 
 		p.pendingTxs = append(p.pendingTxs, &tx)

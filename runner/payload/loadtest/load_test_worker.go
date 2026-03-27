@@ -39,8 +39,10 @@ type loadTestConfig struct {
 }
 
 type loadTestTransactionDef struct {
-	Type   string `yaml:"type"`
-	Weight uint64 `yaml:"weight"`
+	Type    string `yaml:"type"`
+	Weight  uint64 `yaml:"weight"`
+	MaxSize uint64 `yaml:"max_size,omitempty"`
+	Target  string `yaml:"target,omitempty"`
 }
 
 type loadTestPayloadWorker struct {
@@ -159,8 +161,8 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 		FundingAmount: "10000000000000000000",
 		Transactions: []loadTestTransactionDef{
 			{Type: "transfer", Weight: 70},
-			{Type: "calldata", Weight: 20},
-			{Type: "precompile", Weight: 10},
+			{Type: "calldata", Weight: 20, MaxSize: 256},
+			{Type: "precompile", Weight: 10, Target: "sha256"},
 		},
 	}
 
