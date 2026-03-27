@@ -44,7 +44,6 @@ git checkout -f "$BASE_RETH_NODE_VERSION"
 
 # Build the binaries using cargo
 echo "Building base-reth-node, base-builder, and base-load-test with cargo..."
-# Build with maxperf profile
 cargo build --bin base-reth-node --bin base-builder --bin base-load-test --profile maxperf
 
 # Copy binaries to output directory
