@@ -119,7 +119,9 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 	w.proxyServer.Stop()
 
 	if w.configFilePath != "" {
-		os.Remove(w.configFilePath)
+		if err := os.Remove(w.configFilePath); err != nil {
+			w.log.Warn("failed to remove load-test config", "path", w.configFilePath, "err", err)
+		}
 	}
 
 	return nil
@@ -175,10 +177,14 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 	if err != nil {
 		return "", errors.Wrap(err, "failed to create temp config file")
 	}
-	defer tmpFile.Close()
 
 	if _, err := tmpFile.Write(data); err != nil {
+		tmpFile.Close()
 		return "", errors.Wrap(err, "failed to write temp config file")
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return "", errors.Wrap(err, "failed to close temp config file")
 	}
 
 	return tmpFile.Name(), nil
