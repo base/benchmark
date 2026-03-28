@@ -29,13 +29,11 @@ func NewMultiWriterCloser(writerClosers ...io.WriteCloser) *MultiWriterCloser {
 // Close closes all the underlying io.WriteCloser instances and returns the first error if any.
 // If all close calls succeed, it returns nil.
 func (m *MultiWriterCloser) Close() error {
-	var err error
+	var firstErr error
 	for _, closer := range m.closers {
-		if err != nil {
-			err = closer.Close()
-		} else {
-			_ = closer.Close()
+		if closeErr := closer.Close(); closeErr != nil && firstErr == nil {
+			firstErr = closeErr
 		}
 	}
-	return nil
+	return firstErr
 }

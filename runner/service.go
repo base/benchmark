@@ -388,19 +388,20 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
-	err = benchmark.Run(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to run benchmark")
+	runErr := benchmark.Run(ctx)
+
+	// Always export output, even if the benchmark failed or the node crashed.
+	// This ensures log files are preserved for debugging.
+	if exportErr := s.exportOutput(testName, runErr, sequencerOptions, outputDir, "sequencer"); exportErr != nil {
+		s.log.Error("failed to export sequencer output", "err", exportErr)
 	}
 
-	err = s.exportOutput(testName, err, sequencerOptions, outputDir, "sequencer")
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to export sequencer output")
+	if exportErr := s.exportOutput(testName, runErr, validatorOptions, outputDir, "validator"); exportErr != nil {
+		s.log.Error("failed to export validator output", "err", exportErr)
 	}
 
-	err = s.exportOutput(testName, err, validatorOptions, outputDir, "validator")
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to export validator output")
+	if runErr != nil {
+		return nil, errors.Wrap(runErr, "failed to run benchmark")
 	}
 
 	result, err := benchmark.GetResult()
