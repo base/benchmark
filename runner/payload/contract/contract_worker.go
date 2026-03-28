@@ -286,13 +286,13 @@ func (t *contractPayloadWorker) sendContractTx(ctx context.Context) error {
 	return nil
 }
 
-func (t *contractPayloadWorker) SendTxs(ctx context.Context) error {
+func (t *contractPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
 	for i := 0; i < t.params.CallsPerBlock; i++ {
 		err := t.sendContractTx(ctx)
 
 		if err != nil {
 			t.log.Error("Failed to send transaction", "error", err)
-			return err
+			return 0, err
 		}
 
 		debugResult, err := t.debugContract()
@@ -301,5 +301,5 @@ func (t *contractPayloadWorker) SendTxs(ctx context.Context) error {
 		}
 	}
 
-	return nil
+	return t.params.CallsPerBlock, nil
 }
