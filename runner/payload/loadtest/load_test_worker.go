@@ -11,6 +11,7 @@ import (
 	"os/exec"
 
 	"github.com/base/base-bench/runner/clients/common/proxy"
+	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"
@@ -18,8 +19,6 @@ import (
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
-
-const proxyPort = 8545
 
 // LoadTestPayloadDefinition is the YAML payload params for the load-test type.
 // Fields map directly to the Rust base-load-test config format.
@@ -64,12 +63,12 @@ func NewLoadTestPayloadWorker(
 	params types.RunParams,
 	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
-	loadTestBin string,
+	cfg config.Config,
 	chainID *big.Int,
 	definition LoadTestPayloadDefinition,
 ) (worker.Worker, error) {
 	mp := mempool.NewStaticWorkloadMempool(log, chainID)
-	ps := proxy.NewProxyServer(elRPCURL, log, proxyPort, mp)
+	ps := proxy.NewProxyServer(elRPCURL, log, cfg.ProxyPort(), mp)
 
 	blockTimeSec := uint64(params.BlockTime.Seconds())
 	if blockTimeSec == 0 {
@@ -79,7 +78,7 @@ func NewLoadTestPayloadWorker(
 	w := &loadTestPayloadWorker{
 		log:          log,
 		prefundSK:    hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
-		loadTestBin:  loadTestBin,
+		loadTestBin:  cfg.LoadTestBinary(),
 		elRPCURL:     elRPCURL,
 		gasLimit:     params.GasLimit,
 		blockTimeSec: blockTimeSec,
@@ -208,7 +207,7 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 	}
 
 	config := loadTestConfig{
-		RPC:           fmt.Sprintf("http://localhost:%d", proxyPort),
+		RPC:           w.proxyServer.ClientURL(),
 		SenderCount:   senderCount,
 		TargetGPS:     targetGPS,
 		Duration:      "99999s",

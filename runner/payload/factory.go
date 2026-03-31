@@ -31,14 +31,14 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 	switch definition.Type {
 	case "tx-fuzz":
 		worker, err = txfuzz.NewTxFuzzPayloadWorker(
-			log, sequencerClient.ClientURL(), params, privateKey, amount, config.TxFuzzBinary(), genesis.Config.ChainID)
+			log, sequencerClient.ClientURL(), params, privateKey, amount, config, genesis.Config.ChainID)
 	case "load-test":
 		def, _ := definition.Params.(*loadtest.LoadTestPayloadDefinition)
 		if def == nil {
 			def = &loadtest.LoadTestPayloadDefinition{}
 		}
 		worker, err = loadtest.NewLoadTestPayloadWorker(
-			log, sequencerClient.ClientURL(), params, privateKey, amount, config.LoadTestBinary(), genesis.Config.ChainID, *def)
+			log, sequencerClient.ClientURL(), params, privateKey, amount, config, genesis.Config.ChainID, *def)
 	case "transfer-only":
 		worker, err = transferonly.NewTransferPayloadWorker(
 			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, definition.Params)
