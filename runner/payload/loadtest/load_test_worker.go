@@ -142,13 +142,13 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (w *loadTestPayloadWorker) SendTxs(ctx context.Context) error {
+func (w *loadTestPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
 	w.log.Info("Collecting txs from load test")
 	pendingTxs := w.proxyServer.PendingTxs()
 	w.proxyServer.ClearPendingTxs()
 
 	w.mempool.AddTransactions(pendingTxs)
-	return nil
+	return len(pendingTxs), nil
 }
 
 // defaultTransactions returns the default transaction mix as a yaml.Node.
