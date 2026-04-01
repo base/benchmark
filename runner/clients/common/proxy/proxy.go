@@ -22,7 +22,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	ethTypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type ProxyServer struct {
@@ -196,11 +195,13 @@ func (p *ProxyServer) OverrideRequest(method string, rawParams json.RawMessage) 
 			return false, nil, fmt.Errorf("failed to decode hex: %w", err)
 		}
 
-		err = rlp.DecodeBytes(rawTxBytes, &tx)
+		// Use UnmarshalBinary to support both legacy and typed (EIP-2718) transactions.
+		// The previous rlp.DecodeBytes only handled legacy transactions.
+		err = tx.UnmarshalBinary(rawTxBytes)
 
 		if err != nil {
-			p.log.Error("failed to decode RLP", "err", err)
-			return false, nil, fmt.Errorf("failed to decode RLP: %w", err)
+			p.log.Error("failed to decode transaction", "err", err)
+			return false, nil, fmt.Errorf("failed to decode transaction: %w", err)
 		}
 
 		p.pendingTxs = append(p.pendingTxs, &tx)
@@ -217,21 +218,21 @@ func (p *ProxyServer) DebugResponse(method string, params json.RawMessage, respB
 	p.log.Debug("method", "method", method)
 	p.log.Debug("params", "params", params)
 
-	// Try gzip decompression; fall back to raw body if the response is plain JSON.
 	gzipReader, err := gzip.NewReader(bytes.NewReader(respBody))
 	if err != nil {
-		p.log.Debug("Response body", "body", string(respBody))
+		p.log.Error("Error creating gzip reader", "err", err)
 		return
 	}
 	defer func() {
 		if err := gzipReader.Close(); err != nil {
-			p.log.Debug("Error closing gzip reader", "err", err)
+			p.log.Error("Error closing gzip reader", "err", err)
 		}
 	}()
 
 	uncompressedBody, err := io.ReadAll(gzipReader)
+
 	if err != nil {
-		p.log.Debug("Error reading uncompressed response body", "err", err)
+		p.log.Error("Error reading uncompressed response body", "err", err)
 		return
 	}
 	p.log.Debug("Uncompressed body", "body", string(uncompressedBody))

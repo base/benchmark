@@ -19,7 +19,7 @@ on:
         description: "Base Reth Node version to build"
         required: false
         type: string
-        default: "main"
+        default: "feature/load-test-benchmark"
 
 # Set minimal permissions for all jobs by default
 permissions:
@@ -155,6 +155,8 @@ jobs:
 
       - name: Set up Rust
         uses: actions-rust-lang/setup-rust-toolchain@9399c7bb15d4c7d47b27263d024f0a4978346ba4 # v1.11.0
+        with:
+          cache: false
 
       - name: Cache base-reth-node binaries
         uses: actions/cache@2f8e54208210a422b2efd51efaa6bd6d7ca8920f # v3.4.3
@@ -163,9 +165,10 @@ jobs:
           path: |
             ~/bin/base-reth-node
             ~/bin/builder
-          key: ${{ runner.os }}-base-reth-node-builder-${{ inputs.base_reth_node_version }}
+            ~/bin/base-load-test
+          key: ${{ runner.os }}-base-reth-node-builder-load-test-${{ inputs.base_reth_node_version }}
 
-      - name: Build base-reth-node and base-builder
+      - name: Build base-reth-node, base-builder, and base-load-test
         if: steps.cache-base-reth-node.outputs.cache-hit != 'true'
         run: |
           unset CI
@@ -186,6 +189,13 @@ jobs:
         with:
           name: builder
           path: ~/bin/builder
+          retention-days: 1
+
+      - name: Upload base-load-test artifact
+        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
+        with:
+          name: base-load-test
+          path: ~/bin/base-load-test
           retention-days: 1
 
   build-op-program:
