@@ -18,7 +18,6 @@ jobs:
     with:
       optimism_version: 3019251e80aa248e91743addd3e833190acb26f1
       geth_version: 6cbfcd5161083bcd4052edc3022d9f99c6fe40e0
-      base_reth_node_version: main
 
   example-benchmarks:
     runs-on: ubuntu-latest

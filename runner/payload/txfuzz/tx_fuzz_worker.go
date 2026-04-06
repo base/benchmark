@@ -9,6 +9,7 @@ import (
 	"os/exec"
 
 	"github.com/base/base-bench/runner/clients/common/proxy"
+	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"
@@ -34,16 +35,16 @@ func NewTxFuzzPayloadWorker(
 	params types.RunParams,
 	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
-	txFuzzBin string,
+	cfg config.Config,
 	chainID *big.Int,
 ) (worker.Worker, error) {
 	mempool := mempool.NewStaticWorkloadMempool(log, chainID)
-	proxyServer := proxy.NewProxyServer(elRPCURL, log, 8545, mempool)
+	proxyServer := proxy.NewProxyServer(elRPCURL, log, cfg.ProxyPort(), mempool)
 
 	t := &txFuzzPayloadWorker{
 		log:         log,
 		prefundSK:   hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
-		txFuzzBin:   txFuzzBin,
+		txFuzzBin:   cfg.TxFuzzBinary(),
 		elRPCURL:    elRPCURL,
 		mempool:     mempool,
 		proxyServer: proxyServer,
@@ -65,7 +66,7 @@ func (t *txFuzzPayloadWorker) Setup(ctx context.Context) error {
 
 	t.log.Info("Sending txs in tx-fuzz mode")
 
-	cmd := exec.CommandContext(ctx, t.txFuzzBin, "spam", "--sk", t.prefundSK, "--rpc", t.elRPCURL, "--slot-time", "1")
+	cmd := exec.CommandContext(ctx, t.txFuzzBin, "spam", "--sk", t.prefundSK, "--rpc", t.proxyServer.ClientURL(), "--slot-time", "1")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stdout
 

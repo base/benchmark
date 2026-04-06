@@ -15,22 +15,24 @@ func prefixEnvVars(name string) []string {
 }
 
 const (
-	ConfigFlagName          = "config"
-	RootDirFlagName         = "root-dir"
-	OutputDirFlagName       = "output-dir"
-	TxFuzzBinFlagName       = "tx-fuzz-bin"
-	ProxyPortFlagName       = "proxy-port"
-	BenchmarkRunIDFlagName  = "benchmark-run-id"
-	MachineTypeFlagName     = "machine-type"
-	MachineProviderFlagName = "machine-provider"
-	MachineRegionFlagName   = "machine-region"
-	FileSystemFlagName      = "file-system"
+	ConfigFlagName            = "config"
+	RootDirFlagName           = "root-dir"
+	OutputDirFlagName         = "output-dir"
+	TxFuzzBinFlagName         = "tx-fuzz-bin"
+	LoadTestBinFlagName       = "load-test-bin"
+	ProxyPortFlagName         = "proxy-port"
+	BenchmarkRunIDFlagName    = "benchmark-run-id"
+	MachineTypeFlagName       = "machine-type"
+	MachineProviderFlagName   = "machine-provider"
+	MachineRegionFlagName     = "machine-region"
+	FileSystemFlagName        = "file-system"
 	ParallelTxBatchesFlagName = "parallel-tx-batches"
 )
 
 // TxFuzz defaults
 const (
-	DefaultTxFuzzBin = "../tx-fuzz/cmd/livefuzzer/livefuzzer"
+	DefaultTxFuzzBin   = "../tx-fuzz/cmd/livefuzzer/livefuzzer"
+	DefaultLoadTestBin = "./base-load-test"
 )
 
 var (
@@ -60,6 +62,13 @@ var (
 		Usage:   "Transaction Fuzzer binary path",
 		Value:   DefaultTxFuzzBin,
 		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "TX_FUZZ_BIN"),
+	}
+
+	LoadTestBinFlag = &cli.StringFlag{
+		Name:    LoadTestBinFlagName,
+		Usage:   "Load test binary path",
+		Value:   DefaultLoadTestBin,
+		EnvVars: opservice.PrefixEnvVar(EnvVarPrefix, "LOAD_TEST_BIN"),
 	}
 
 	ProxyPortFlag = &cli.IntFlag{
@@ -116,6 +125,7 @@ var RunFlags = []cli.Flag{
 	RootDirFlag,
 	OutputDirFlag,
 	TxFuzzBinFlag,
+	LoadTestBinFlag,
 	ProxyPortFlag,
 	BenchmarkRunIDFlag,
 	MachineTypeFlag,
