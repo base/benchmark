@@ -43,8 +43,8 @@ type opProgramBenchmark struct {
 	rollupCfg    *rollup.Config
 }
 
-func NewOPProgramBenchmark(genesis *core.Genesis, log log.Logger, opProgramBin string, l2RPCURL string, l1Chain fakel1.L1Chain, batcherKey *ecdsa.PrivateKey) ProofProgramBenchmark {
-	rollupCfg := configutil.GetRollupConfig(genesis, l1Chain, crypto.PubkeyToAddress(batcherKey.PublicKey))
+func NewOPProgramBenchmark(genesis *core.Genesis, log log.Logger, opProgramBin string, l2RPCURL string, l1Chain fakel1.L1Chain, batcherKey *ecdsa.PrivateKey, blockTimeSec uint64) ProofProgramBenchmark {
+	rollupCfg := configutil.GetRollupConfig(genesis, l1Chain, crypto.PubkeyToAddress(batcherKey.PublicKey), blockTimeSec)
 	batcher := proofprogram.NewBatcher(rollupCfg, batcherKey, l1Chain)
 
 	return &opProgramBenchmark{
