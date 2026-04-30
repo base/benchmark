@@ -1,4 +1,4 @@
-import { ChartConfig } from "../types";
+import { ChartConfig, RustDuration } from "../types";
 
 const PREFIXES = {
   "": 1,
@@ -114,6 +114,63 @@ export const formatValue = (
 
   // Default: just return the number as string
   return value.toString();
+};
+
+export const durationToNanos = (d: RustDuration): number =>
+  d.secs * 1e9 + d.nanos;
+
+export const durationToMs = (d: RustDuration): number =>
+  d.secs * 1000 + d.nanos / 1e6;
+
+export const formatDuration = (d: RustDuration): string =>
+  formatValue(durationToNanos(d), "ns");
+
+export const formatTps = (n: number): string => `${n.toFixed(1)} tx/s`;
+
+export const formatGps = (n: number): string => formatValue(n, "gas/s");
+
+export const formatPercent = (
+  numerator: number,
+  denominator: number,
+): string =>
+  denominator === 0 ? "—" : `${((numerator / denominator) * 100).toFixed(2)}%`;
+
+export const formatEthFromWei = (wei: number): string => {
+  // total_cost_wei may exceed Number.MAX_SAFE_INTEGER; once the producer
+  // stringifies it (upgrades.md P0 #1) accept `string` here and parse via BigInt.
+  // Today we accept the precision loss because the display only needs 6 decimals.
+  return `${(wei / 1e18).toFixed(6)} ETH`;
+};
+
+const LOAD_TEST_TIMESTAMP_RE =
+  /^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})$/;
+
+export const parseLoadTestTimestamp = (raw: string): Date | null => {
+  // Format produced by base-load-test: "YYYY-MM-DD-HH-MM-SS" (UTC, no zone in
+  // the string but the producer writes UTC). Returning null on parse failure
+  // lets callers degrade to showing the raw string instead of crashing.
+  const m = LOAD_TEST_TIMESTAMP_RE.exec(raw);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const ts = Date.UTC(
+    Number(y),
+    Number(mo) - 1,
+    Number(d),
+    Number(h),
+    Number(mi),
+    Number(s),
+  );
+  return Number.isNaN(ts) ? null : new Date(ts);
+};
+
+export const formatLoadTestTimestamp = (raw: string): string => {
+  const d = parseLoadTestTimestamp(raw);
+  if (!d) return raw;
+  return Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(d);
 };
 
 export const camelToTitleCase = (str: string) => {

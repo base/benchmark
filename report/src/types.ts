@@ -108,6 +108,101 @@ const statusRelatedMetrics = {
 
 export type BenchmarkRunWithStatus = BenchmarkRun & { status: RunStatus };
 
+// -----------------------------------------------------------------------------
+// Load tests
+// -----------------------------------------------------------------------------
+//
+// These types mirror the JSON written by the `base-load-test` Rust binary and
+// served by report-api at:
+//   GET /api/v1/load-tests/:network                  -> LoadTestEntry[]
+//   GET /api/v1/load-tests/:network/:timestamp       -> LoadTestResult
+//
+// IMPORTANT: types are hand-maintained. If the Rust schema changes, update here.
+// See `upgrades.md` for planned producer-side changes (schema_version, metadata
+// block, sidecar index, etc.) that would let us generate these instead.
+
+/**
+ * Mirrors Rust `std::time::Duration` as serialized by serde_json.
+ */
+export interface RustDuration {
+  secs: number;
+  nanos: number;
+}
+
+export interface LatencyStats {
+  // NOTE: `count` is currently only present on flashblocks_latency, not
+  // block_latency. See upgrades.md P0 #2. Treat as optional until backend fixes.
+  count?: number;
+  min: RustDuration;
+  max: RustDuration;
+  mean: RustDuration;
+  p50: RustDuration;
+  p95: RustDuration;
+  p99: RustDuration;
+}
+
+export interface FlashblocksLatencyStats extends LatencyStats {
+  count: number;
+  p90: RustDuration;
+}
+
+export interface ThroughputStats {
+  total_submitted: number;
+  total_confirmed: number;
+  total_failed: number;
+  tps: number;
+  gps: number;
+  duration: RustDuration;
+}
+
+export interface ThroughputPercentiles {
+  tps_p50: number;
+  tps_p90: number;
+  tps_p99: number;
+  tps_max: number;
+  gps_p50: number;
+  gps_p90: number;
+  gps_p99: number;
+  gps_max: number;
+}
+
+export interface GasStats {
+  total_gas: number;
+  avg_gas: number;
+  // WARNING: This can exceed Number.MAX_SAFE_INTEGER (2^53). The Rust binary
+  // currently emits it as a JSON number, which silently loses precision in
+  // JavaScript. See upgrades.md P0 #1 — once backend stringifies it, change
+  // the type here to `string` and parse with BigInt at the formatting boundary.
+  total_cost_wei: number;
+  avg_gas_price: number;
+}
+
+export interface FailureReason {
+  reason: string;
+  count: number;
+}
+
+export interface LoadTestResult {
+  block_latency: LatencyStats;
+  flashblocks_latency: FlashblocksLatencyStats;
+  throughput: ThroughputStats;
+  throughput_percentiles: ThroughputPercentiles;
+  gas: GasStats;
+  // Element type is best-effort until upgrades.md P3 #7 lands. Empty arrays
+  // dominate today, so we have no live samples to verify against.
+  top_failure_reasons: FailureReason[];
+}
+
+/**
+ * One entry in the list returned by `GET /api/v1/load-tests/:network`.
+ * Backend sorts newest-first by timestamp string (lexicographic over the
+ * "YYYY-MM-DD-HH-MM-SS" format works because all components are zero-padded).
+ */
+export interface LoadTestEntry {
+  network: string;
+  timestamp: string;
+}
+
 export const getTestRunsWithStatus = (
   runs: BenchmarkRuns,
 ): BenchmarkRunWithStatus[] => {

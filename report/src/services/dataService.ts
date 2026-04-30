@@ -1,6 +1,16 @@
 // Unified data service that works with both static files and API servers
 // Since the API now emulates the static file structure, we only need one service
-import { BenchmarkRuns, MetricData } from "../types";
+import {
+  BenchmarkRuns,
+  LoadTestEntry,
+  LoadTestResult,
+  MetricData,
+} from "../types";
+
+// Load-test endpoints live under the versioned API prefix, unlike benchmark
+// data which uses the legacy unversioned `output/` paths. Centralized here so
+// the call sites stay clean and a future migration is one constant change.
+const LOAD_TEST_API_PREFIX = "api/v1/load-tests";
 
 export interface DataServiceConfig {
   baseUrl: string; // Base URL for both static and API modes
@@ -33,6 +43,37 @@ export class DataService {
     if (!response.ok) {
       throw new Error(
         `Failed to fetch metrics: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  }
+
+  async getLoadTestList(network: string): Promise<LoadTestEntry[]> {
+    const response = await fetch(
+      `${this.baseUrl}${LOAD_TEST_API_PREFIX}/${encodeURIComponent(network)}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch load test list: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  }
+
+  async getLoadTestResult(
+    network: string,
+    timestamp: string,
+  ): Promise<LoadTestResult> {
+    const response = await fetch(
+      `${this.baseUrl}${LOAD_TEST_API_PREFIX}/${encodeURIComponent(network)}/${encodeURIComponent(timestamp)}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch load test result: ${response.status} ${response.statusText}`,
       );
     }
 

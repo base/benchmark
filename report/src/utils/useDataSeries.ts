@@ -1,5 +1,10 @@
 import useSWR, { State, useSWRConfig } from "swr";
-import { BenchmarkRuns, MetricData } from "../types";
+import {
+  BenchmarkRuns,
+  LoadTestEntry,
+  LoadTestResult,
+  MetricData,
+} from "../types";
 import { useCallback } from "react";
 import { getDataService } from "../services/dataService";
 
@@ -90,4 +95,47 @@ export const useMultipleDataSeries = (
     errorRetryCount: 3,
     errorRetryInterval: 5000,
   });
+};
+
+export const useLoadTestList = (network: string | null | undefined) => {
+  const fetcher = useCallback(async (): Promise<LoadTestEntry[]> => {
+    if (!network) {
+      throw new Error("network required");
+    }
+    const dataService = getDataService();
+    return await dataService.getLoadTestList(network);
+  }, [network]);
+
+  return useSWR(network ? `load-tests-${network}` : null, fetcher, {
+    dedupingInterval: 5 * 60 * 1000,
+    revalidateOnFocus: true,
+    errorRetryCount: 3,
+    errorRetryInterval: 5000,
+  });
+};
+
+export const useLoadTestResult = (
+  network: string | undefined,
+  timestamp: string | undefined,
+) => {
+  const fetcher = useCallback(async (): Promise<LoadTestResult> => {
+    if (!network || !timestamp) {
+      throw new Error("network and timestamp required");
+    }
+    const dataService = getDataService();
+    return await dataService.getLoadTestResult(network, timestamp);
+  }, [network, timestamp]);
+
+  return useSWR(
+    network && timestamp ? `load-test-${network}-${timestamp}` : null,
+    fetcher,
+    {
+      // Individual results are immutable (the file at <timestamp>.json never
+      // changes), so cache aggressively to match the backend's 12h Cache-Control.
+      dedupingInterval: 12 * 60 * 60 * 1000,
+      revalidateOnFocus: false,
+      errorRetryCount: 3,
+      errorRetryInterval: 5000,
+    },
+  );
 };
