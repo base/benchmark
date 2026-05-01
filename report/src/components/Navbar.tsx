@@ -7,10 +7,7 @@ import {
 } from "react-router-dom";
 import clsx from "clsx";
 import Logo from "../assets/logo.svg";
-import {
-  useLoadTestList,
-  useTestMetadata,
-} from "../utils/useDataSeries";
+import { useLoadTestList, useTestMetadata } from "../utils/useDataSeries";
 import { useCallback, useMemo } from "react";
 import { uniqBy } from "lodash";
 import {} from "react-router-dom";
@@ -42,8 +39,11 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
     [urlPrefix, searchParams, navigate],
   );
 
-  const { benchmarkRunId, network: loadTestNetwork, timestamp: loadTestTimestamp } =
-    useParams();
+  const {
+    benchmarkRunId,
+    network: loadTestNetwork,
+    timestamp: loadTestTimestamp,
+  } = useParams();
 
   const activeLoadTestNetwork = loadTestNetwork ?? DEFAULT_LOAD_TEST_NETWORK;
 

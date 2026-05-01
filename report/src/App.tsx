@@ -17,10 +17,7 @@ function App() {
           element={<Navigate to="/load-tests/sepolia" replace />}
         />
         <Route path="/load-tests/:network" element={<LoadTestLanding />} />
-        <Route
-          path="/load-tests/:network/all"
-          element={<LoadTestAllRuns />}
-        />
+        <Route path="/load-tests/:network/all" element={<LoadTestAllRuns />} />
         <Route
           path="/load-tests/:network/:timestamp"
           element={<LoadTestDetail />}

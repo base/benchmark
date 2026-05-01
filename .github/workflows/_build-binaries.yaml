@@ -19,7 +19,7 @@ on:
         description: "Base Reth Node version to build"
         required: false
         type: string
-        default: "feature/load-test-benchmark"
+        default: "main"
 
 # Set minimal permissions for all jobs by default
 permissions:
