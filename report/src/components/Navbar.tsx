@@ -1,21 +1,29 @@
 import {
   Link,
+  useLocation,
   useNavigate,
   useParams,
   useSearchParams,
 } from "react-router-dom";
+import clsx from "clsx";
 import Logo from "../assets/logo.svg";
-import { useTestMetadata } from "../utils/useDataSeries";
+import { useLoadTestList, useTestMetadata } from "../utils/useDataSeries";
 import { useCallback, useMemo } from "react";
 import { uniqBy } from "lodash";
 import {} from "react-router-dom";
 import Select from "./Select";
+import { formatLoadTestTimestamp } from "../utils/formatters";
 
 interface ProvidedProps {
   urlPrefix?: string;
 }
 
+const DEFAULT_LOAD_TEST_NETWORK = "sepolia";
+
 const Navbar = ({ urlPrefix }: ProvidedProps) => {
+  const location = useLocation();
+  const isLoadTestsRoute = location.pathname.startsWith("/load-tests");
+
   const { data: allBenchmarkRuns, isLoading } = useTestMetadata();
 
   const [searchParams] = useSearchParams();
@@ -31,7 +39,33 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
     [urlPrefix, searchParams, navigate],
   );
 
-  const { benchmarkRunId } = useParams();
+  const {
+    benchmarkRunId,
+    network: loadTestNetwork,
+    timestamp: loadTestTimestamp,
+  } = useParams();
+
+  const activeLoadTestNetwork = loadTestNetwork ?? DEFAULT_LOAD_TEST_NETWORK;
+
+  const { data: loadTestEntries, isLoading: isLoadingLoadTests } =
+    useLoadTestList(isLoadTestsRoute ? activeLoadTestNetwork : null);
+
+  const navigateToLoadTestRun = useCallback(
+    (timestamp: string) => {
+      navigate({
+        pathname: `/load-tests/${activeLoadTestNetwork}/${timestamp}`,
+      });
+    },
+    [activeLoadTestNetwork, navigate],
+  );
+
+  const loadTestOptions = useMemo(() => {
+    if (!loadTestEntries) return [];
+    return loadTestEntries.map((entry) => ({
+      label: formatLoadTestTimestamp(entry.timestamp),
+      value: entry.timestamp,
+    }));
+  }, [loadTestEntries]);
 
   const latestRun = useMemo(() => {
     return allBenchmarkRuns?.runs.sort(
@@ -80,6 +114,14 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
     return optionsWithTestNum;
   }, [allBenchmarkRuns, latestRun]);
 
+  const tabClass = (active: boolean) =>
+    clsx(
+      "px-3 py-4 text-sm border-b-2 -mb-px",
+      active
+        ? "border-blue-600 text-slate-900 font-medium"
+        : "border-transparent text-slate-500 hover:text-slate-900",
+    );
+
   return (
     <nav className="flex px-8 border-b border-slate-300 items-center bg-white gap-x-4">
       <div className="flex items-center gap-x-4 flex-grow">
@@ -89,8 +131,16 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
           </Link>
           <div className="font-medium">Client Benchmark Report</div>
         </div>
+        <div className="flex items-center gap-x-2 ml-4 self-stretch">
+          <Link to="/" className={tabClass(!isLoadTestsRoute)}>
+            Benchmarks
+          </Link>
+          <Link to="/load-tests/sepolia" className={tabClass(isLoadTestsRoute)}>
+            Load Tests
+          </Link>
+        </div>
       </div>
-      {!isLoading && !!allBenchmarkRuns?.runs.length && (
+      {!isLoadTestsRoute && !isLoading && !!allBenchmarkRuns?.runs.length && (
         <div>
           <Select
             value={benchmarkRunId}
@@ -104,6 +154,23 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
           </Select>
         </div>
       )}
+      {isLoadTestsRoute &&
+        !!loadTestTimestamp &&
+        !isLoadingLoadTests &&
+        loadTestOptions.length > 0 && (
+          <div>
+            <Select
+              value={loadTestTimestamp}
+              onChange={(e) => navigateToLoadTestRun(e.target.value)}
+            >
+              {loadTestOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
     </nav>
   );
 };

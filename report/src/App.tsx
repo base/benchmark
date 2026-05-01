@@ -1,7 +1,10 @@
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import RunIndex from "./pages/RunIndex";
 import RunComparison from "./pages/RunComparison";
 import RedirectToLatestRun from "./pages/RedirectToLatestRun";
+import LoadTestLanding from "./pages/LoadTestLanding";
+import LoadTestAllRuns from "./pages/LoadTestAllRuns";
+import LoadTestDetail from "./pages/LoadTestDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
@@ -9,6 +12,16 @@ function App() {
     <ErrorBoundary>
       <Routes>
         <Route path="/" element={<RedirectToLatestRun />} />
+        <Route
+          path="/load-tests"
+          element={<Navigate to="/load-tests/sepolia" replace />}
+        />
+        <Route path="/load-tests/:network" element={<LoadTestLanding />} />
+        <Route path="/load-tests/:network/all" element={<LoadTestAllRuns />} />
+        <Route
+          path="/load-tests/:network/:timestamp"
+          element={<LoadTestDetail />}
+        />
         <Route path="/:benchmarkRunId" element={<RunIndex />} />
         <Route
           path="/run-comparison/:benchmarkRunId"
