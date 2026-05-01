@@ -177,9 +177,42 @@ export interface GasStats {
   avg_gas_price: number;
 }
 
-export interface FailureReason {
-  reason: string;
-  count: number;
+// Producer emits this as a JSON tuple `[reason, count]`, not an object.
+// Once upgrades.md P3 #7 lands and the producer switches to `{reason, count}`
+// objects, change the type here and update the page accessor.
+export type FailureReason = [string, number];
+
+/**
+ * Run parameters captured by the producer at start time. All fields mirror the
+ * Rust config struct verbatim; the page omits any null-valued field rather than
+ * showing "—" so older runs (which lack `config` entirely) and runs with mixed
+ * nulls present a uniform UI.
+ */
+export interface LoadTestConfig {
+  funding_amount: string;
+  sender_count: number;
+  sender_offset: number;
+  in_flight_per_sender: number;
+  batch_size: number;
+  batch_timeout: string;
+  duration: string;
+  target_gps: number;
+  seed: number;
+  chain_id: number | null;
+  transactions: Array<{ type: string; weight: number }>;
+  looper_contract: string | null;
+  swap_token_amount: string;
+}
+
+/**
+ * One sample of the throughput timeseries. Producer emits one sample per
+ * window (≈0.5–1s apart, irregular). Plot against `elapsed_secs` directly,
+ * not array index, so the curve stays time-accurate.
+ */
+export interface ThroughputSample {
+  elapsed_secs: number;
+  tps: number;
+  gps: number;
 }
 
 export interface LoadTestResult {
@@ -191,6 +224,11 @@ export interface LoadTestResult {
   // Element type is best-effort until upgrades.md P3 #7 lands. Empty arrays
   // dominate today, so we have no live samples to verify against.
   top_failure_reasons: FailureReason[];
+  // Both optional for back-compat: older S3 runs predate these fields and the
+  // page must render without them. Sections that depend on each field are
+  // gated on its presence rather than rendering empty placeholders.
+  config?: LoadTestConfig;
+  throughput_timeseries?: ThroughputSample[];
 }
 
 /**

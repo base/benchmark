@@ -5,6 +5,8 @@ import StatCard, { Stat, StatGrid } from "../components/StatCard";
 import PercentileBarChart, {
   PercentileBarRow,
 } from "../components/PercentileBar";
+import ThroughputChart from "../components/ThroughputChart";
+import ConfigCard from "../components/ConfigCard";
 import { useLoadTestResult } from "../utils/useDataSeries";
 import {
   durationToNanos,
@@ -179,6 +181,19 @@ const LoadTestDetail = () => {
           <>
             <SwapsPerSecondHero tps={result.throughput.tps} />
 
+            {result.throughput_timeseries &&
+              result.throughput_timeseries.length > 1 && (
+                <StatCard title="Throughput over time">
+                  <ThroughputChart
+                    samples={result.throughput_timeseries}
+                    avgTps={result.throughput.tps}
+                    avgGps={result.throughput.gps}
+                  />
+                </StatCard>
+              )}
+
+            {result.config && <ConfigCard config={result.config} />}
+
             <SummarySection result={result} />
 
             <StatCard title="Block latency (submit → block)">
@@ -204,14 +219,14 @@ const LoadTestDetail = () => {
                 </div>
               ) : (
                 <ul className="text-sm text-slate-700 divide-y divide-slate-100">
-                  {result.top_failure_reasons.map((f) => (
+                  {result.top_failure_reasons.map(([reason, count]) => (
                     <li
-                      key={f.reason}
+                      key={reason}
                       className="py-2 flex justify-between gap-x-4"
                     >
-                      <span>{f.reason}</span>
+                      <span>{reason}</span>
                       <span className="font-mono">
-                        {f.count.toLocaleString()}
+                        {count.toLocaleString()}
                       </span>
                     </li>
                   ))}

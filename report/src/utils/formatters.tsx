@@ -142,6 +142,24 @@ export const formatEthFromWei = (wei: number): string => {
   return `${(wei / 1e18).toFixed(6)} ETH`;
 };
 
+export const formatEthFromWeiString = (wei: string): string => {
+  // funding_amount and swap_token_amount come over the wire as decimal strings
+  // (Rust u128 → JSON string) so they don't lose precision in JSON. Use BigInt
+  // for the integer-ETH part; only the fractional remainder needs Number math
+  // (which is safe because it's < 1 ETH worth of wei).
+  try {
+    const w = BigInt(wei);
+    const oneEth = 10n ** 18n;
+    const whole = w / oneEth;
+    const remainder = w % oneEth;
+    if (remainder === 0n) return `${whole.toString()} ETH`;
+    const frac = (Number(remainder) / 1e18).toFixed(6).slice(2);
+    return `${whole.toString()}.${frac} ETH`;
+  } catch {
+    return `${wei} wei`;
+  }
+};
+
 const LOAD_TEST_TIMESTAMP_RE =
   /^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})$/;
 
