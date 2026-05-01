@@ -11,9 +11,7 @@ interface Row {
   value: string;
 }
 
-const formatTransactions = (
-  txs: LoadTestConfig["transactions"],
-): string => {
+const formatTransactions = (txs: LoadTestConfig["transactions"]): string => {
   if (!txs || txs.length === 0) return "—";
   const total = txs.reduce((acc, t) => acc + t.weight, 0);
   if (total === 0) return txs.map((t) => t.type).join(" · ");
@@ -68,9 +66,7 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
     });
   }
 
-  const repro: Row[] = [
-    { label: "Seed", value: config.seed.toLocaleString() },
-  ];
+  const repro: Row[] = [{ label: "Seed", value: config.seed.toLocaleString() }];
   if (config.chain_id !== null) {
     repro.push({ label: "Chain ID", value: config.chain_id.toLocaleString() });
   }

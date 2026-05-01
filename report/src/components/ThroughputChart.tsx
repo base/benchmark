@@ -233,10 +233,7 @@ const ThroughputChart = ({
         const sample =
           Math.abs(xv - a.elapsed_secs) < Math.abs(xv - b.elapsed_secs) ? a : b;
         const px = x(sample.elapsed_secs);
-        focusLine
-          .attr("x1", px)
-          .attr("x2", px)
-          .style("display", null);
+        focusLine.attr("x1", px).attr("x2", px).style("display", null);
         focusTpsDot
           .attr("cx", px)
           .attr("cy", yTps(sample.tps))
@@ -273,14 +270,18 @@ const ThroughputChart = ({
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: TPS_COLOR }}
             />
-            <span className="text-slate-700">{formatTps(hover.sample.tps)}</span>
+            <span className="text-slate-700">
+              {formatTps(hover.sample.tps)}
+            </span>
           </div>
           <div className="mt-0.5 flex items-center gap-x-2">
             <span
               className="inline-block h-2 w-2 rounded-full"
               style={{ background: GPS_COLOR }}
             />
-            <span className="text-slate-700">{formatGps(hover.sample.gps)}</span>
+            <span className="text-slate-700">
+              {formatGps(hover.sample.gps)}
+            </span>
           </div>
         </div>
       )}
