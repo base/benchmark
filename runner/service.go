@@ -174,7 +174,7 @@ func (s *service) dumpLogFile(testDirs *config.InternalClientOptions, nodeType s
 		s.log.Warn("could not open log file for dump", "path", logsPath, "err", err)
 		return
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	stat, err := f.Stat()
 	if err != nil {
@@ -206,7 +206,7 @@ func (s *service) dumpLogFile(testDirs *config.InternalClientOptions, nodeType s
 	if truncated {
 		fmt.Printf("[truncated: showing last %d bytes of %d total]\n", readSize, size)
 	}
-	os.Stdout.Write(buf)
+	_, _ = os.Stdout.Write(buf)
 	fmt.Printf("\n=== end %s EL logs ===\n\n", nodeType)
 }
 
