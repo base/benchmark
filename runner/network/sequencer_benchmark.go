@@ -273,7 +273,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			}
 
 			log.Info("Sleeping for block time", "block_time", params.BlockTime)
-			time.Sleep(time.Duration(params.BlockTime) * time.Second)
+			time.Sleep(params.BlockTime)
 
 			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
 			if err != nil {

@@ -14,7 +14,7 @@ type RuntimeConfig struct {
 	Stderr               io.WriteCloser
 	Args                 []string
 	FlashblocksURL       *string // Optional URL for flashblocks websocket server (only used by clients that support it)
-	FlashblocksBlockTime string  // Block time for flashblocks (e.g. "250ms")
+	FlashblocksBlockTime string  // Block time for flashblocks in milliseconds (e.g. "250")
 	BlockTimeMs          uint64  // L2 block time in milliseconds
 }
 

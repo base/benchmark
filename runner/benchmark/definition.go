@@ -93,7 +93,7 @@ type FlashblocksConfig struct {
 	BlockTime string `yaml:"block_time"`
 }
 
-const DefaultFlashblocksBlockTime = "250ms"
+const DefaultFlashblocksBlockTime = "250"
 const DefaultBlockTime = "1s"
 
 type BenchmarkConfig struct {
