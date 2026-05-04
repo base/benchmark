@@ -166,6 +166,12 @@ export interface ThroughputPercentiles {
   gps_max: number;
 }
 
+export interface BlockRange {
+  first_block: number;
+  last_block: number;
+  block_count: number;
+}
+
 export interface GasStats {
   total_gas: number;
   avg_gas: number;
@@ -229,6 +235,9 @@ export interface LoadTestResult {
   // gated on its presence rather than rendering empty placeholders.
   config?: LoadTestConfig;
   throughput_timeseries?: ThroughputSample[];
+  // Optional for back-compat: older runs predate this field. The summary
+  // section gates the block range stats on its presence.
+  block_range?: BlockRange;
 }
 
 /**
