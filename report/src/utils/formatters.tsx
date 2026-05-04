@@ -129,6 +129,31 @@ export const formatTps = (n: number): string => `${n.toFixed(1)} tx/s`;
 
 export const formatGps = (n: number): string => formatValue(n, "gas/s");
 
+const WRITTEN_PREFIXES: Record<string, string> = {
+  "": "",
+  k: "thousand ",
+  M: "million ",
+  G: "billion ",
+  T: "trillion ",
+};
+
+const formatGasWritten = (value: number, suffix: string): string => {
+  if (value === 0) return `0 gas${suffix}`;
+  const sortedPrefixes = Object.entries(PREFIXES).sort(([, a], [, b]) => b - a);
+  for (const [prefix, multiplier] of sortedPrefixes) {
+    if (Math.abs(value) >= multiplier) {
+      const written = WRITTEN_PREFIXES[prefix] ?? `${prefix} `;
+      return `${(value / multiplier).toFixed(1)} ${written}gas${suffix}`;
+    }
+  }
+  return `${value.toFixed(1)} gas${suffix}`;
+};
+
+export const formatGasVerbose = (n: number): string => formatGasWritten(n, "");
+
+export const formatGpsVerbose = (n: number): string =>
+  formatGasWritten(n, "/s");
+
 export const formatPercent = (
   numerator: number,
   denominator: number,

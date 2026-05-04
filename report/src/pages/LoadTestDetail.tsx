@@ -12,11 +12,11 @@ import {
   durationToNanos,
   formatDuration,
   formatEthFromWei,
-  formatGps,
+  formatGasVerbose,
+  formatGpsVerbose,
   formatLoadTestTimestamp,
   formatPercent,
   formatTps,
-  formatValue,
 } from "../utils/formatters";
 import {
   FlashblocksLatencyStats,
@@ -107,10 +107,13 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
         />
         <Stat label="Failed" value={failed.toLocaleString()} />
         <Stat label="Avg TPS" value={formatTps(result.throughput.tps)} />
-        <Stat label="Avg gas/s" value={formatGps(result.throughput.gps)} />
+        <Stat
+          label="Avg gas/s"
+          value={formatGpsVerbose(result.throughput.gps)}
+        />
         <Stat
           label="Total gas"
-          value={formatValue(result.gas.total_gas, "gas")}
+          value={formatGasVerbose(result.gas.total_gas)}
           hint={`${result.gas.avg_gas.toLocaleString()} avg / tx`}
         />
         <Stat
@@ -118,6 +121,13 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
           value={formatEthFromWei(result.gas.total_cost_wei)}
           hint={`${result.gas.avg_gas_price.toLocaleString()} wei avg gas price`}
         />
+        {result.block_range && (
+          <Stat
+            label="Block range"
+            value={`${result.block_range.first_block.toLocaleString()} → ${result.block_range.last_block.toLocaleString()}`}
+            hint={`${result.block_range.block_count.toLocaleString()} blocks`}
+          />
+        )}
       </StatGrid>
     </StatCard>
   );
