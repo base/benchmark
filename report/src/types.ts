@@ -49,7 +49,8 @@ export interface ChartConfig {
     | "gas"
     | "count"
     | "gas/s"
-    | "blocks"; // Add 'gas/s', ensure 's' is present
+    | "blocks";
+  aliases?: string[];
 }
 
 export interface MachineInfo {
