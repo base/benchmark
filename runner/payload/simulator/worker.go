@@ -242,18 +242,32 @@ func (t *simulatorPayloadWorker) Stop(ctx context.Context) error {
 	return nil
 }
 
+// mineAndConfirmBatchSize is the maximum number of transactions to submit per
+// mineAndConfirm call. Sending tens of thousands of transactions in a single
+// batch would require waiting for the very last one to be mined, which can
+// easily exceed the waitForReceipt timeout. Batching ensures each group of
+// transactions is confirmed before the next group is submitted.
+const mineAndConfirmBatchSize = 50
+
 func (t *simulatorPayloadWorker) mineAndConfirm(ctx context.Context, txs []*types.Transaction) error {
-	t.mempool.AddTransactions(txs)
+	for len(txs) > 0 {
+		batch := txs
+		if len(batch) > mineAndConfirmBatchSize {
+			batch = txs[:mineAndConfirmBatchSize]
+		}
+		txs = txs[len(batch):]
 
-	receipt, err := t.waitForReceipt(ctx, txs[len(txs)-1].Hash())
-	if err != nil {
-		return errors.Wrap(err, "failed to wait for receipt")
+		t.mempool.AddTransactions(batch)
+
+		receipt, err := t.waitForReceipt(ctx, batch[len(batch)-1].Hash())
+		if err != nil {
+			return errors.Wrap(err, "failed to wait for receipt")
+		}
+
+		if receipt.Status != types.ReceiptStatusSuccessful {
+			return fmt.Errorf("receipt status not successful: %d", receipt.Status)
+		}
 	}
-
-	if receipt.Status != types.ReceiptStatusSuccessful {
-		return fmt.Errorf("receipt status not successful: %d", receipt.Status)
-	}
-
 	return nil
 }
 
