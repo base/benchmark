@@ -91,6 +91,7 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
   const submitted = result.throughput.total_submitted;
   const confirmed = result.throughput.total_confirmed;
   const failed = result.throughput.total_failed;
+  const reverted = result.throughput.total_reverted;
 
   return (
     <StatCard title="Summary">
@@ -106,6 +107,13 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
           hint={formatPercent(confirmed, submitted) + " of submitted"}
         />
         <Stat label="Failed" value={failed.toLocaleString()} />
+        {reverted > 0 && (
+          <Stat
+            label="Reverted"
+            value={reverted.toLocaleString()}
+            hint={formatPercent(reverted, confirmed) + " of confirmed"}
+          />
+        )}
         <Stat label="Avg TPS" value={formatTps(result.throughput.tps)} />
         <Stat
           label="Avg gas/s"
@@ -223,25 +231,35 @@ const LoadTestDetail = () => {
             </StatCard>
 
             <StatCard title="Top failure reasons">
-              {result.top_failure_reasons.length === 0 ? (
-                <div className="text-sm text-slate-500">
-                  No failures recorded.
-                </div>
-              ) : (
-                <ul className="text-sm text-slate-700 divide-y divide-slate-100">
-                  {result.top_failure_reasons.map(([reason, count]) => (
-                    <li
-                      key={reason}
-                      className="py-2 flex justify-between gap-x-4"
-                    >
-                      <span>{reason}</span>
-                      <span className="font-mono">
-                        {count.toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              {(() => {
+                const reverted = result.throughput.total_reverted;
+                const reasons: [string, number][] = [
+                  ...(reverted > 0 ? [["reverted", reverted] as [string, number]] : []),
+                  ...result.top_failure_reasons,
+                ];
+                if (reasons.length === 0) {
+                  return (
+                    <div className="text-sm text-slate-500">
+                      No failures recorded.
+                    </div>
+                  );
+                }
+                return (
+                  <ul className="text-sm text-slate-700 divide-y divide-slate-100">
+                    {reasons.map(([reason, count]) => (
+                      <li
+                        key={reason}
+                        className="py-2 flex justify-between gap-x-4"
+                      >
+                        <span>{reason}</span>
+                        <span className="font-mono">
+                          {count.toLocaleString()}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
             </StatCard>
           </>
         )}
