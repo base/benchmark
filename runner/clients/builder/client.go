@@ -49,6 +49,12 @@ func (r *BuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error
 
 	cfg2 := *cfg
 	cfg2.Args = append(cfg2.Args, "--flashblocks.port", fmt.Sprintf("%d", r.websocketPort))
+	if cfg.FlashblocksBlockTime != "" {
+		cfg2.Args = append(cfg2.Args, "--flashblocks.block-time", cfg.FlashblocksBlockTime)
+	}
+	if cfg.BlockTimeMs > 0 {
+		cfg2.Args = append(cfg2.Args, "--rollup.chain-block-time", fmt.Sprintf("%d", cfg.BlockTimeMs))
+	}
 	err := r.elClient.Run(ctx, &cfg2)
 	if err != nil {
 		return err

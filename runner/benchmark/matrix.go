@@ -47,6 +47,11 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *Benchm
 
 // ResolveTestRunsFromMatrix constructs a new ParamsMatrix from a config.
 func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *BenchmarkConfig) ([]TestRun, error) {
+	blockTime, err := config.GetBlockTime()
+	if err != nil {
+		return nil, fmt.Errorf("invalid block_time: %w", err)
+	}
+
 	seenParams := make(map[string]bool)
 
 	// Multiple payloads can run in a single benchmark.
@@ -107,6 +112,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *Be
 			return nil, err
 		}
 
+		params.BlockTime = blockTime
 		params.Name = config.Name
 		if config.Description != nil {
 			params.Description = *config.Description

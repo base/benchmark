@@ -8,16 +8,31 @@ interface ProvidedProps {
   role: "sequencer" | "validator" | null;
 }
 
+function resolveMetricKey(
+  data: DataSeries[],
+  primaryKey: string,
+  aliases: string[] = [],
+): string {
+  const keys = [primaryKey, ...aliases];
+  const chartData = data.flatMap((s) => s.data);
+  for (const key of keys) {
+    if (chartData.some((d) => d.ExecutionMetrics[key] !== undefined)) {
+      return key;
+    }
+  }
+  return primaryKey;
+}
+
 const ChartGrid: React.FC<ProvidedProps> = ({ data, role }: ProvidedProps) => {
   return (
     <div className="charts-container">
       {SORTED_CHART_CONFIG.map(([metricKey, config]) => {
-        // sequencer and validator have different thresholds
+        const resolvedKey = resolveMetricKey(data, metricKey, config.aliases);
         const thresholdKey = role ? `${role}/${metricKey}` : null;
         const chartData = data.flatMap((s) => s.data);
         const thresholds = data[0]?.thresholds;
         const executionMetrics = chartData
-          .map((d) => d.ExecutionMetrics[metricKey])
+          .map((d) => d.ExecutionMetrics[resolvedKey])
           .filter((v) => v !== undefined);
 
         if (executionMetrics.length === 0) {
@@ -26,7 +41,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data, role }: ProvidedProps) => {
 
         const chartProps = {
           series: data,
-          metricKey,
+          metricKey: resolvedKey,
           title: config.title,
           description: config.description,
           unit: config.unit,

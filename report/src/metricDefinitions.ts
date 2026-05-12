@@ -136,112 +136,114 @@ export const CHART_CONFIG = {
     description: "Shows the median gas per block",
     unit: "gas",
   },
-  reth_sync_execution_execution_duration: {
+  reth_sync_execution_execution_duration_avg: {
     type: "line",
     title: "Reth Sync Execution Duration",
-    description: "Shows the time taken for execution during reth sync",
+    description: "Shows the average time taken for execution during reth sync",
     unit: "s",
+    aliases: ["reth_sync_execution_execution_duration"],
   },
-  reth_sync_block_validation_state_root_duration: {
+  reth_sync_block_validation_state_root_duration_avg: {
     type: "line",
     title: "Reth Sync Block Validation State Root Duration",
     description:
-      "Shows the time taken for state root validation during reth sync",
+      "Shows the average time taken for state root validation during reth sync",
     unit: "s",
+    aliases: ["reth_sync_block_validation_state_root_duration"],
   },
-  reth_op_rbuilder_block_built_success: {
+  reth_base_builder_block_built_success: {
     type: "line",
-    title: "Reth OP Builder Block Built Success",
-    description: "Indicates whether the Builder successfully built a block",
+    title: "Builder Block Built Success",
+    description: "Number of blocks successfully built per block interval",
+    unit: "count",
+    aliases: ["reth_op_rbuilder_block_built_success"],
+  },
+  reth_base_builder_flashblock_count: {
+    type: "line",
+    title: "Builder Flashblock Count",
+    description: "Number of flashblock bundles sent per block",
+    unit: "count",
+    aliases: ["reth_op_rbuilder_flashblock_count"],
+  },
+  reth_base_builder_flashblock_count_avg: {
+    type: "line",
+    title: "Builder Flashblocks per Block (avg)",
+    description: "Average number of flashblocks included per block",
     unit: "count",
   },
-  reth_op_rbuilder_flashblock_count: {
+  reth_base_builder_total_block_built_duration_avg: {
     type: "line",
-    title: "Reth OP Builder Flashblock Count",
-    description: "Shows the number of flashblocks built by Builder",
+    title: "Builder Total Block Built Duration",
+    description: "Average total time taken to build a block",
+    unit: "s",
+    aliases: ["reth_op_rbuilder_total_block_built_duration"],
+  },
+  reth_base_builder_flashblock_build_duration_avg: {
+    type: "line",
+    title: "Builder Flashblock Build Duration",
+    description: "Average time taken to build a single flashblock",
+    unit: "s",
+    aliases: ["reth_op_rbuilder_flashblock_build_duration"],
+  },
+  reth_base_builder_state_root_calculation_duration_avg: {
+    type: "line",
+    title: "Builder State Root Calculation Duration",
+    description: "Average time taken to calculate the state root",
+    unit: "s",
+    aliases: ["reth_op_rbuilder_state_root_calculation_duration"],
+  },
+  reth_base_builder_sequencer_tx_duration_avg: {
+    type: "line",
+    title: "Builder Sequencer Tx Duration",
+    description: "Average time taken to process sequencer transactions",
+    unit: "s",
+    aliases: ["reth_op_rbuilder_sequencer_tx_duration"],
+  },
+  reth_base_builder_payload_transaction_simulation_duration_avg: {
+    type: "line",
+    title: "Builder Payload Tx Simulation Duration",
+    description: "Average time taken for payload transaction simulation",
+    unit: "s",
+    aliases: ["reth_op_rbuilder_payload_tx_simulation_duration"],
+  },
+  reth_base_builder_tx_simulation_duration_avg: {
+    type: "line",
+    title: "Builder Tx Simulation Duration",
+    description: "Average per-transaction simulation duration",
+    unit: "s",
+  },
+  reth_base_builder_payload_num_tx_gauge: {
+    type: "line",
+    title: "Builder Payload Tx Count",
+    description: "Number of transactions included in the most recent payload",
     unit: "count",
   },
-  reth_op_rbuilder_total_block_built_duration: {
+  reth_base_builder_flashblock_gas_headroom_pct_avg: {
     type: "line",
-    title: "Reth OP Builder Total Block Built Duration",
-    description: "Shows the total time taken to build a block by Builder",
-    unit: "s",
+    title: "Builder Flashblock Gas Headroom %",
+    description: "Average gas headroom percentage across flashblocks",
+    unit: "count",
   },
-  reth_op_rbuilder_flashblock_build_duration: {
-    type: "line",
-    title: "Reth OP Builder Flashblock Build Duration",
-    description: "Shows the time taken to build a flashblock by Builder",
-    unit: "s",
-  },
-  reth_op_rbuilder_state_root_calculation_duration: {
-    type: "line",
-    title: "Reth OP Builder State Root Calculation Duration",
-    description: "Shows the time taken to calculate the state root by Builder",
-    unit: "s",
-  },
-  reth_op_rbuilder_sequencer_tx_duration: {
-    type: "line",
-    title: "Reth OP Builder Sequencer Tx Duration",
-    description: "Shows the time taken for sequencer transactions in Builder",
-    unit: "s",
-  },
-  reth_op_rbuilder_payload_tx_simulation_duration: {
-    type: "line",
-    title: "Reth OP Builder Payload Tx Simulation Duration",
-    description:
-      "Shows the time taken for payload transaction simulation in Builder",
-    unit: "s",
-  },
-  reth_sync_state_provider_total_storage_fetch_latency: {
+  reth_sync_state_provider_total_storage_fetch_latency_avg: {
     type: "line",
     title: "Validator Storage Load Latency",
-    description: "Shows the 90th percentile latency for storage slot loads",
+    description: "Average latency for storage slot loads during validation",
     unit: "s",
+    aliases: ["reth_sync_state_provider_total_storage_fetch_latency"],
   },
-  reth_sync_state_provider_total_code_fetch_latency: {
+  reth_sync_state_provider_total_code_fetch_latency_avg: {
     type: "line",
     title: "Validator Code Load Latency",
-    description: "Shows the 90th percentile latency for code loads",
+    description: "Average latency for bytecode loads during validation",
     unit: "s",
+    aliases: ["reth_sync_state_provider_total_code_fetch_latency"],
   },
-  reth_sync_state_provider_total_account_fetch_latency: {
+  reth_sync_state_provider_total_account_fetch_latency_avg: {
     type: "line",
     title: "Validator Account Load Latency",
-    description: "Shows the 90th percentile latency for account loads",
+    description: "Average latency for account loads during validation",
     unit: "s",
-  },
-  reth_reth_flashblocks_block_processing_duration: {
-    type: "line",
-    title: "Flashblock Processing Duration",
-    description: "Shows the time taken to process flashblocks on the validator",
-    unit: "s",
-  },
-  reth_reth_flashblocks_flashblocks_in_block: {
-    type: "line",
-    title: "Flashblocks per Block",
-    description: "Shows the number of flashblocks received per block",
-    unit: "count",
-  },
-  reth_reth_flashblocks_sender_recovery_duration: {
-    type: "line",
-    title: "Flashblock Sender Recovery Duration",
-    description:
-      "Shows the time taken to recover senders from flashblock transactions",
-    unit: "s",
-  },
-  reth_reth_flashblocks_upstream_messages: {
-    type: "line",
-    title: "Flashblock Upstream Messages",
-    description:
-      "Shows the number of upstream messages received from the flashblock stream",
-    unit: "count",
-  },
-  reth_reth_flashblocks_bundle_state_clone_duration: {
-    type: "line",
-    title: "Flashblock Bundle State Clone Duration",
-    description:
-      "Shows the time taken to clone the bundle state for flashblock processing",
-    unit: "s",
+    aliases: ["reth_sync_state_provider_total_account_fetch_latency"],
   },
 } satisfies Record<string, ChartConfig>;
 

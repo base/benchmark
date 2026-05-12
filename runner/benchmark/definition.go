@@ -8,6 +8,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/base/base-bench/runner/payload"
 )
@@ -87,11 +88,38 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 	return cmd.Run()
 }
 
+// FlashblocksConfig holds top-level flashblocks configuration.
+type FlashblocksConfig struct {
+	BlockTime string `yaml:"block_time"`
+}
+
+const DefaultFlashblocksBlockTime = "250"
+const DefaultBlockTime = "1s"
+
 type BenchmarkConfig struct {
 	Name                string               `yaml:"name"`
 	Description         *string              `yaml:"description"`
+	BlockTime           *string              `yaml:"block_time"`
+	Flashblocks         *FlashblocksConfig   `yaml:"flashblocks"`
 	Benchmarks          []TestDefinition     `yaml:"benchmarks"`
 	TransactionPayloads []payload.Definition `yaml:"payloads"`
+}
+
+// GetBlockTime returns the configured block time as a duration, or the default (1s).
+func (bc *BenchmarkConfig) GetBlockTime() (time.Duration, error) {
+	raw := DefaultBlockTime
+	if bc.BlockTime != nil && *bc.BlockTime != "" {
+		raw = *bc.BlockTime
+	}
+	return time.ParseDuration(raw)
+}
+
+// FlashblocksBlockTime returns the configured flashblocks block time, or the default.
+func (bc *BenchmarkConfig) FlashblocksBlockTime() string {
+	if bc.Flashblocks != nil && bc.Flashblocks.BlockTime != "" {
+		return bc.Flashblocks.BlockTime
+	}
+	return DefaultFlashblocksBlockTime
 }
 
 type DatadirConfig struct {

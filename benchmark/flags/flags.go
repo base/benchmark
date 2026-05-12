@@ -44,17 +44,17 @@ var (
 	}
 
 	RootDirFlag = &cli.StringFlag{
-		Name:     RootDirFlagName,
-		Usage:    "Root Directory",
-		EnvVars:  prefixEnvVars("ROOT_DIR"),
-		Required: true,
+		Name:    RootDirFlagName,
+		Usage:   "Root Directory",
+		EnvVars: prefixEnvVars("ROOT_DIR"),
+		Value:   "./data-dir",
 	}
 
 	OutputDirFlag = &cli.StringFlag{
-		Name:     OutputDirFlagName,
-		Usage:    "Output Directory",
-		EnvVars:  prefixEnvVars("OUTPUT_DIR"),
-		Required: true,
+		Name:    OutputDirFlagName,
+		Usage:   "Output Directory",
+		Value:   "./output",
+		EnvVars: prefixEnvVars("OUTPUT_DIR"),
 	}
 
 	TxFuzzBinFlag = &cli.StringFlag{

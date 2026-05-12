@@ -162,6 +162,54 @@ type TestRunMetadata struct {
 	Error    *string `json:"error,omitempty"`
 }
 
+const maxLogDumpSize = 1 << 20 // 1 MB
+
+// dumpLogFile reads the last maxLogDumpSize bytes of the EL log file and prints them to stdout.
+// This is called on benchmark failure so CI logs contain useful subprocess output.
+func (s *service) dumpLogFile(testDirs *config.InternalClientOptions, nodeType string) {
+	logsPath := path.Join(testDirs.TestDirPath, network.ExecutionLayerLogFileName)
+
+	f, err := os.Open(logsPath)
+	if err != nil {
+		s.log.Warn("could not open log file for dump", "path", logsPath, "err", err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+
+	stat, err := f.Stat()
+	if err != nil {
+		s.log.Warn("could not stat log file for dump", "path", logsPath, "err", err)
+		return
+	}
+
+	size := stat.Size()
+	truncated := false
+	readSize := size
+	if readSize > maxLogDumpSize {
+		truncated = true
+		readSize = maxLogDumpSize
+		if _, err := f.Seek(-readSize, io.SeekEnd); err != nil {
+			s.log.Warn("could not seek log file for dump", "path", logsPath, "err", err)
+			return
+		}
+	}
+
+	buf := make([]byte, readSize)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		s.log.Warn("could not read log file for dump", "path", logsPath, "err", err)
+		return
+	}
+	buf = buf[:n]
+
+	fmt.Printf("\n=== %s EL logs ===\n", nodeType)
+	if truncated {
+		fmt.Printf("[truncated: showing last %d bytes of %d total]\n", readSize, size)
+	}
+	_, _ = os.Stdout.Write(buf)
+	fmt.Printf("\n=== end %s EL logs ===\n\n", nodeType)
+}
+
 func (s *service) exportOutput(testName string, returnedError error, testDirs *config.InternalClientOptions, testOutputDir string, nodeType string) error {
 	// package up logs from the EL client and write them to the output dir
 	// outputDir/
@@ -320,7 +368,7 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
-func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig) (*benchmark.RunResult, error) {
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig, flashblocksBlockTime string) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
@@ -384,7 +432,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	}
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState, flashblocksBlockTime)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
@@ -401,6 +449,8 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	}
 
 	if runErr != nil {
+		s.dumpLogFile(sequencerOptions, "sequencer")
+		s.dumpLogFile(validatorOptions, "validator")
 		return nil, errors.Wrap(runErr, "failed to run benchmark")
 	}
 
@@ -567,7 +617,7 @@ outerLoop:
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir)
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir, config.FlashblocksBlockTime())
 			if err != nil {
 				log.Error("Failed to run test", "err", err)
 				metricSummary = &benchmark.RunResult{
