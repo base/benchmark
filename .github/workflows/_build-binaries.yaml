@@ -19,7 +19,7 @@ on:
         description: "Base Reth Node version to build"
         required: false
         type: string
-        default: "1e4a8a7"
+        default: "main"
 
 # Set minimal permissions for all jobs by default
 permissions:
