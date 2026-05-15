@@ -1,0 +1,25 @@
+name: Simulator load-test throughput test
+description: Test builder throughput using base-load-tester with the simulator payload. The Simulator contract is deployed automatically via CREATE before the test starts if not already present.
+payloads:
+  - name: Load Test Simulator
+    type: load-test
+    id: load-test-simulator
+    sender_count: 5
+    transactions:
+      - weight: 100
+        type: simulator
+        create_storage: 10
+        create_accounts: 5
+
+benchmarks:
+  - variables:
+      - type: payload
+        value: load-test-simulator
+      - type: node_type
+        value: builder
+      - type: validator_node_type
+        value: base-reth-node
+      - type: num_blocks
+        value: 20
+      - type: gas_limit
+        value: 1000000000
