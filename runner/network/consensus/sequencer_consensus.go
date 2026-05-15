@@ -112,7 +112,7 @@ func marshalBinaryWithSignature(info *derive.L1BlockInfo, signature []byte) ([]b
 	return w.Bytes(), nil
 }
 
-func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte, isSetupPayload bool) (*eth.PayloadAttributes, *common.Hash, error) {
+func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]byte, isSetupPayload bool, nextBoundary time.Time, blockTime time.Duration) (*eth.PayloadAttributes, *common.Hash, error) {
 	gasLimit := eth.Uint64Quantity(f.options.GasLimit)
 	if isSetupPayload {
 		gasLimit = eth.Uint64Quantity(f.options.GasLimitSetup)
@@ -121,15 +121,11 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	var b8 eth.Bytes8
 	copy(b8[:], eip1559.EncodeHolocene1559Params(50, 1))
 
-	// Always keep timestamps at or ahead of wall clock so the builder
-	// never sees "FCU arrived too late" and produces empty blocks.
-	now := uint64(time.Now().Unix())
-	lastTimestamp := f.lastTimestamp
-	if now > lastTimestamp {
-		lastTimestamp = now
-	}
-
-	timestamp := lastTimestamp + 1
+	// Use nextBoundary (the block-time-aligned wall-clock boundary we slept to) plus
+	// one block time as the block timestamp. This guarantees the FCU always arrives
+	// at the same point relative to the block deadline, eliminating the jitter that
+	// causes "FCU arrived too late" and empty blocks when sendTxs takes variable time.
+	timestamp := uint64(nextBoundary.Add(blockTime).Unix())
 
 	number := uint64(0)
 	time := uint64(0)
@@ -268,11 +264,17 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	duration := time.Since(startTime)
 	f.log.Info("Sent transactions", "duration", duration, "num_txs", len(sendTxs))
 	blockMetrics.AddExecutionMetric(networktypes.SendTxsLatencyMetric, duration)
-	startBlockBuildingTime := time.Now()
 
+	now := time.Now()
+	nextBoundary := now.Truncate(f.options.BlockTime).Add(f.options.BlockTime)
+	sleepDuration := time.Until(nextBoundary)
+	f.log.Info("Aligning to next block time boundary before FCU", "sleep", sleepDuration, "block_time", f.options.BlockTime)
+	time.Sleep(sleepDuration)
+
+	startBlockBuildingTime := time.Now()
 	f.log.Info("Starting block building")
 
-	payloadAttrs, beaconRoot, err := f.generatePayloadAttributes(sequencerTxs, isSetupPayload)
+	payloadAttrs, beaconRoot, err := f.generatePayloadAttributes(sequencerTxs, isSetupPayload, nextBoundary, f.options.BlockTime)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to generate payload attributes")
 	}
@@ -290,9 +292,10 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	blockMetrics.AddExecutionMetric(networktypes.UpdateForkChoiceLatencyMetric, duration)
 
 	f.currentPayloadID = payloadID
-	f.log.Info("Waiting for block time", "block_time", f.options.BlockTime)
-	// wait block time
-	time.Sleep(f.options.BlockTime)
+	blockDeadline := nextBoundary.Add(f.options.BlockTime)
+	waitDuration := time.Until(blockDeadline)
+	f.log.Info("Waiting for block deadline", "wait", waitDuration)
+	time.Sleep(waitDuration)
 
 	startTime = time.Now()
 
