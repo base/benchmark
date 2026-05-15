@@ -139,3 +139,29 @@ export const useLoadTestResult = (
     },
   );
 };
+
+export const useBenchmarkLoadTestResult = (
+  outputDir: string | undefined,
+  artifactPath?: string,
+) => {
+  const fetcher = useCallback(async (): Promise<LoadTestResult> => {
+    if (!outputDir) {
+      throw new Error("outputDir required");
+    }
+    const dataService = getDataService();
+    return await dataService.getBenchmarkLoadTestResult(outputDir, artifactPath);
+  }, [outputDir, artifactPath]);
+
+  return useSWR(
+    outputDir
+      ? `benchmark-load-test-${outputDir}-${artifactPath ?? "load-test-result.json"}`
+      : null,
+    fetcher,
+    {
+      dedupingInterval: 12 * 60 * 60 * 1000,
+      revalidateOnFocus: false,
+      errorRetryCount: 3,
+      errorRetryInterval: 5000,
+    },
+  );
+};

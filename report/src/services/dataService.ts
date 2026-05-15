@@ -79,6 +79,23 @@ export class DataService {
 
     return await response.json();
   }
+
+  async getBenchmarkLoadTestResult(
+    outputDir: string,
+    artifactPath = "load-test-result.json",
+  ): Promise<LoadTestResult> {
+    const response = await fetch(
+      `${this.baseUrl}output/${encodeURIComponent(outputDir)}/${encodeURIComponent(artifactPath)}`,
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch benchmark load test result: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    return await response.json();
+  }
 }
 
 // Configuration helper to determine base URL from environment

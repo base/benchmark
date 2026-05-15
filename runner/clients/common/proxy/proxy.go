@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/ethereum/go-ethereum/common"
@@ -31,6 +32,7 @@ type ProxyServer struct {
 	pendingTxs []*ethTypes.Transaction
 	clientURL  string
 	mempool    *mempool.StaticWorkloadMempool
+	mu         sync.Mutex
 }
 
 func NewProxyServer(clientURL string, log log.Logger, port int, mempool *mempool.StaticWorkloadMempool) *ProxyServer {
@@ -62,11 +64,29 @@ func (p *ProxyServer) Run(ctx context.Context) error {
 }
 
 func (p *ProxyServer) PendingTxs() []*ethTypes.Transaction {
-	return p.pendingTxs
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	txs := make([]*ethTypes.Transaction, len(p.pendingTxs))
+	copy(txs, p.pendingTxs)
+	return txs
 }
 
 func (p *ProxyServer) ClearPendingTxs() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	p.pendingTxs = make([]*ethTypes.Transaction, 0)
+}
+
+func (p *ProxyServer) DrainPendingTxs() []*ethTypes.Transaction {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	txs := make([]*ethTypes.Transaction, len(p.pendingTxs))
+	copy(txs, p.pendingTxs)
+	p.pendingTxs = make([]*ethTypes.Transaction, 0)
+	return txs
 }
 
 // Stop stops both the proxy server and the underlying client
@@ -89,12 +109,19 @@ func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request struct {
+	type rpcRequest struct {
 		Method  string          `json:"method"`
 		Params  json.RawMessage `json:"params"`
 		ID      interface{}     `json:"id"`
 		JSONRPC string          `json:"jsonrpc"`
 	}
+
+	if len(body) > 0 && body[0] == '[' {
+		p.handleBatchRequest(w, body)
+		return
+	}
+
+	var request rpcRequest
 
 	if err := json.Unmarshal(body, &request); err != nil {
 		http.Error(w, "Error parsing request", http.StatusBadRequest)
@@ -164,6 +191,50 @@ func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	p.DebugResponse(request.Method, request.Params, respBody)
 }
 
+func (p *ProxyServer) handleBatchRequest(w http.ResponseWriter, body []byte) {
+	type rpcRequest struct {
+		Method  string          `json:"method"`
+		Params  json.RawMessage `json:"params"`
+		ID      interface{}     `json:"id"`
+		JSONRPC string          `json:"jsonrpc"`
+	}
+
+	var requests []rpcRequest
+	if err := json.Unmarshal(body, &requests); err != nil {
+		http.Error(w, "Error parsing batch request", http.StatusBadRequest)
+		return
+	}
+
+	type rpcResponse struct {
+		JSONRPC string          `json:"jsonrpc"`
+		ID      interface{}     `json:"id"`
+		Result  json.RawMessage `json:"result,omitempty"`
+		Error   interface{}     `json:"error,omitempty"`
+	}
+
+	responses := make([]rpcResponse, 0, len(requests))
+	for _, request := range requests {
+		handled, result, err := p.OverrideRequest(request.Method, request.Params)
+		response := rpcResponse{
+			JSONRPC: "2.0",
+			ID:      request.ID,
+		}
+		if err != nil {
+			response.Error = map[string]interface{}{"code": -32000, "message": err.Error()}
+		} else if handled {
+			response.Result = result
+		} else {
+			response.Error = map[string]interface{}{"code": -32601, "message": "method not supported in proxy batch mode"}
+		}
+		responses = append(responses, response)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(responses); err != nil {
+		p.log.Error("Error encoding batch response", "err", err)
+	}
+}
+
 func (p *ProxyServer) OverrideRequest(method string, rawParams json.RawMessage) (bool, json.RawMessage, error) {
 	switch method {
 	case "eth_getTransactionCount":
@@ -204,7 +275,9 @@ func (p *ProxyServer) OverrideRequest(method string, rawParams json.RawMessage) 
 			return false, nil, fmt.Errorf("failed to decode transaction: %w", err)
 		}
 
+		p.mu.Lock()
 		p.pendingTxs = append(p.pendingTxs, &tx)
+		p.mu.Unlock()
 
 		txHash := tx.Hash().Hex()
 		jsonResponse, _ := json.Marshal(txHash)

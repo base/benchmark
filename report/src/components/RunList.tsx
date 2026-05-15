@@ -1,5 +1,6 @@
 import { groupBy } from "lodash";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { formatValue, MetricValue } from "../utils/formatters";
 import ThresholdDisplay from "../pages/ThresholdDisplay";
 import { BenchmarkRunWithStatus } from "../types";
@@ -404,10 +405,22 @@ const RunList = ({
                           />
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm">
-                          <StatusBadge
-                            status={run.status}
-                            className="text-xs"
-                          />
+                          <div className="flex items-center gap-2">
+                            <StatusBadge
+                              status={run.status}
+                              className="text-xs"
+                            />
+                            {run.result?.artifacts?.loadTestResult && (
+                              <Link
+                                to={`/benchmark-load-test/${encodeURIComponent(
+                                  run.outputDir,
+                                )}`}
+                                className="text-xs text-blue-600 hover:underline"
+                              >
+                                Load test
+                              </Link>
+                            )}
+                          </div>
                         </td>
                         {Object.keys(COLUMN_DEFINITIONS).map((column) => (
                           <td
