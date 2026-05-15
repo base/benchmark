@@ -597,7 +597,7 @@ func (t *simulatorPayloadWorker) sendTxs(ctx context.Context, pendingTxs int) (i
 
 	targetCalls := uint64(math.Ceil(float64(t.numCallsPerBlock) * t.scaleFactor))
 	var callsToSend uint64
-	if uint64(pendingTxs) >= t.numCallsPerBlock {
+	if uint64(pendingTxs) >= targetCalls {
 		callsToSend = 0
 	} else {
 		callsToSend = targetCalls - uint64(pendingTxs)
