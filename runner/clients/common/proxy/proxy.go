@@ -89,12 +89,20 @@ func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var request struct {
+	// Detect JSON batch requests (arrays of RPC calls).
+	if len(body) > 0 && body[0] == '[' {
+		p.handleBatchRequest(w, body)
+		return
+	}
+
+	type rpcRequest struct {
 		Method  string          `json:"method"`
 		Params  json.RawMessage `json:"params"`
 		ID      interface{}     `json:"id"`
 		JSONRPC string          `json:"jsonrpc"`
 	}
+
+	var request rpcRequest
 
 	if err := json.Unmarshal(body, &request); err != nil {
 		http.Error(w, "Error parsing request", http.StatusBadRequest)
@@ -162,6 +170,48 @@ func (p *ProxyServer) handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p.DebugResponse(request.Method, request.Params, respBody)
+}
+
+func (p *ProxyServer) handleBatchRequest(w http.ResponseWriter, body []byte) {
+	type rpcRequest struct {
+		Method  string          `json:"method"`
+		Params  json.RawMessage `json:"params"`
+		ID      interface{}     `json:"id"`
+		JSONRPC string          `json:"jsonrpc"`
+	}
+	var requests []rpcRequest
+	if err := json.Unmarshal(body, &requests); err != nil {
+		http.Error(w, "Error parsing batch request", http.StatusBadRequest)
+		return
+	}
+
+	type rpcResponse struct {
+		JSONRPC string          `json:"jsonrpc"`
+		ID      interface{}     `json:"id"`
+		Result  json.RawMessage `json:"result,omitempty"`
+		Error   interface{}     `json:"error,omitempty"`
+	}
+
+	responses := make([]rpcResponse, 0, len(requests))
+	for _, req := range requests {
+		handled, result, err := p.OverrideRequest(req.Method, req.Params)
+		var resp rpcResponse
+		resp.JSONRPC = "2.0"
+		resp.ID = req.ID
+		if err != nil {
+			resp.Error = map[string]interface{}{"code": -32000, "message": err.Error()}
+		} else if handled {
+			resp.Result = result
+		} else {
+			resp.Error = map[string]interface{}{"code": -32601, "message": "method not supported in proxy batch mode"}
+		}
+		responses = append(responses, resp)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(responses); err != nil {
+		p.log.Error("Error encoding batch response", "err", err)
+	}
 }
 
 func (p *ProxyServer) OverrideRequest(method string, rawParams json.RawMessage) (bool, json.RawMessage, error) {

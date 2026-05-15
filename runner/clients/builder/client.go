@@ -128,3 +128,11 @@ func (r *BuilderClient) FlashblocksClient() types.FlashblocksClient {
 func (r *BuilderClient) SupportsFlashblocks() bool {
 	return false
 }
+
+// FlashblocksWsURL returns the local WebSocket URL of the flashblocks server hosted by the builder.
+func (r *BuilderClient) FlashblocksWsURL() string {
+	if r.websocketPort == 0 {
+		return ""
+	}
+	return fmt.Sprintf("ws://localhost:%d", r.websocketPort)
+}

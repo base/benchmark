@@ -32,34 +32,36 @@ type LoadTestPayloadDefinition struct {
 
 // loadTestConfig is the YAML config written to a temp file for the load-test binary.
 type loadTestConfig struct {
-	RPC           string    `yaml:"rpc"`
-	SenderCount   uint64    `yaml:"sender_count"`
-	TargetGPS     uint64    `yaml:"target_gps"`
-	Duration      string    `yaml:"duration"`
-	Seed          uint64    `yaml:"seed"`
-	FundingAmount string    `yaml:"funding_amount"`
-	Transactions  yaml.Node `yaml:"transactions"`
+	RPC             string    `yaml:"transaction_submission_rpcs"`
+	SetupRPC        string    `yaml:"setup_rpc,omitempty"`
+	FlashblocksWs   string    `yaml:"flashblocks_ws"`
+	SenderCount     uint64    `yaml:"sender_count"`
+	TargetGPS       uint64    `yaml:"target_gps"`
+	Duration        string    `yaml:"duration"`
+	Seed            uint64    `yaml:"seed"`
+	FundingAmount   string    `yaml:"funding_amount"`
+	Transactions    yaml.Node `yaml:"transactions"`
 }
 
 type loadTestPayloadWorker struct {
-	log            log.Logger
-	prefundSK      string
-	loadTestBin    string
-	elRPCURL       string
-	gasLimit       uint64
-	blockTimeSec   uint64
-	params         LoadTestPayloadDefinition
-	mempool        *mempool.StaticWorkloadMempool
-	proxyServer    *proxy.ProxyServer
-	cmd            *exec.Cmd
-	configFilePath string
+	log             log.Logger
+	prefundSK       string
+	loadTestBin     string
+	elRPCURL        string
+	flashblocksWsURL string
+	gasLimit        uint64
+	blockTimeSec    uint64
+	params          LoadTestPayloadDefinition
+	mempool         *mempool.StaticWorkloadMempool
+	proxyServer     *proxy.ProxyServer
+	cmd             *exec.Cmd
+	configFilePath  string
 }
 
-// NewLoadTestPayloadWorker creates a worker that runs the base-load-test binary
-// as an external transaction generator, capturing transactions via a proxy server.
 func NewLoadTestPayloadWorker(
 	log log.Logger,
 	elRPCURL string,
+	flashblocksWsURL string,
 	params types.RunParams,
 	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
@@ -76,15 +78,16 @@ func NewLoadTestPayloadWorker(
 	}
 
 	w := &loadTestPayloadWorker{
-		log:          log,
-		prefundSK:    hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
-		loadTestBin:  cfg.LoadTestBinary(),
-		elRPCURL:     elRPCURL,
-		gasLimit:     params.GasLimit,
-		blockTimeSec: blockTimeSec,
-		params:       definition,
-		mempool:      mp,
-		proxyServer:  ps,
+		log:              log,
+		prefundSK:        hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
+		loadTestBin:      cfg.LoadTestBinary(),
+		elRPCURL:         elRPCURL,
+		flashblocksWsURL: flashblocksWsURL,
+		gasLimit:         params.GasLimit,
+		blockTimeSec:     blockTimeSec,
+		params:           definition,
+		mempool:          mp,
+		proxyServer:      ps,
 	}
 
 	return w, nil
@@ -206,8 +209,15 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 		transactions = defaultTransactions()
 	}
 
+	flashblocksWs := w.flashblocksWsURL
+	if flashblocksWs == "" {
+		flashblocksWs = "ws://localhost:7111"
+	}
+
 	config := loadTestConfig{
 		RPC:           w.proxyServer.ClientURL(),
+		SetupRPC:      w.elRPCURL,
+		FlashblocksWs: flashblocksWs,
 		SenderCount:   senderCount,
 		TargetGPS:     targetGPS,
 		Duration:      "99999s",

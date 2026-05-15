@@ -32,4 +32,8 @@ type ExecutionClient interface {
 	SetHead(ctx context.Context, blockNumber uint64) error
 	FlashblocksClient() FlashblocksClient // returns nil for clients that don't support flashblocks
 	SupportsFlashblocks() bool            // returns true if the client supports receiving flashblock payloads
+	// FlashblocksWsURL returns the local WebSocket URL of the flashblocks server hosted by this
+	// client, or an empty string if the client does not host one. Used by the load-test worker to
+	// configure flashblocks_ws in the Rust load-tester binary.
+	FlashblocksWsURL() string
 }
