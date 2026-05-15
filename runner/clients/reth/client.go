@@ -296,3 +296,7 @@ func (r *RethClient) FlashblocksClient() types.FlashblocksClient {
 func (r *RethClient) SupportsFlashblocks() bool {
 	return true
 }
+
+func (r *RethClient) FlashblocksWsURL() string {
+	return ""
+}
