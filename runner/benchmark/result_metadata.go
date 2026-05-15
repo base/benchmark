@@ -12,6 +12,7 @@ type RunResult struct {
 	SequencerMetrics types.SequencerKeyMetrics `json:"sequencerMetrics"`
 	ValidatorMetrics types.ValidatorKeyMetrics `json:"validatorMetrics"`
 	ClientVersion    string                    `json:"clientVersion,omitempty"`
+	Artifacts        map[string]string        `json:"artifacts,omitempty"`
 }
 
 // MachineInfo contains information about the machine running the benchmark
@@ -51,7 +52,9 @@ func (runs *RunGroup) AddResult(testIdx int, runResult RunResult) {
 }
 
 const (
-	BenchmarkRunTag = "BenchmarkRun"
+	BenchmarkRunTag            = "BenchmarkRun"
+	LoadTestResultArtifactKey   = "loadTestResult"
+	LoadTestResultFileName      = "load-test-result.json"
 )
 
 func RunGroupFromTestPlans(testPlans []TestPlan, machineInfo *MachineInfo) RunGroup {

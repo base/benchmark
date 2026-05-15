@@ -9,6 +9,9 @@ import (
 	"math/big"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"sync"
+	"time"
 
 	"github.com/base/base-bench/runner/clients/common/proxy"
 	"github.com/base/base-bench/runner/config"
@@ -32,13 +35,16 @@ type LoadTestPayloadDefinition struct {
 
 // loadTestConfig is the YAML config written to a temp file for the load-test binary.
 type loadTestConfig struct {
-	RPC           string    `yaml:"rpc"`
-	SenderCount   uint64    `yaml:"sender_count"`
-	TargetGPS     uint64    `yaml:"target_gps"`
-	Duration      string    `yaml:"duration"`
-	Seed          uint64    `yaml:"seed"`
-	FundingAmount string    `yaml:"funding_amount"`
-	Transactions  yaml.Node `yaml:"transactions"`
+	RPC                       string    `yaml:"rpc,omitempty"`
+	TransactionSubmissionRPCs []string  `yaml:"transaction_submission_rpcs"`
+	QueryRPC                  string    `yaml:"query_rpc"`
+	FlashblocksWs             string    `yaml:"flashblocks_ws"`
+	SenderCount               uint64    `yaml:"sender_count"`
+	TargetGPS                 uint64    `yaml:"target_gps"`
+	Duration                  string    `yaml:"duration"`
+	Seed                      uint64    `yaml:"seed"`
+	FundingAmount             string    `yaml:"funding_amount"`
+	Transactions              yaml.Node `yaml:"transactions"`
 }
 
 type loadTestPayloadWorker struct {
@@ -46,13 +52,19 @@ type loadTestPayloadWorker struct {
 	prefundSK      string
 	loadTestBin    string
 	elRPCURL       string
+	flashblocksURL string
 	gasLimit       uint64
 	blockTimeSec   uint64
 	params         LoadTestPayloadDefinition
 	mempool        *mempool.StaticWorkloadMempool
 	proxyServer    *proxy.ProxyServer
 	cmd            *exec.Cmd
+	done           chan struct{}
+	waitErr        error
+	waitMu         sync.Mutex
+	shutdownOnce   sync.Once
 	configFilePath string
+	outputPath     string
 }
 
 // NewLoadTestPayloadWorker creates a worker that runs the base-load-test binary
@@ -60,12 +72,14 @@ type loadTestPayloadWorker struct {
 func NewLoadTestPayloadWorker(
 	log log.Logger,
 	elRPCURL string,
+	flashblocksURL string,
 	params types.RunParams,
 	prefundedPrivateKey ecdsa.PrivateKey,
 	prefundAmount *big.Int,
 	cfg config.Config,
 	chainID *big.Int,
 	definition LoadTestPayloadDefinition,
+	outputPath string,
 ) (worker.Worker, error) {
 	mp := mempool.NewStaticWorkloadMempool(log, chainID)
 	ps := proxy.NewProxyServer(elRPCURL, log, cfg.ProxyPort(), mp)
@@ -76,15 +90,17 @@ func NewLoadTestPayloadWorker(
 	}
 
 	w := &loadTestPayloadWorker{
-		log:          log,
-		prefundSK:    hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
-		loadTestBin:  cfg.LoadTestBinary(),
-		elRPCURL:     elRPCURL,
-		gasLimit:     params.GasLimit,
-		blockTimeSec: blockTimeSec,
-		params:       definition,
-		mempool:      mp,
-		proxyServer:  ps,
+		log:            log,
+		prefundSK:      hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
+		loadTestBin:    cfg.LoadTestBinary(),
+		elRPCURL:       elRPCURL,
+		flashblocksURL: flashblocksURL,
+		gasLimit:       params.GasLimit,
+		blockTimeSec:   blockTimeSec,
+		params:         definition,
+		mempool:        mp,
+		proxyServer:    ps,
+		outputPath:     outputPath,
 	}
 
 	return w, nil
@@ -111,23 +127,85 @@ func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stdout
 	cmd.Env = append(os.Environ(), fmt.Sprintf("FUNDER_KEY=%s", w.prefundSK))
+	if w.outputPath != "" {
+		if err := os.MkdirAll(filepath.Dir(w.outputPath), 0755); err != nil {
+			return errors.Wrap(err, "failed to create load-test output directory")
+		}
+		cmd.Env = append(cmd.Env, fmt.Sprintf("LOAD_TEST_OUTPUT=%s", w.outputPath))
+	}
 
 	if err := cmd.Start(); err != nil {
 		return errors.Wrap(err, "failed to start load test binary")
 	}
 	w.cmd = cmd
+	w.done = make(chan struct{})
+	go func() {
+		err := cmd.Wait()
+		w.waitMu.Lock()
+		w.waitErr = err
+		w.waitMu.Unlock()
+		close(w.done)
+	}()
 
 	return nil
 }
 
+func (w *loadTestPayloadWorker) BeginGracefulShutdown(ctx context.Context) error {
+	if w.cmd == nil || w.cmd.Process == nil {
+		return nil
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-w.Done():
+		return nil
+	default:
+	}
+
+	var signalErr error
+	w.shutdownOnce.Do(func() {
+		w.log.Info("Stopping load test process gracefully", "pid", w.cmd.Process.Pid, "output", w.outputPath)
+		signalErr = w.cmd.Process.Signal(os.Interrupt)
+	})
+	if signalErr != nil {
+		select {
+		case <-w.Done():
+			return nil
+		default:
+		}
+	}
+	return signalErr
+}
+
+func (w *loadTestPayloadWorker) Done() <-chan struct{} {
+	if w.done != nil {
+		return w.done
+	}
+
+	done := make(chan struct{})
+	close(done)
+	return done
+}
+
 func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 	if w.cmd != nil && w.cmd.Process != nil {
-		w.log.Info("Stopping load test process", "pid", w.cmd.Process.Pid)
-		if err := w.cmd.Process.Kill(); err != nil {
-			w.log.Warn("failed to kill load test process", "err", err)
-		} else {
-			// Reap the process to avoid zombies.
-			_, _ = w.cmd.Process.Wait()
+		if err := w.BeginGracefulShutdown(ctx); err != nil {
+			w.log.Warn("failed to signal load test process", "err", err)
+		}
+
+		select {
+		case <-w.Done():
+		case <-time.After(10 * time.Second):
+			w.log.Warn("load test process did not stop gracefully, killing", "pid", w.cmd.Process.Pid)
+			if err := w.cmd.Process.Kill(); err != nil {
+				w.log.Warn("failed to kill load test process", "err", err)
+			}
+			select {
+			case <-w.Done():
+			case <-time.After(5 * time.Second):
+				w.log.Warn("timed out waiting for killed load test process")
+			}
 		}
 	}
 
@@ -144,8 +222,7 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 
 func (w *loadTestPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
 	w.log.Info("Collecting txs from load test")
-	pendingTxs := w.proxyServer.PendingTxs()
-	w.proxyServer.ClearPendingTxs()
+	pendingTxs := w.proxyServer.DrainPendingTxs()
 
 	w.mempool.AddTransactions(pendingTxs)
 	return len(pendingTxs), nil
@@ -206,14 +283,22 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 		transactions = defaultTransactions()
 	}
 
+	flashblocksURL := w.flashblocksURL
+	if flashblocksURL == "" {
+		flashblocksURL = "ws://localhost:7111"
+	}
+
 	config := loadTestConfig{
-		RPC:           w.proxyServer.ClientURL(),
-		SenderCount:   senderCount,
-		TargetGPS:     targetGPS,
-		Duration:      "99999s",
-		Seed:          randomSeed(),
-		FundingAmount: fundingAmount,
-		Transactions:  transactions,
+		RPC:                       w.proxyServer.ClientURL(),
+		TransactionSubmissionRPCs: []string{w.proxyServer.ClientURL()},
+		QueryRPC:                  w.proxyServer.ClientURL(),
+		FlashblocksWs:             flashblocksURL,
+		SenderCount:               senderCount,
+		TargetGPS:                 targetGPS,
+		Duration:                  "99999s",
+		Seed:                      randomSeed(),
+		FundingAmount:             fundingAmount,
+		Transactions:              transactions,
 	}
 
 	data, err := yaml.Marshal(&config)

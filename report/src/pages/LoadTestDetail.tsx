@@ -1,5 +1,5 @@
 import { Link, useParams } from "react-router-dom";
-import { useMemo } from "react";
+import { type ReactNode, useMemo } from "react";
 import Navbar from "../components/Navbar";
 import StatCard, { Stat, StatGrid } from "../components/StatCard";
 import PercentileBarChart, {
@@ -141,6 +141,101 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
   );
 };
 
+interface LoadTestReportContentProps {
+  result: LoadTestResult;
+  title: string;
+  subtitle: ReactNode;
+  backLink?: {
+    to: string;
+    label: string;
+  };
+}
+
+export const LoadTestReportContent = ({
+  result,
+  title,
+  subtitle,
+  backLink,
+}: LoadTestReportContentProps) => {
+  const blockLatencyRows = useMemo(
+    () => buildLatencyRows(result.block_latency),
+    [result],
+  );
+  const flashblocksLatencyRows = useMemo(
+    () => buildLatencyRows(result.flashblocks_latency),
+    [result],
+  );
+
+  return (
+    <>
+      <header className="flex items-center justify-between gap-x-4">
+        <div>
+          {backLink && (
+            <Link
+              to={backLink.to}
+              className="text-sm text-blue-600 hover:underline"
+            >
+              {backLink.label}
+            </Link>
+          )}
+          <h1 className="text-2xl font-semibold text-slate-900 mt-2">
+            {title}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">{subtitle}</p>
+        </div>
+      </header>
+
+      <SwapsPerSecondHero tps={result.throughput.tps} />
+
+      {result.throughput_timeseries &&
+        result.throughput_timeseries.length > 1 && (
+          <StatCard title="Throughput over time">
+            <ThroughputChart
+              samples={result.throughput_timeseries}
+              avgTps={result.throughput.tps}
+              avgGps={result.throughput.gps}
+            />
+          </StatCard>
+        )}
+
+      {result.config && <ConfigCard config={result.config} />}
+
+      <SummarySection result={result} />
+
+      <StatCard title="Block latency (submit → block)">
+        <PercentileBarChart
+          rows={blockLatencyRows}
+          barColorClass="bg-amber-500"
+        />
+      </StatCard>
+
+      <StatCard
+        title={`Flashblocks latency (submit → flashblock) · ${result.flashblocks_latency.count.toLocaleString()} samples`}
+      >
+        <PercentileBarChart
+          rows={flashblocksLatencyRows}
+          barColorClass="bg-fuchsia-500"
+        />
+      </StatCard>
+
+      <StatCard title="Top failure reasons">
+        {result.top_failure_reasons.length === 0 ? (
+          <div className="text-sm text-slate-500">No failures recorded.</div>
+        ) : (
+          <ul className="text-sm text-slate-700 divide-y divide-slate-100">
+            {result.top_failure_reasons.map(([reason, count]) => (
+              <li key={reason} className="py-2 flex justify-between gap-x-4">
+                <span>{reason}</span>
+                <span className="font-mono">{count.toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </StatCard>
+    </>
+  );
+};
+
 const LoadTestDetail = () => {
   const { network, timestamp } = useParams();
   const {
@@ -149,42 +244,10 @@ const LoadTestDetail = () => {
     error,
   } = useLoadTestResult(network, timestamp);
 
-  const blockLatencyRows = useMemo(
-    () => (result ? buildLatencyRows(result.block_latency) : []),
-    [result],
-  );
-  const flashblocksLatencyRows = useMemo(
-    () => (result ? buildLatencyRows(result.flashblocks_latency) : []),
-    [result],
-  );
-
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
       <main className="px-8 py-6 max-w-5xl mx-auto flex flex-col gap-y-6">
-        <header className="flex items-center justify-between gap-x-4">
-          <div>
-            <Link
-              to={`/load-tests/${network ?? "sepolia"}/all`}
-              className="text-sm text-blue-600 hover:underline"
-            >
-              View all runs →
-            </Link>
-            <h1 className="text-2xl font-semibold text-slate-900 mt-2">
-              {timestamp ? formatLoadTestTimestamp(timestamp) : "Load test"}
-            </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Network: <span className="font-mono">{network}</span>
-              {timestamp && (
-                <>
-                  {" · "}
-                  <span className="font-mono text-slate-400">{timestamp}</span>
-                </>
-              )}
-            </p>
-          </div>
-        </header>
-
         {isLoading && (
           <div className="text-sm text-slate-500">Loading load test…</div>
         )}
@@ -196,62 +259,27 @@ const LoadTestDetail = () => {
         )}
 
         {result && (
-          <>
-            <SwapsPerSecondHero tps={result.throughput.tps} />
-
-            {result.throughput_timeseries &&
-              result.throughput_timeseries.length > 1 && (
-                <StatCard title="Throughput over time">
-                  <ThroughputChart
-                    samples={result.throughput_timeseries}
-                    avgTps={result.throughput.tps}
-                    avgGps={result.throughput.gps}
-                  />
-                </StatCard>
-              )}
-
-            {result.config && <ConfigCard config={result.config} />}
-
-            <SummarySection result={result} />
-
-            <StatCard title="Block latency (submit → block)">
-              <PercentileBarChart
-                rows={blockLatencyRows}
-                barColorClass="bg-amber-500"
-              />
-            </StatCard>
-
-            <StatCard
-              title={`Flashblocks latency (submit → flashblock) · ${result.flashblocks_latency.count.toLocaleString()} samples`}
-            >
-              <PercentileBarChart
-                rows={flashblocksLatencyRows}
-                barColorClass="bg-fuchsia-500"
-              />
-            </StatCard>
-
-            <StatCard title="Top failure reasons">
-              {result.top_failure_reasons.length === 0 ? (
-                <div className="text-sm text-slate-500">
-                  No failures recorded.
-                </div>
-              ) : (
-                <ul className="text-sm text-slate-700 divide-y divide-slate-100">
-                  {result.top_failure_reasons.map(([reason, count]) => (
-                    <li
-                      key={reason}
-                      className="py-2 flex justify-between gap-x-4"
-                    >
-                      <span>{reason}</span>
-                      <span className="font-mono">
-                        {count.toLocaleString()}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </StatCard>
-          </>
+          <LoadTestReportContent
+            result={result}
+            title={timestamp ? formatLoadTestTimestamp(timestamp) : "Load test"}
+            subtitle={
+              <>
+                Network: <span className="font-mono">{network}</span>
+                {timestamp && (
+                  <>
+                    {" · "}
+                    <span className="font-mono text-slate-400">
+                      {timestamp}
+                    </span>
+                  </>
+                )}
+              </>
+            }
+            backLink={{
+              to: `/load-tests/${network ?? "sepolia"}/all`,
+              label: "View all runs →",
+            }}
+          />
         )}
       </main>
     </div>

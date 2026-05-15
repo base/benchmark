@@ -247,11 +247,22 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 		return nil, errors.New("metrics not collected")
 	}
 
+	artifacts := make(map[string]string)
+	if nb.testConfig.LoadTestOutputPath != "" {
+		if _, err := os.Stat(nb.testConfig.LoadTestOutputPath); err == nil {
+			artifacts[benchmark.LoadTestResultArtifactKey] = benchmark.LoadTestResultFileName
+		}
+	}
+	if len(artifacts) == 0 {
+		artifacts = nil
+	}
+
 	return &benchmark.RunResult{
 		SequencerMetrics: *nb.collectedSequencerMetrics,
 		ValidatorMetrics: *nb.collectedValidatorMetrics,
 		Success:          true,
 		Complete:         true,
+		Artifacts:        artifacts,
 	}, nil
 }
 

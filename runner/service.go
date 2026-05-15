@@ -423,12 +423,13 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 
 	prefundAmount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(ethparams.Ether))
 	config := &types.TestConfig{
-		Params:            params,
-		Config:            s.config,
-		Genesis:           *genesis,
-		BatcherKey:        *batcherKey,
-		PrefundPrivateKey: *prefundKey,
-		PrefundAmount:     *prefundAmount,
+		Params:             params,
+		Config:             s.config,
+		Genesis:            *genesis,
+		BatcherKey:         *batcherKey,
+		PrefundPrivateKey:  *prefundKey,
+		PrefundAmount:      *prefundAmount,
+		LoadTestOutputPath: path.Join(outputDir, benchmark.LoadTestResultFileName),
 	}
 
 	// Run benchmark
