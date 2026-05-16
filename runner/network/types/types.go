@@ -40,6 +40,10 @@ type TestConfig struct {
 
 	PrefundPrivateKey ecdsa.PrivateKey
 	PrefundAmount     big.Int
+
+	// LoadTestOutputPath is the optional normal load-test report JSON path used
+	// by the load-test payload worker.
+	LoadTestOutputPath string
 }
 
 // BatcherAddr returns the batcher address, computing it if necessary

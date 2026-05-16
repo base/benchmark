@@ -26,6 +26,7 @@ import (
 	"github.com/base/base-bench/runner/network"
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload"
+	"github.com/base/base-bench/runner/payload/loadtest"
 	"github.com/base/base-bench/runner/utils"
 	"github.com/ethereum/go-ethereum/core"
 	ethparams "github.com/ethereum/go-ethereum/params"
@@ -368,6 +369,54 @@ func (s *service) setupBlobsDir(workingDir string) error {
 	return nil
 }
 
+func loadTestNetwork(genesis *core.Genesis, transactionPayload payload.Definition) string {
+	if envNetwork := os.Getenv("BASE_BENCH_LOAD_TEST_NETWORK"); envNetwork != "" {
+		return envNetwork
+	}
+
+	if transactionPayload.Type == "load-test" {
+		if def, ok := transactionPayload.Params.(*loadtest.LoadTestPayloadDefinition); ok && def.Network != "" {
+			return def.Network
+		}
+	}
+
+	if genesis == nil || genesis.Config == nil || genesis.Config.ChainID == nil {
+		return "unknown"
+	}
+
+	switch genesis.Config.ChainID.Uint64() {
+	case 8453:
+		return "mainnet"
+	case 84532:
+		return "sepolia"
+	case 13371337:
+		return "devnet"
+	default:
+		return fmt.Sprintf("chain-%s", genesis.Config.ChainID.String())
+	}
+}
+
+func (s *service) loadTestOutputPath(genesis *core.Genesis, transactionPayload payload.Definition) string {
+	if transactionPayload.Type != "load-test" {
+		return ""
+	}
+
+	network := loadTestNetwork(genesis, transactionPayload)
+	baseTime := time.Now().UTC()
+	for i := 0; ; i++ {
+		timestamp := baseTime.Add(time.Duration(i) * time.Second).Format(benchmark.LoadTestTimestampLayout)
+		outputPath := path.Join(
+			s.config.OutputDir(),
+			benchmark.LoadTestResultsDir,
+			network,
+			fmt.Sprintf("%s.json", timestamp),
+		)
+		if _, err := os.Stat(outputPath); err != nil {
+			return outputPath
+		}
+	}
+}
+
 func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig, flashblocksBlockTime string) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
@@ -423,12 +472,13 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 
 	prefundAmount := new(big.Int).Mul(big.NewInt(1e6), big.NewInt(ethparams.Ether))
 	config := &types.TestConfig{
-		Params:            params,
-		Config:            s.config,
-		Genesis:           *genesis,
-		BatcherKey:        *batcherKey,
-		PrefundPrivateKey: *prefundKey,
-		PrefundAmount:     *prefundAmount,
+		Params:             params,
+		Config:             s.config,
+		Genesis:            *genesis,
+		BatcherKey:         *batcherKey,
+		PrefundPrivateKey:  *prefundKey,
+		PrefundAmount:      *prefundAmount,
+		LoadTestOutputPath: s.loadTestOutputPath(genesis, transactionPayload),
 	}
 
 	// Run benchmark

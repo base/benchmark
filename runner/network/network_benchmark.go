@@ -44,9 +44,9 @@ type NetworkBenchmark struct {
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
 
-	transactionPayload     payload.Definition
-	ports                  portmanager.PortManager
-	flashblocksBlockTime   string
+	transactionPayload   payload.Definition
+	ports                portmanager.PortManager
+	flashblocksBlockTime string
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client

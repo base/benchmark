@@ -84,8 +84,7 @@ func (t *txFuzzPayloadWorker) Stop(ctx context.Context) error {
 
 func (t *txFuzzPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
 	t.log.Info("Sending txs in tx-fuzz mode")
-	pending := t.proxyServer.PendingTxs()
-	t.proxyServer.ClearPendingTxs()
+	pending := t.proxyServer.DrainPendingTxs()
 
 	t.mempool.AddTransactions(pending)
 	return len(pending), nil

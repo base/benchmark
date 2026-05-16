@@ -51,7 +51,9 @@ func (runs *RunGroup) AddResult(testIdx int, runResult RunResult) {
 }
 
 const (
-	BenchmarkRunTag = "BenchmarkRun"
+	BenchmarkRunTag         = "BenchmarkRun"
+	LoadTestResultsDir      = "load-tests"
+	LoadTestTimestampLayout = "2006-01-02-15-04-05"
 )
 
 func RunGroupFromTestPlans(testPlans []TestPlan, machineInfo *MachineInfo) RunGroup {

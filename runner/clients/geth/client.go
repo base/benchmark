@@ -280,3 +280,7 @@ func (g *GethClient) FlashblocksClient() types.FlashblocksClient {
 func (g *GethClient) SupportsFlashblocks() bool {
 	return false
 }
+
+func (g *GethClient) FlashblocksWsURL() string {
+	return ""
+}

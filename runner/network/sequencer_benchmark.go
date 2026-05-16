@@ -15,6 +15,7 @@ import (
 	"github.com/base/base-bench/runner/network/proofprogram/fakel1"
 	benchtypes "github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload"
+	payloadworker "github.com/base/base-bench/runner/payload/worker"
 	"github.com/ethereum-optimism/optimism/op-service/retry"
 	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -23,6 +24,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 )
+
+const gracefulWorkerShutdownTimeout = 90 * time.Second
 
 type sequencerBenchmark struct {
 	log                log.Logger
@@ -282,8 +285,13 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			payloads = append(payloads, *payload)
 		}
 
-		err = consensusClient.Stop(benchmarkCtx)
-		if err != nil {
+		pendingTxs, shutdownErr := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs)
+		if shutdownErr != nil {
+			errChan <- shutdownErr
+			return
+		}
+
+		if err := consensusClient.Stop(benchmarkCtx); err != nil {
 			nb.log.Warn("failed to stop consensus client", "err", err)
 		}
 
@@ -306,6 +314,64 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			Flashblocks:        flashblocks,
 		}
 		return result, payloads[0].Number, nil
+	}
+}
+
+func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(
+	ctx context.Context,
+	transactionWorker payloadworker.Worker,
+	consensusClient *consensus.SequencerConsensusClient,
+	pendingTxs int,
+) (int, error) {
+	gracefulWorker, ok := transactionWorker.(payloadworker.GracefulShutdownWorker)
+	if !ok {
+		return pendingTxs, nil
+	}
+
+	if err := gracefulWorker.BeginGracefulShutdown(ctx); err != nil {
+		return pendingTxs, errors.Wrap(err, "failed to begin graceful payload worker shutdown")
+	}
+
+	timeout := time.NewTimer(gracefulWorkerShutdownTimeout)
+	defer timeout.Stop()
+
+	settlementBlock := 0
+	for {
+		select {
+		case <-gracefulWorker.Done():
+			nb.log.Info("Payload worker stopped gracefully", "settlement_blocks", settlementBlock)
+			return pendingTxs, nil
+		case <-timeout.C:
+			nb.log.Warn("Timed out waiting for payload worker to stop gracefully", "settlement_blocks", settlementBlock)
+			return pendingTxs, nil
+		default:
+		}
+
+		blockMetrics := metrics.NewBlockMetrics()
+		txsSent, err := transactionWorker.SendTxs(ctx, pendingTxs)
+		if err != nil {
+			return pendingTxs, errors.Wrap(err, "failed to collect settlement transactions")
+		}
+
+		payload, err := consensusClient.Propose(ctx, blockMetrics, true)
+		if err != nil {
+			return pendingTxs, errors.Wrap(err, "failed to propose settlement block")
+		}
+		if payload == nil {
+			return pendingTxs, errors.New("received nil settlement payload from consensus client")
+		}
+
+		userTxsIncluded := len(payload.Transactions) - 1
+		if userTxsIncluded < 0 {
+			userTxsIncluded = 0
+		}
+		pendingTxs = pendingTxs + txsSent - userTxsIncluded
+		if pendingTxs < 0 {
+			pendingTxs = 0
+		}
+
+		settlementBlock++
+		time.Sleep(nb.config.Params.BlockTime)
 	}
 }
 
