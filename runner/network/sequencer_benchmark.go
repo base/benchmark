@@ -285,9 +285,8 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 			payloads = append(payloads, *payload)
 		}
 
-		pendingTxs, shutdownErr := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs)
-		if shutdownErr != nil {
-			errChan <- shutdownErr
+		if err := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs); err != nil {
+			errChan <- err
 			return
 		}
 
@@ -322,14 +321,14 @@ func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(
 	transactionWorker payloadworker.Worker,
 	consensusClient *consensus.SequencerConsensusClient,
 	pendingTxs int,
-) (int, error) {
+) error {
 	gracefulWorker, ok := transactionWorker.(payloadworker.GracefulShutdownWorker)
 	if !ok {
-		return pendingTxs, nil
+		return nil
 	}
 
 	if err := gracefulWorker.BeginGracefulShutdown(ctx); err != nil {
-		return pendingTxs, errors.Wrap(err, "failed to begin graceful payload worker shutdown")
+		return errors.Wrap(err, "failed to begin graceful payload worker shutdown")
 	}
 
 	timeout := time.NewTimer(gracefulWorkerShutdownTimeout)
@@ -340,25 +339,25 @@ func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(
 		select {
 		case <-gracefulWorker.Done():
 			nb.log.Info("Payload worker stopped gracefully", "settlement_blocks", settlementBlock)
-			return pendingTxs, nil
+			return nil
 		case <-timeout.C:
 			nb.log.Warn("Timed out waiting for payload worker to stop gracefully", "settlement_blocks", settlementBlock)
-			return pendingTxs, nil
+			return nil
 		default:
 		}
 
 		blockMetrics := metrics.NewBlockMetrics()
 		txsSent, err := transactionWorker.SendTxs(ctx, pendingTxs)
 		if err != nil {
-			return pendingTxs, errors.Wrap(err, "failed to collect settlement transactions")
+			return errors.Wrap(err, "failed to collect settlement transactions")
 		}
 
 		payload, err := consensusClient.Propose(ctx, blockMetrics, true)
 		if err != nil {
-			return pendingTxs, errors.Wrap(err, "failed to propose settlement block")
+			return errors.Wrap(err, "failed to propose settlement block")
 		}
 		if payload == nil {
-			return pendingTxs, errors.New("received nil settlement payload from consensus client")
+			return errors.New("received nil settlement payload from consensus client")
 		}
 
 		userTxsIncluded := len(payload.Transactions) - 1

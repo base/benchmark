@@ -87,10 +87,6 @@ export interface BenchmarkRun {
       gasPerSecond: number;
       newPayload: number;
     };
-    artifacts?: {
-      loadTestResult?: string;
-      [key: string]: string | undefined;
-    };
   } | null;
 }
 
