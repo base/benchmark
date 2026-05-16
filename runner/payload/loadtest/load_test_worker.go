@@ -30,6 +30,7 @@ import (
 type LoadTestPayloadDefinition struct {
 	SenderCount   uint64    `yaml:"sender_count"`
 	FundingAmount string    `yaml:"funding_amount"`
+	Network       string    `yaml:"network"`
 	Transactions  yaml.Node `yaml:"transactions"`
 }
 
@@ -60,8 +61,6 @@ type loadTestPayloadWorker struct {
 	proxyServer    *proxy.ProxyServer
 	cmd            *exec.Cmd
 	done           chan struct{}
-	waitErr        error
-	waitMu         sync.Mutex
 	shutdownOnce   sync.Once
 	configFilePath string
 	outputPath     string
@@ -140,10 +139,7 @@ func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
 	w.cmd = cmd
 	w.done = make(chan struct{})
 	go func() {
-		err := cmd.Wait()
-		w.waitMu.Lock()
-		w.waitErr = err
-		w.waitMu.Unlock()
+		_ = cmd.Wait()
 		close(w.done)
 	}()
 

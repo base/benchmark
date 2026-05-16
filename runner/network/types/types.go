@@ -41,8 +41,8 @@ type TestConfig struct {
 	PrefundPrivateKey ecdsa.PrivateKey
 	PrefundAmount     big.Int
 
-	// LoadTestOutputPath is the optional JSON summary path used by the
-	// load-test payload worker.
+	// LoadTestOutputPath is the optional normal load-test report JSON path used
+	// by the load-test payload worker.
 	LoadTestOutputPath string
 }
 
