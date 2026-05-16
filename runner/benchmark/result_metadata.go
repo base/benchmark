@@ -55,6 +55,8 @@ const (
 	BenchmarkRunTag           = "BenchmarkRun"
 	LoadTestResultArtifactKey = "loadTestResult"
 	LoadTestResultFileName    = "load-test-result.json"
+	LoadTestResultsDir        = "load-tests"
+	LoadTestTimestampLayout   = "2006-01-02-15-04-05"
 )
 
 func RunGroupFromTestPlans(testPlans []TestPlan, machineInfo *MachineInfo) RunGroup {

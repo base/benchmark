@@ -5,7 +5,6 @@ import RedirectToLatestRun from "./pages/RedirectToLatestRun";
 import LoadTestLanding from "./pages/LoadTestLanding";
 import LoadTestAllRuns from "./pages/LoadTestAllRuns";
 import LoadTestDetail from "./pages/LoadTestDetail";
-import BenchmarkLoadTestDetail from "./pages/BenchmarkLoadTestDetail";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
@@ -22,10 +21,6 @@ function App() {
         <Route
           path="/load-tests/:network/:timestamp"
           element={<LoadTestDetail />}
-        />
-        <Route
-          path="/benchmark-load-test/:outputDir"
-          element={<BenchmarkLoadTestDetail />}
         />
         <Route path="/:benchmarkRunId" element={<RunIndex />} />
         <Route
