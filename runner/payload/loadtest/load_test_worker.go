@@ -3,13 +3,13 @@ package loadtest
 import (
 	"context"
 	"crypto/ecdsa"
-	cryptorand "crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"time"
 
@@ -24,46 +24,30 @@ import (
 )
 
 // LoadTestPayloadDefinition is the YAML payload params for the load-test type.
-// Fields map directly to the Rust base-load-test config format.
-// The `transactions` field is passed through as raw YAML to support the full
-// Rust config schema (transfer, calldata, precompile, erc20, etc.).
+// The load-test workload itself lives in a native base-load-tester config file;
+// benchmark mode only overlays the RPC and timing fields it must control.
 type LoadTestPayloadDefinition struct {
-	SenderCount   uint64    `yaml:"sender_count"`
-	FundingAmount string    `yaml:"funding_amount"`
-	Network       string    `yaml:"network"`
-	Transactions  yaml.Node `yaml:"transactions"`
-}
-
-// loadTestConfig is the YAML config written to a temp file for the load-test binary.
-type loadTestConfig struct {
-	RPC                       string    `yaml:"rpc,omitempty"`
-	TransactionSubmissionRPCs []string  `yaml:"transaction_submission_rpcs"`
-	QueryRPC                  string    `yaml:"query_rpc"`
-	FlashblocksWs             string    `yaml:"flashblocks_ws"`
-	SenderCount               uint64    `yaml:"sender_count"`
-	TargetGPS                 uint64    `yaml:"target_gps"`
-	Duration                  string    `yaml:"duration"`
-	Seed                      uint64    `yaml:"seed"`
-	FundingAmount             string    `yaml:"funding_amount"`
-	Transactions              yaml.Node `yaml:"transactions"`
+	ConfigFile string `yaml:"config_file"`
+	Network    string `yaml:"network"`
 }
 
 type loadTestPayloadWorker struct {
-	log            log.Logger
-	prefundSK      string
-	loadTestBin    string
-	elRPCURL       string
-	flashblocksURL string
-	gasLimit       uint64
-	blockTimeSec   uint64
-	params         LoadTestPayloadDefinition
-	mempool        *mempool.StaticWorkloadMempool
-	proxyServer    *proxy.ProxyServer
-	cmd            *exec.Cmd
-	done           chan struct{}
-	shutdownOnce   sync.Once
-	configFilePath string
-	outputPath     string
+	log                log.Logger
+	prefundSK          string
+	loadTestBin        string
+	elRPCURL           string
+	flashblocksURL     string
+	gasLimit           uint64
+	blockTimeSec       uint64
+	params             LoadTestPayloadDefinition
+	mempool            *mempool.StaticWorkloadMempool
+	proxyServer        *proxy.ProxyServer
+	cmd                *exec.Cmd
+	done               chan struct{}
+	shutdownOnce       sync.Once
+	sourceConfigPath   string
+	renderedConfigPath string
+	outputPath         string
 }
 
 // NewLoadTestPayloadWorker creates a worker that runs the base-load-test binary
@@ -88,18 +72,24 @@ func NewLoadTestPayloadWorker(
 		blockTimeSec = 1
 	}
 
+	sourceConfigPath, err := resolveConfigFilePath(cfg.ConfigPath(), definition.ConfigFile)
+	if err != nil {
+		return nil, err
+	}
+
 	w := &loadTestPayloadWorker{
-		log:            log,
-		prefundSK:      hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
-		loadTestBin:    cfg.LoadTestBinary(),
-		elRPCURL:       elRPCURL,
-		flashblocksURL: flashblocksURL,
-		gasLimit:       params.GasLimit,
-		blockTimeSec:   blockTimeSec,
-		params:         definition,
-		mempool:        mp,
-		proxyServer:    ps,
-		outputPath:     outputPath,
+		log:              log,
+		prefundSK:        hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
+		loadTestBin:      cfg.LoadTestBinary(),
+		elRPCURL:         elRPCURL,
+		flashblocksURL:   flashblocksURL,
+		gasLimit:         params.GasLimit,
+		blockTimeSec:     blockTimeSec,
+		params:           definition,
+		mempool:          mp,
+		proxyServer:      ps,
+		sourceConfigPath: sourceConfigPath,
+		outputPath:       outputPath,
 	}
 
 	return w, nil
@@ -118,7 +108,7 @@ func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to write load-test config")
 	}
-	w.configFilePath = configPath
+	w.renderedConfigPath = configPath
 
 	w.log.Info("Starting load test", "binary", w.loadTestBin, "config", configPath)
 
@@ -207,9 +197,9 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 
 	w.proxyServer.Stop()
 
-	if w.configFilePath != "" {
-		if err := os.Remove(w.configFilePath); err != nil {
-			w.log.Warn("failed to remove load-test config", "path", w.configFilePath, "err", err)
+	if w.renderedConfigPath != "" {
+		if err := os.Remove(w.renderedConfigPath); err != nil {
+			w.log.Warn("failed to remove load-test config", "path", w.renderedConfigPath, "err", err)
 		}
 	}
 
@@ -224,80 +214,104 @@ func (w *loadTestPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error)
 	return len(pendingTxs), nil
 }
 
-// defaultTransactions returns the default transaction mix as a yaml.Node.
-func defaultTransactions() yaml.Node {
-	var node yaml.Node
-	// Default: 70% transfer, 20% calldata, 10% precompile
-	defaultYAML := `
-- weight: 70
-  type: transfer
-- weight: 20
-  type: calldata
-  max_size: 256
-- weight: 10
-  type: precompile
-  target: sha256
-`
-	if err := yaml.Unmarshal([]byte(defaultYAML), &node); err != nil {
-		panic(fmt.Sprintf("failed to parse default transactions YAML: %v", err))
+func resolveConfigFilePath(benchmarkConfigPath string, loadTestConfigPath string) (string, error) {
+	if loadTestConfigPath == "" {
+		return "", errors.New("load-test payload requires config_file")
 	}
-	// yaml.Unmarshal wraps in a document node; return the inner sequence
-	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
-		return *node.Content[0]
+	if filepath.IsAbs(loadTestConfigPath) {
+		return loadTestConfigPath, nil
 	}
-	return node
+	return filepath.Join(filepath.Dir(benchmarkConfigPath), loadTestConfigPath), nil
 }
 
-// randomSeed returns a cryptographically random uint64 seed.
-func randomSeed() uint64 {
-	var b [8]byte
-	if _, err := cryptorand.Read(b[:]); err != nil {
-		return 42
+func (w *loadTestPayloadWorker) targetGPS() uint64 {
+	blockTimeSec := w.blockTimeSec
+	if blockTimeSec == 0 {
+		blockTimeSec = 1
 	}
-	return uint64(b[0]) | uint64(b[1])<<8 | uint64(b[2])<<16 | uint64(b[3])<<24 |
-		uint64(b[4])<<32 | uint64(b[5])<<40 | uint64(b[6])<<48 | uint64(b[7])<<56
+	return w.gasLimit / blockTimeSec
 }
 
-// writeConfig generates a temporary YAML config file for the load-test binary
-// with the RPC URL pointing to the proxy server.
-func (w *loadTestPayloadWorker) writeConfig() (string, error) {
-	senderCount := w.params.SenderCount
-	if senderCount == 0 {
-		senderCount = 10
+func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
+	data, err := os.ReadFile(w.sourceConfigPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read load-test config file")
 	}
 
-	fundingAmount := w.params.FundingAmount
-	if fundingAmount == "" {
-		fundingAmount = "10000000000000000000"
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, errors.Wrap(err, "failed to parse load-test config file")
 	}
 
-	// Compute target GPS from gas limit and block time
-	targetGPS := w.gasLimit / w.blockTimeSec
-
-	transactions := w.params.Transactions
-	if transactions.Kind == 0 {
-		transactions = defaultTransactions()
+	config, err := mappingRoot(&doc)
+	if err != nil {
+		return nil, err
 	}
+
+	proxyURL := w.proxyServer.ClientURL()
+	setMappingValue(config, "transaction_submission_rpcs", stringSequenceNode(proxyURL))
+	setMappingValue(config, "query_rpc", stringNode(proxyURL))
 
 	flashblocksURL := w.flashblocksURL
 	if flashblocksURL == "" {
 		flashblocksURL = "ws://localhost:7111"
 	}
+	setMappingValue(config, "flashblocks_ws", stringNode(flashblocksURL))
+	setMappingValue(config, "target_gps", uintNode(w.targetGPS()))
+	setMappingValue(config, "duration", stringNode("99999s"))
 
-	config := loadTestConfig{
-		RPC:                       w.proxyServer.ClientURL(),
-		TransactionSubmissionRPCs: []string{w.proxyServer.ClientURL()},
-		QueryRPC:                  w.proxyServer.ClientURL(),
-		FlashblocksWs:             flashblocksURL,
-		SenderCount:               senderCount,
-		TargetGPS:                 targetGPS,
-		Duration:                  "99999s",
-		Seed:                      randomSeed(),
-		FundingAmount:             fundingAmount,
-		Transactions:              transactions,
+	return config, nil
+}
+
+func mappingRoot(doc *yaml.Node) (*yaml.Node, error) {
+	root := doc
+	if doc.Kind == yaml.DocumentNode {
+		if len(doc.Content) == 0 {
+			return nil, errors.New("load-test config file is empty")
+		}
+		root = doc.Content[0]
 	}
 
-	data, err := yaml.Marshal(&config)
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("load-test config file must be a YAML mapping, got kind %d", root.Kind)
+	}
+	return root, nil
+}
+
+func setMappingValue(mapping *yaml.Node, key string, value *yaml.Node) {
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content[i+1] = value
+			return
+		}
+	}
+	mapping.Content = append(mapping.Content, stringNode(key), value)
+}
+
+func stringNode(value string) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
+}
+
+func uintNode(value uint64) *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.FormatUint(value, 10)}
+}
+
+func stringSequenceNode(values ...string) *yaml.Node {
+	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, value := range values {
+		node.Content = append(node.Content, stringNode(value))
+	}
+	return node
+}
+
+// writeConfig generates a temporary YAML config file for the load-test binary
+// with the RPC URL pointing to the proxy server.
+func (w *loadTestPayloadWorker) writeConfig() (string, error) {
+	config, err := w.buildConfig()
+	if err != nil {
+		return "", err
+	}
+	data, err := yaml.Marshal(config)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to marshal load-test config")
 	}
@@ -317,8 +331,8 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 	}
 
 	w.log.Info("Generated load-test config",
-		"sender_count", senderCount,
-		"target_gps", targetGPS,
+		"source_config", w.sourceConfigPath,
+		"target_gps", w.targetGPS(),
 		"gas_limit", w.gasLimit,
 		"block_time_sec", w.blockTimeSec,
 	)

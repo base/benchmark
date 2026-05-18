@@ -1,0 +1,20 @@
+transaction_submission_rpcs:
+  - "http://localhost:8545"
+query_rpc: "http://localhost:8545"
+txpool_nodes: []
+flashblocks_ws: "ws://localhost:7111"
+
+sender_count: 10
+target_gps: 500000000
+duration: "60s"
+funding_amount: "10000000000000000000"
+
+transactions:
+  - weight: 70
+    type: transfer
+  - weight: 20
+    type: calldata
+    max_size: 256
+  - weight: 10
+    type: precompile
+    target: sha256
