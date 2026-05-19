@@ -17,6 +17,8 @@ benchmarks:
       # just delete the snapshot directory to force a full copy
       command: ./scripts/copy-local-snapshot.sh --skip-if-nonempty
       genesis_file: ../../sepolia-alpha/sepolia-alpha-genesis.json
+    roles:
+      - sequencer
     # force_clean is true by default to ensure consistency, but we can skip it for testing
     force_clean: false
     variables:
