@@ -46,11 +46,26 @@ type NetworkBenchmark struct {
 
 	transactionPayload   payload.Definition
 	ports                portmanager.PortManager
+	roles                []benchmark.BenchmarkRole
 	flashblocksBlockTime string
 }
 
 // NewNetworkBenchmark creates a new network benchmark and initializes the payload worker and consensus client
-func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager, flashblocksBlockTime string) (*NetworkBenchmark, error) {
+func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequencerOptions *config.InternalClientOptions, validatorOptions *config.InternalClientOptions, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, ports portmanager.PortManager, roles []benchmark.BenchmarkRole, flashblocksBlockTime string) (*NetworkBenchmark, error) {
+	normalizedRoles, err := benchmark.NormalizeBenchmarkRoles(roles)
+	if err != nil {
+		return nil, err
+	}
+	if !benchmark.BenchmarkRolesContain(normalizedRoles, benchmark.BenchmarkRoleSequencer) {
+		return nil, errors.New("network benchmark requires the sequencer role")
+	}
+	if benchmark.BenchmarkRolesContain(normalizedRoles, benchmark.BenchmarkRoleValidator) && validatorOptions == nil {
+		return nil, errors.New("validator options are required when the validator role is enabled")
+	}
+	if proofConfig != nil && !benchmark.BenchmarkRolesContain(normalizedRoles, benchmark.BenchmarkRoleValidator) {
+		return nil, errors.New("proof program benchmark requires the validator role")
+	}
+
 	return &NetworkBenchmark{
 		log:                  log,
 		sequencerOptions:     sequencerOptions,
@@ -59,6 +74,7 @@ func NewNetworkBenchmark(config *benchtypes.TestConfig, log log.Logger, sequence
 		proofConfig:          proofConfig,
 		transactionPayload:   transactionPayload,
 		ports:                ports,
+		roles:                normalizedRoles,
 		flashblocksBlockTime: flashblocksBlockTime,
 	}, nil
 }
@@ -79,6 +95,12 @@ func (nb *NetworkBenchmark) Run(ctx context.Context) error {
 	payloadResult, lastSetupBlock, sequencerClient, err := nb.benchmarkSequencer(ctx, l1Chain)
 	if err != nil {
 		return fmt.Errorf("failed to run sequencer benchmark: %w", err)
+	}
+
+	if !nb.runsValidator() {
+		nb.log.Info("Skipping validator benchmark", "roles", benchmark.BenchmarkRolesString(nb.roles))
+		sequencerClient.Stop()
+		return nil
 	}
 
 	// Benchmark the validator to sync the payloads
@@ -243,16 +265,28 @@ func (nb *NetworkBenchmark) benchmarkValidator(ctx context.Context, payloadResul
 }
 
 func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
-	if nb.collectedSequencerMetrics == nil || nb.collectedValidatorMetrics == nil {
-		return nil, errors.New("metrics not collected")
+	if nb.collectedSequencerMetrics == nil {
+		return nil, errors.New("sequencer metrics not collected")
 	}
 
-	return &benchmark.RunResult{
-		SequencerMetrics: *nb.collectedSequencerMetrics,
-		ValidatorMetrics: *nb.collectedValidatorMetrics,
+	result := &benchmark.RunResult{
+		SequencerMetrics: nb.collectedSequencerMetrics,
 		Success:          true,
 		Complete:         true,
-	}, nil
+	}
+
+	if nb.runsValidator() {
+		if nb.collectedValidatorMetrics == nil {
+			return nil, errors.New("validator metrics not collected")
+		}
+		result.ValidatorMetrics = nb.collectedValidatorMetrics
+	}
+
+	return result, nil
+}
+
+func (nb *NetworkBenchmark) runsValidator() bool {
+	return benchmark.BenchmarkRolesContain(nb.roles, benchmark.BenchmarkRoleValidator)
 }
 
 func setupNode(ctx context.Context, l log.Logger, nodeTypeStr string, params benchtypes.RunParams, options *config.InternalClientOptions, portManager portmanager.PortManager, flashblockServerURL string, flashblocksBlockTime string) (types.ExecutionClient, error) {

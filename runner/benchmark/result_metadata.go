@@ -7,11 +7,11 @@ import (
 )
 
 type RunResult struct {
-	Success          bool                      `json:"success"`
-	Complete         bool                      `json:"complete"`
-	SequencerMetrics types.SequencerKeyMetrics `json:"sequencerMetrics"`
-	ValidatorMetrics types.ValidatorKeyMetrics `json:"validatorMetrics"`
-	ClientVersion    string                    `json:"clientVersion,omitempty"`
+	Success          bool                       `json:"success"`
+	Complete         bool                       `json:"complete"`
+	SequencerMetrics *types.SequencerKeyMetrics `json:"sequencerMetrics,omitempty"`
+	ValidatorMetrics *types.ValidatorKeyMetrics `json:"validatorMetrics,omitempty"`
+	ClientVersion    string                     `json:"clientVersion,omitempty"`
 }
 
 // MachineInfo contains information about the machine running the benchmark
@@ -63,13 +63,22 @@ func RunGroupFromTestPlans(testPlans []TestPlan, machineInfo *MachineInfo) RunGr
 	}
 
 	for _, testPlan := range testPlans {
+		roles := testPlan.Roles
+		if len(roles) == 0 {
+			roles = DefaultBenchmarkRoles()
+		}
 		for _, params := range testPlan.Runs {
+			testConfig := params.Params.ToConfig()
+			if !IsDefaultBenchmarkRoles(roles) {
+				testConfig["Roles"] = BenchmarkRolesString(roles)
+			}
+
 			metadata.Runs = append(metadata.Runs, Run{
 				ID:              params.ID,
 				SourceFile:      params.TestFile,
 				TestName:        params.Name,
 				TestDescription: params.Description,
-				TestConfig:      params.Params.ToConfig(),
+				TestConfig:      testConfig,
 				OutputDir:       params.OutputDir,
 				Thresholds:      testPlan.Thresholds,
 				CreatedAt:       &now,

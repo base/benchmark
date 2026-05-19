@@ -13,6 +13,83 @@ import (
 	"github.com/base/base-bench/runner/payload"
 )
 
+type BenchmarkRole string
+
+const (
+	BenchmarkRoleSequencer BenchmarkRole = "sequencer"
+	BenchmarkRoleValidator BenchmarkRole = "validator"
+)
+
+var defaultBenchmarkRoles = []BenchmarkRole{BenchmarkRoleSequencer, BenchmarkRoleValidator}
+
+func DefaultBenchmarkRoles() []BenchmarkRole {
+	return append([]BenchmarkRole(nil), defaultBenchmarkRoles...)
+}
+
+func NormalizeBenchmarkRoles(roles []BenchmarkRole) ([]BenchmarkRole, error) {
+	if len(roles) == 0 {
+		return DefaultBenchmarkRoles(), nil
+	}
+
+	seen := make(map[BenchmarkRole]bool, len(roles))
+	for _, role := range roles {
+		switch role {
+		case BenchmarkRoleSequencer, BenchmarkRoleValidator:
+		default:
+			return nil, fmt.Errorf("invalid benchmark role %q", role)
+		}
+
+		if seen[role] {
+			return nil, fmt.Errorf("duplicate benchmark role %q", role)
+		}
+		seen[role] = true
+	}
+
+	if !seen[BenchmarkRoleSequencer] {
+		return nil, fmt.Errorf("benchmark roles must include %q", BenchmarkRoleSequencer)
+	}
+
+	normalized := []BenchmarkRole{BenchmarkRoleSequencer}
+	if seen[BenchmarkRoleValidator] {
+		normalized = append(normalized, BenchmarkRoleValidator)
+	}
+
+	return normalized, nil
+}
+
+func BenchmarkRolesContain(roles []BenchmarkRole, role BenchmarkRole) bool {
+	for _, r := range roles {
+		if r == role {
+			return true
+		}
+	}
+	return false
+}
+
+func BenchmarkRoleNames(roles []BenchmarkRole) []string {
+	names := make([]string, 0, len(roles))
+	for _, role := range roles {
+		names = append(names, string(role))
+	}
+	return names
+}
+
+func BenchmarkRolesString(roles []BenchmarkRole) string {
+	return strings.Join(BenchmarkRoleNames(roles), ",")
+}
+
+func IsDefaultBenchmarkRoles(roles []BenchmarkRole) bool {
+	if len(roles) != len(defaultBenchmarkRoles) {
+		return false
+	}
+	for i, role := range roles {
+		if role != defaultBenchmarkRoles[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // Param is a single dimension of a benchmark matrix. It can be a
 // single value or a list of values.
 type Param struct {
@@ -134,11 +211,22 @@ type TestDefinition struct {
 	Snapshot     *SnapshotDefinition  `yaml:"snapshot"`
 	Metrics      *ThresholdConfig     `yaml:"metrics"`
 	Tags         *map[string]string   `yaml:"tags"`
+	Roles        []BenchmarkRole      `yaml:"roles"`
 	Variables    []Param              `yaml:"variables"`
 	ProofProgram *ProofProgramOptions `yaml:"proof_program"`
 }
 
 func (bc *TestDefinition) Check() error {
+	roles, err := NormalizeBenchmarkRoles(bc.Roles)
+	if err != nil {
+		return err
+	}
+
+	proofProgramEnabled := bc.ProofProgram != nil && (bc.ProofProgram.Enabled == nil || *bc.ProofProgram.Enabled)
+	if proofProgramEnabled && !BenchmarkRolesContain(roles, BenchmarkRoleValidator) {
+		return errors.New("proof_program requires the validator benchmark role")
+	}
+
 	for _, b := range bc.Variables {
 		err := b.Check()
 		if err != nil {
@@ -146,4 +234,8 @@ func (bc *TestDefinition) Check() error {
 		}
 	}
 	return nil
+}
+
+func (bc *TestDefinition) NormalizedRoles() ([]BenchmarkRole, error) {
+	return NormalizeBenchmarkRoles(bc.Roles)
 }

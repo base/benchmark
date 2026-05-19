@@ -159,6 +159,111 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 	}
 }
 
+func TestNewTestPlanFromConfigRoles(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.NoError(t, err)
+	require.Equal(t, []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer}, plan.Roles)
+
+	metadata := benchmark.RunGroupFromTestPlans([]benchmark.TestPlan{*plan}, nil)
+	require.Len(t, metadata.Runs, 1)
+	require.Equal(t, "sequencer", metadata.Runs[0].TestConfig["Roles"])
+}
+
+func TestNewTestPlanFromConfigDefaultsToBothRoles(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.NoError(t, err)
+	require.Equal(t, []benchmark.BenchmarkRole{
+		benchmark.BenchmarkRoleSequencer,
+		benchmark.BenchmarkRoleValidator,
+	}, plan.Roles)
+
+	metadata := benchmark.RunGroupFromTestPlans([]benchmark.TestPlan{*plan}, nil)
+	require.Len(t, metadata.Runs, 1)
+	require.NotContains(t, metadata.Runs[0].TestConfig, "Roles")
+}
+
+func TestNewTestPlanFromConfigRejectsInvalidRoles(t *testing.T) {
+	tests := []struct {
+		name  string
+		roles []benchmark.BenchmarkRole
+	}{
+		{
+			name:  "unknown role",
+			roles: []benchmark.BenchmarkRole{"other"},
+		},
+		{
+			name:  "duplicate role",
+			roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer, benchmark.BenchmarkRoleSequencer},
+		},
+		{
+			name:  "validator without sequencer",
+			roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleValidator},
+		},
+	}
+
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			definition := benchmark.TestDefinition{
+				Roles: tt.roles,
+				Variables: []benchmark.Param{
+					{
+						ParamType: "payload",
+						Value:     "simple",
+					},
+				},
+			}
+
+			_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestNewTestPlanFromConfigRejectsProofProgramWithoutValidator(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		ProofProgram: &benchmark.ProofProgramOptions{
+			Enabled: boolPtr(true),
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.ErrorContains(t, err, "proof_program requires the validator benchmark role")
+}
+
 func stringPtr(s string) *string {
 	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

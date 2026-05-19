@@ -201,6 +201,8 @@ Each test executes a standardized workflow:
 
 This approach allows precise measurement of performance characteristics for both block production and validation.
 
+Benchmarks run both phases by default. Set `roles: [sequencer]` on a benchmark definition to run only the sequencer/block-building phase, which is useful for snapshot startup and load-test coverage that does not need validator payload replay.
+
 ## Configuration
 
 ### Available Flags

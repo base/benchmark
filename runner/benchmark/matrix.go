@@ -17,9 +17,19 @@ type TestPlan struct {
 	Snapshot     *SnapshotDefinition
 	ProofProgram *ProofProgramOptions
 	Thresholds   *ThresholdConfig
+	Roles        []BenchmarkRole
 }
 
 func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *BenchmarkConfig) (*TestPlan, error) {
+	if err := c.Check(); err != nil {
+		return nil, err
+	}
+
+	roles, err := c.NormalizedRoles()
+	if err != nil {
+		return nil, err
+	}
+
 	testRuns, err := ResolveTestRunsFromMatrix(c, testFileName, config)
 	if err != nil {
 		return nil, err
@@ -42,6 +52,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *Benchm
 		Snapshot:     c.Snapshot,
 		ProofProgram: proofProgram,
 		Thresholds:   c.Metrics,
+		Roles:        roles,
 	}, nil
 }
 
