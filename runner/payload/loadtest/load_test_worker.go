@@ -25,7 +25,8 @@ import (
 
 // LoadTestPayloadDefinition is the YAML payload params for the load-test type.
 // The load-test workload itself lives in a native base-load-tester config file;
-// benchmark mode only overlays the RPC and timing fields it must control.
+// benchmark mode overlays the RPC/timing fields it must control and overlays
+// target_gps only when the benchmark matrix specifies one.
 type LoadTestPayloadDefinition struct {
 	ConfigFile string `yaml:"config_file"`
 	Network    string `yaml:"network"`
@@ -37,8 +38,7 @@ type loadTestPayloadWorker struct {
 	loadTestBin        string
 	elRPCURL           string
 	flashblocksURL     string
-	gasLimit           uint64
-	blockTimeSec       uint64
+	targetGPS          uint64
 	params             LoadTestPayloadDefinition
 	mempool            *mempool.StaticWorkloadMempool
 	proxyServer        *proxy.ProxyServer
@@ -67,11 +67,6 @@ func NewLoadTestPayloadWorker(
 	mp := mempool.NewStaticWorkloadMempool(log, chainID)
 	ps := proxy.NewProxyServer(elRPCURL, log, cfg.ProxyPort(), mp)
 
-	blockTimeSec := uint64(params.BlockTime.Seconds())
-	if blockTimeSec == 0 {
-		blockTimeSec = 1
-	}
-
 	sourceConfigPath, err := resolveConfigFilePath(cfg.ConfigPath(), definition.ConfigFile)
 	if err != nil {
 		return nil, err
@@ -83,8 +78,7 @@ func NewLoadTestPayloadWorker(
 		loadTestBin:      cfg.LoadTestBinary(),
 		elRPCURL:         elRPCURL,
 		flashblocksURL:   flashblocksURL,
-		gasLimit:         params.GasLimit,
-		blockTimeSec:     blockTimeSec,
+		targetGPS:        params.TargetGPS,
 		params:           definition,
 		mempool:          mp,
 		proxyServer:      ps,
@@ -224,14 +218,6 @@ func resolveConfigFilePath(benchmarkConfigPath string, loadTestConfigPath string
 	return filepath.Join(filepath.Dir(benchmarkConfigPath), loadTestConfigPath), nil
 }
 
-func (w *loadTestPayloadWorker) targetGPS() uint64 {
-	blockTimeSec := w.blockTimeSec
-	if blockTimeSec == 0 {
-		blockTimeSec = 1
-	}
-	return w.gasLimit / blockTimeSec
-}
-
 func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 	data, err := os.ReadFile(w.sourceConfigPath)
 	if err != nil {
@@ -257,7 +243,9 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 		flashblocksURL = "ws://localhost:7111"
 	}
 	setMappingValue(config, "flashblocks_ws", stringNode(flashblocksURL))
-	setMappingValue(config, "target_gps", uintNode(w.targetGPS()))
+	if w.targetGPS > 0 {
+		setMappingValue(config, "target_gps", uintNode(w.targetGPS))
+	}
 	setMappingValue(config, "duration", stringNode("99999s"))
 
 	return config, nil
@@ -332,9 +320,7 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 
 	w.log.Info("Generated load-test config",
 		"source_config", w.sourceConfigPath,
-		"target_gps", w.targetGPS(),
-		"gas_limit", w.gasLimit,
-		"block_time_sec", w.blockTimeSec,
+		"target_gps", w.targetGPS,
 	)
 
 	return tmpFile.Name(), nil
