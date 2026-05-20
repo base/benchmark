@@ -66,6 +66,9 @@ type RunParams struct {
 	// GasLimit is the gas limit for the benchmark run which is the maximum gas that the sequencer will include per block.
 	GasLimit uint64
 
+	// TargetGPS is the target gas per second for load-test payloads.
+	TargetGPS uint64
+
 	// PayloadID is a reference to a transaction payload that will be sent to the sequencer.
 	PayloadID string
 
@@ -110,6 +113,10 @@ func (p RunParams) ToConfig() map[string]interface{} {
 	// Include ValidatorNodeType if it's set and different from NodeType
 	if p.ValidatorNodeType != "" && p.ValidatorNodeType != p.NodeType {
 		params["ValidatorNodeType"] = p.ValidatorNodeType
+	}
+
+	if p.TargetGPS > 0 {
+		params["TargetGPS"] = p.TargetGPS
 	}
 
 	for k, v := range p.Tags {
