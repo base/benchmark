@@ -89,6 +89,33 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "config with target gps",
+			config: benchmark.TestDefinition{
+				Variables: []benchmark.Param{
+					{
+						ParamType: "payload",
+						Value:     "load-test",
+					},
+					{
+						ParamType: "target_gps",
+						Value:     200_000_000,
+					},
+				},
+			},
+			want: []benchmark.TestRun{
+				{
+					Params: types.RunParams{
+						NodeType:  "geth",
+						PayloadID: "load-test",
+						GasLimit:  benchmark.DefaultParams.GasLimit,
+						TargetGPS: 200_000_000,
+						BlockTime: 1 * time.Second,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
 			name: "duplicate param type",
 			config: benchmark.TestDefinition{
 				Variables: []benchmark.Param{
@@ -157,6 +184,45 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			require.ElementsMatch(t, tt.want, got)
 		})
 	}
+}
+
+func TestResolveTestRunsFromMatrixExpandsTargetGPSValues(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "snapshot load test"}
+	definition := benchmark.TestDefinition{
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "mainnet-snapshot-load-test",
+			},
+			{
+				ParamType: "node_type",
+				Value:     "builder",
+			},
+			{
+				ParamType: "gas_limit",
+				Value:     1_200_000_000,
+			},
+			{
+				ParamType: "target_gps",
+				Values: []interface{}{
+					80_000_000,
+					400_000_000,
+					1_200_000_000,
+				},
+			},
+		},
+	}
+
+	runs, err := benchmark.ResolveTestRunsFromMatrix(definition, "snapshot-load-test.yml", config)
+	require.NoError(t, err)
+	require.Len(t, runs, 3)
+
+	require.Equal(t, uint64(1_200_000_000), runs[0].Params.GasLimit)
+	require.Equal(t, uint64(1_200_000_000), runs[1].Params.GasLimit)
+	require.Equal(t, uint64(1_200_000_000), runs[2].Params.GasLimit)
+	require.Equal(t, uint64(80_000_000), runs[0].Params.TargetGPS)
+	require.Equal(t, uint64(400_000_000), runs[1].Params.TargetGPS)
+	require.Equal(t, uint64(1_200_000_000), runs[2].Params.TargetGPS)
 }
 
 func stringPtr(s string) *string {
