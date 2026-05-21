@@ -6,6 +6,7 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/types"
+	"github.com/base/base-bench/runner/payload"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,10 +30,11 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			want: []benchmark.TestRun{
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						PayloadID: "simple",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						PayloadID:           "simple",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 			},
@@ -55,34 +57,38 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			want: []benchmark.TestRun{
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "simple",
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "simple",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 				{
 					Params: types.RunParams{
-						NodeType:  "erigon",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "simple",
-						BlockTime: 1 * time.Second,
+						NodeType:            "erigon",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "simple",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "complex",
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "complex",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 				{
 					Params: types.RunParams{
-						NodeType:  "erigon",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "complex",
-						BlockTime: 1 * time.Second,
+						NodeType:            "erigon",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "complex",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 			},
@@ -105,11 +111,12 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			want: []benchmark.TestRun{
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						PayloadID: "load-test",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						TargetGPS: 200_000_000,
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						PayloadID:           "load-test",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						TargetGPS:           200_000_000,
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 			},
@@ -352,10 +359,6 @@ func TestResolveTestRunsFromMatrixExpandsTargetGPSValues(t *testing.T) {
 					1_200_000_000,
 				},
 			},
-			{
-				ParamType: "consensus_timing",
-				Value:     types.ConsensusTimingModeBaseConsensus,
-			},
 		},
 	}
 
@@ -369,9 +372,69 @@ func TestResolveTestRunsFromMatrixExpandsTargetGPSValues(t *testing.T) {
 	require.Equal(t, uint64(80_000_000), runs[0].Params.TargetGPS)
 	require.Equal(t, uint64(400_000_000), runs[1].Params.TargetGPS)
 	require.Equal(t, uint64(1_200_000_000), runs[2].Params.TargetGPS)
+	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[0].Params.ConsensusTimingMode)
+	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[1].Params.ConsensusTimingMode)
+	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[2].Params.ConsensusTimingMode)
+}
+
+func TestResolveTestRunsFromMatrixDefaultsSnapshotLoadTestsToBaseConsensusTiming(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{
+		Name: "snapshot load test",
+		TransactionPayloads: []payload.Definition{
+			{
+				ID:   "mainnet-snapshot-load-test",
+				Type: "load-test",
+			},
+		},
+	}
+	definition := benchmark.TestDefinition{
+		Snapshot: &benchmark.SnapshotDefinition{
+			Command: "./setup-initial-snapshot.sh --network mainnet",
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "mainnet-snapshot-load-test",
+			},
+		},
+	}
+
+	runs, err := benchmark.ResolveTestRunsFromMatrix(definition, "snapshot-load-test.yml", config)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
 	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[0].Params.ConsensusTimingMode)
-	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[1].Params.ConsensusTimingMode)
-	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[2].Params.ConsensusTimingMode)
+}
+
+func TestResolveTestRunsFromMatrixAllowsSnapshotLoadTestsToOverrideConsensusTiming(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{
+		Name: "snapshot load test",
+		TransactionPayloads: []payload.Definition{
+			{
+				ID:   "mainnet-snapshot-load-test",
+				Type: "load-test",
+			},
+		},
+	}
+	definition := benchmark.TestDefinition{
+		Snapshot: &benchmark.SnapshotDefinition{
+			Command: "./setup-initial-snapshot.sh --network mainnet",
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "mainnet-snapshot-load-test",
+			},
+			{
+				ParamType: "consensus_timing",
+				Value:     types.ConsensusTimingModePreventLateFCU,
+			},
+		},
+	}
+
+	runs, err := benchmark.ResolveTestRunsFromMatrix(definition, "snapshot-load-test.yml", config)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[0].Params.ConsensusTimingMode)
 }
 
 func TestResolveTestRunsFromMatrixRejectsInvalidConsensusTiming(t *testing.T) {

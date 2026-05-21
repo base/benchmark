@@ -82,6 +82,8 @@ benchmarks:
         values: [array, of, values] # for matrix testing
 ```
 
+`consensus_timing` can be `prevent-late-fcu` or `base-consensus`. Snapshot load-test runs default to `base-consensus`; other benchmark runs default to `prevent-late-fcu`.
+
 ## 🎯 Choosing the Right Configuration
 
 - **Development/Testing**: Use `examples/` configurations for focused testing
