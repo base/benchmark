@@ -51,7 +51,12 @@ const RunIndexInner = ({ benchmarkRuns }: { benchmarkRuns: BenchmarkRuns }) => {
       }
     });
 
-    const groups = groupBy(matchedRuns, "testConfig.GasLimit");
+    const groups = groupBy(matchedRuns, (run) => {
+      if (run.testConfig.TargetGPS) {
+        return `target-gps-${run.testConfig.TargetGPS}`;
+      }
+      return `gas-limit-${run.testConfig.GasLimit}`;
+    });
 
     // Build sections array with diffKeyStart
     const sections: {

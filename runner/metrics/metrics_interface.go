@@ -51,6 +51,21 @@ func (m *BlockMetrics) Copy() *BlockMetrics {
 	}
 }
 
+func (m *BlockMetrics) SetPreviousPrometheusMetrics(prev map[string]*io_prometheus_client.Metric) {
+	m.prevMetrics = make(map[string]*io_prometheus_client.Metric, len(prev))
+	maps.Copy(m.prevMetrics, prev)
+}
+
+func (m *BlockMetrics) PreviousPrometheusMetrics() map[string]*io_prometheus_client.Metric {
+	prevMetrics := make(map[string]*io_prometheus_client.Metric, len(m.prevMetrics))
+	maps.Copy(prevMetrics, m.prevMetrics)
+	return prevMetrics
+}
+
+func (m *BlockMetrics) PreviousPrometheusMetric(name string) *io_prometheus_client.Metric {
+	return m.prevMetrics[name]
+}
+
 func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_client.Metric) error {
 	if value.Histogram != nil {
 		// get the average change in sum divided by the average change in count
