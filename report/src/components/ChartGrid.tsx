@@ -20,6 +20,22 @@ function resolveMetricKey(
       return key;
     }
   }
+
+  const metricKeys = chartData.flatMap((d) => Object.keys(d.ExecutionMetrics));
+  for (const key of keys) {
+    const quantileSuffix = key.match(/(_quantile_\d+(?:_\d+)?)$/)?.[1] ?? "";
+    const metricPrefix = quantileSuffix
+      ? key.slice(0, -quantileSuffix.length)
+      : key;
+    const labeledMetricKey = metricKeys.find(
+      (metricKey) =>
+        metricKey.startsWith(`${metricPrefix}_`) &&
+        (!quantileSuffix || metricKey.endsWith(quantileSuffix)),
+    );
+    if (labeledMetricKey) {
+      return labeledMetricKey;
+    }
+  }
   return primaryKey;
 }
 
