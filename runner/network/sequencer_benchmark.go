@@ -240,57 +240,63 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		payloads = append(payloads, *lastSetupPayload)
 
-		blockMetrics := metrics.NewBlockMetrics()
-
 		pendingTxs := 0
+		completionWorker, runUntilWorkerDone := transactionWorker.(payloadworker.CompletionWorker)
+		if runUntilWorkerDone {
+			nb.log.Info("Running benchmark blocks until payload worker completes")
+			blockIndex := uint64(1)
+		runUntilDoneLoop:
+			for {
+				select {
+				case <-completionWorker.Done():
+					if err := completionWorker.Err(); err != nil {
+						errChan <- errors.Wrap(err, "payload worker failed")
+						return
+					}
+					nb.log.Info("Payload worker completed", "blocks", blockIndex-1)
+					break runUntilDoneLoop
+				default:
+				}
 
-		// run for a few blocks
-		for i := 0; i < params.NumBlocks; i++ {
-			blockMetrics.SetBlockNumber(uint64(i) + 1)
-			txsSent, err := transactionWorker.SendTxs(benchmarkCtx, pendingTxs)
-			if err != nil {
-				nb.log.Warn("failed to send transactions", "err", err)
+				payload, updatedPendingTxs, err := nb.proposeBenchmarkBlock(
+					benchmarkCtx,
+					transactionWorker,
+					consensusClient,
+					metricsCollector,
+					blockIndex,
+					pendingTxs,
+				)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				pendingTxs = updatedPendingTxs
+				payloads = append(payloads, *payload)
+				blockIndex++
+			}
+		} else {
+			// run for a few blocks
+			for i := 0; i < params.NumBlocks; i++ {
+				payload, updatedPendingTxs, err := nb.proposeBenchmarkBlock(
+					benchmarkCtx,
+					transactionWorker,
+					consensusClient,
+					metricsCollector,
+					uint64(i)+1,
+					pendingTxs,
+				)
+				if err != nil {
+					errChan <- err
+					return
+				}
+				pendingTxs = updatedPendingTxs
+				payloads = append(payloads, *payload)
+			}
+
+			if err := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs); err != nil {
 				errChan <- err
 				return
 			}
-
-			payload, err := consensusClient.Propose(benchmarkCtx, blockMetrics, false)
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			if payload == nil {
-				errChan <- errors.New("received nil payload from consensus client")
-				return
-			}
-
-			// Track how many user txs are still pending in the node's mempool.
-			// payload.Transactions includes the L1 info deposit tx, so user txs = total - 1.
-			userTxsIncluded := len(payload.Transactions) - 1
-			if userTxsIncluded < 0 {
-				userTxsIncluded = 0
-			}
-			pendingTxs = pendingTxs + txsSent - userTxsIncluded
-			if pendingTxs < 0 {
-				pendingTxs = 0
-			}
-
-			if !params.UseBaseConsensusTiming() {
-				log.Info("Sleeping for block time", "block_time", params.BlockTime)
-				time.Sleep(params.BlockTime)
-			}
-
-			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
-			if err != nil {
-				nb.log.Error("Failed to collect metrics", "error", err)
-			}
-			payloads = append(payloads, *payload)
-		}
-
-		if err := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs); err != nil {
-			errChan <- err
-			return
 		}
 
 		if err := consensusClient.Stop(benchmarkCtx); err != nil {
@@ -317,6 +323,54 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		}
 		return result, payloads[0].Number, nil
 	}
+}
+
+func (nb *sequencerBenchmark) proposeBenchmarkBlock(
+	ctx context.Context,
+	transactionWorker payloadworker.Worker,
+	consensusClient *consensus.SequencerConsensusClient,
+	metricsCollector metrics.Collector,
+	blockIndex uint64,
+	pendingTxs int,
+) (*engine.ExecutableData, int, error) {
+	blockMetrics := metrics.NewBlockMetrics()
+	blockMetrics.SetBlockNumber(blockIndex)
+
+	txsSent, err := transactionWorker.SendTxs(ctx, pendingTxs)
+	if err != nil {
+		nb.log.Warn("failed to send transactions", "err", err)
+		return nil, pendingTxs, err
+	}
+
+	payload, err := consensusClient.Propose(ctx, blockMetrics, false)
+	if err != nil {
+		return nil, pendingTxs, err
+	}
+	if payload == nil {
+		return nil, pendingTxs, errors.New("received nil payload from consensus client")
+	}
+
+	// Track how many user txs are still pending in the node's mempool.
+	// payload.Transactions includes the L1 info deposit tx, so user txs = total - 1.
+	userTxsIncluded := len(payload.Transactions) - 1
+	if userTxsIncluded < 0 {
+		userTxsIncluded = 0
+	}
+	updatedPendingTxs := pendingTxs + txsSent - userTxsIncluded
+	if updatedPendingTxs < 0 {
+		updatedPendingTxs = 0
+	}
+
+	if !nb.config.Params.UseBaseConsensusTiming() {
+		log.Info("Sleeping for block time", "block_time", nb.config.Params.BlockTime)
+		time.Sleep(nb.config.Params.BlockTime)
+	}
+
+	if err := metricsCollector.Collect(ctx, blockMetrics); err != nil {
+		nb.log.Error("Failed to collect metrics", "error", err)
+	}
+
+	return payload, updatedPendingTxs, nil
 }
 
 func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(

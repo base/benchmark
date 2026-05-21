@@ -82,7 +82,7 @@ transactions:
 		"query_rpc: http://sequencer.example",
 		"flashblocks_ws: ws://benchmark-flashblocks.example",
 		"target_gps: 75000000",
-		"duration: 99999s",
+		"duration: \"60s\"",
 		"chain_id: 8453",
 		"sender_count: 250",
 		"in_flight_per_sender: 64",
@@ -102,7 +102,6 @@ transactions:
 		"standalone-query.invalid",
 		"standalone-flashblocks.invalid",
 		"target_gps: 123",
-		"duration: 60s",
 	} {
 		require.NotContains(t, output, oldValue)
 	}
@@ -137,7 +136,7 @@ transactions:
 	output := string(encoded)
 
 	require.Contains(t, output, "target_gps: 123")
-	require.Contains(t, output, "duration: 99999s")
+	require.Contains(t, output, "duration: \"60s\"")
 }
 
 func TestResolveConfigFilePath(t *testing.T) {

@@ -24,8 +24,8 @@ import (
 
 // LoadTestPayloadDefinition is the YAML payload params for the load-test type.
 // The load-test workload itself lives in a native base-load-tester config file;
-// benchmark mode overlays the RPC/timing fields it must control and overlays
-// target_gps only when the benchmark matrix specifies one.
+// benchmark mode overlays the RPC fields it must control and overlays target_gps
+// only when the benchmark matrix specifies one.
 type LoadTestPayloadDefinition struct {
 	ConfigFile string `yaml:"config_file"`
 	Network    string `yaml:"network"`
@@ -43,6 +43,8 @@ type loadTestPayloadWorker struct {
 	cmd                *exec.Cmd
 	done               chan struct{}
 	shutdownOnce       sync.Once
+	waitErrMu          sync.Mutex
+	waitErr            error
 	sourceConfigPath   string
 	renderedConfigPath string
 	outputPath         string
@@ -115,7 +117,10 @@ func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
 	w.cmd = cmd
 	w.done = make(chan struct{})
 	go func() {
-		_ = cmd.Wait()
+		err := cmd.Wait()
+		w.waitErrMu.Lock()
+		w.waitErr = err
+		w.waitErrMu.Unlock()
 		close(w.done)
 	}()
 
@@ -158,6 +163,12 @@ func (w *loadTestPayloadWorker) Done() <-chan struct{} {
 	done := make(chan struct{})
 	close(done)
 	return done
+}
+
+func (w *loadTestPayloadWorker) Err() error {
+	w.waitErrMu.Lock()
+	defer w.waitErrMu.Unlock()
+	return w.waitErr
 }
 
 func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
@@ -231,7 +242,6 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 	if w.targetGPS > 0 {
 		setMappingValue(config, "target_gps", uintNode(w.targetGPS))
 	}
-	setMappingValue(config, "duration", stringNode("99999s"))
 
 	return config, nil
 }
