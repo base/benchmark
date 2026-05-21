@@ -3,6 +3,8 @@ package benchmark
 import (
 	"fmt"
 	"time"
+
+	"github.com/base/base-bench/runner/network/types"
 )
 
 type ThresholdConfig struct {
@@ -121,6 +123,7 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *Be
 		if c.Tags != nil {
 			params.Tags = *c.Tags
 		}
+		params.ConsensusTimingMode = consensusTimingMode(params, c, config)
 
 		testParams[i] = TestRun{
 			ID:          id,
@@ -152,4 +155,26 @@ func ResolveTestRunsFromMatrix(c TestDefinition, testFileName string, config *Be
 	}
 
 	return testParams, nil
+}
+
+func consensusTimingMode(params *types.RunParams, definition TestDefinition, config *BenchmarkConfig) string {
+	if params.ConsensusTimingMode != "" {
+		return params.ConsensusTimingMode
+	}
+	if isSnapshotLoadTest(params.PayloadID, definition, config) {
+		return types.ConsensusTimingModeBaseConsensus
+	}
+	return types.ConsensusTimingModePreventLateFCU
+}
+
+func isSnapshotLoadTest(payloadID string, definition TestDefinition, config *BenchmarkConfig) bool {
+	if definition.Snapshot == nil || definition.Snapshot.Command == "" {
+		return false
+	}
+	for _, transactionPayload := range config.TransactionPayloads {
+		if transactionPayload.ID == payloadID && transactionPayload.Type == "load-test" {
+			return true
+		}
+	}
+	return false
 }
