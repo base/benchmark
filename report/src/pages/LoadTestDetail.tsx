@@ -92,6 +92,10 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
   const confirmed = result.throughput.total_confirmed;
   const failed = result.throughput.total_failed;
   const reverted = result.throughput.total_reverted;
+  const blockRange = result.block_range;
+  const hasConfirmedBlockRange =
+    typeof blockRange?.first_block === "number" &&
+    typeof blockRange.last_block === "number";
 
   return (
     <StatCard title="Summary">
@@ -129,11 +133,15 @@ const SummarySection = ({ result }: { result: LoadTestResult }) => {
           value={formatEthFromWei(result.gas.total_cost_wei)}
           hint={`${result.gas.avg_gas_price.toLocaleString()} wei avg gas price`}
         />
-        {result.block_range && (
+        {blockRange && (
           <Stat
             label="Block range"
-            value={`${result.block_range.first_block.toLocaleString()} → ${result.block_range.last_block.toLocaleString()}`}
-            hint={`${result.block_range.block_count.toLocaleString()} blocks`}
+            value={
+              hasConfirmedBlockRange
+                ? `${blockRange.first_block.toLocaleString()} → ${blockRange.last_block.toLocaleString()}`
+                : "No confirmed transactions"
+            }
+            hint={`${blockRange.block_count.toLocaleString()} blocks`}
           />
         )}
       </StatGrid>
@@ -234,7 +242,9 @@ const LoadTestDetail = () => {
               {(() => {
                 const reverted = result.throughput.total_reverted;
                 const reasons: [string, number][] = [
-                  ...(reverted > 0 ? [["reverted", reverted] as [string, number]] : []),
+                  ...(reverted > 0
+                    ? [["reverted", reverted] as [string, number]]
+                    : []),
                   ...result.top_failure_reasons,
                 ];
                 if (reasons.length === 0) {

@@ -169,8 +169,9 @@ export interface ThroughputPercentiles {
 }
 
 export interface BlockRange {
-  first_block: number;
-  last_block: number;
+  // Omitted when no test transactions were confirmed.
+  first_block?: number;
+  last_block?: number;
   block_count: number;
 }
 

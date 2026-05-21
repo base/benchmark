@@ -40,8 +40,7 @@ fi
 
 # Checkout specified version/commit
 echo "Checking out version: $BASE_RETH_NODE_VERSION"
-git fetch origin "$BASE_RETH_NODE_VERSION" || true
-git checkout -f "$BASE_RETH_NODE_VERSION" || git checkout -f "origin/$BASE_RETH_NODE_VERSION"
+git checkout -f "$BASE_RETH_NODE_VERSION"
 
 # Build the binaries using cargo
 echo "Building base-reth-node, base-builder, and base-load-test with cargo..."
