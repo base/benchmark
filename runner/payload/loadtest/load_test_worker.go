@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/base/base-bench/runner/clients/common/proxy"
 	"github.com/base/base-bench/runner/config"
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/types"
@@ -41,7 +40,6 @@ type loadTestPayloadWorker struct {
 	targetGPS          uint64
 	params             LoadTestPayloadDefinition
 	mempool            *mempool.StaticWorkloadMempool
-	proxyServer        *proxy.ProxyServer
 	cmd                *exec.Cmd
 	done               chan struct{}
 	shutdownOnce       sync.Once
@@ -51,7 +49,7 @@ type loadTestPayloadWorker struct {
 }
 
 // NewLoadTestPayloadWorker creates a worker that runs the base-load-test binary
-// as an external transaction generator, capturing transactions via a proxy server.
+// as an external transaction generator against the benchmark node's RPC.
 func NewLoadTestPayloadWorker(
 	log log.Logger,
 	elRPCURL string,
@@ -65,7 +63,6 @@ func NewLoadTestPayloadWorker(
 	outputPath string,
 ) (worker.Worker, error) {
 	mp := mempool.NewStaticWorkloadMempool(log, chainID)
-	ps := proxy.NewProxyServer(elRPCURL, log, cfg.ProxyPort(), mp)
 
 	sourceConfigPath, err := resolveConfigFilePath(cfg.ConfigPath(), definition.ConfigFile)
 	if err != nil {
@@ -81,7 +78,6 @@ func NewLoadTestPayloadWorker(
 		targetGPS:        params.TargetGPS,
 		params:           definition,
 		mempool:          mp,
-		proxyServer:      ps,
 		sourceConfigPath: sourceConfigPath,
 		outputPath:       outputPath,
 	}
@@ -94,10 +90,6 @@ func (w *loadTestPayloadWorker) Mempool() mempool.FakeMempool {
 }
 
 func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
-	if err := w.proxyServer.Run(ctx); err != nil {
-		return errors.Wrap(err, "failed to run proxy server")
-	}
-
 	configPath, err := w.writeConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to write load-test config")
@@ -189,8 +181,6 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 		}
 	}
 
-	w.proxyServer.Stop()
-
 	if w.renderedConfigPath != "" {
 		if err := os.Remove(w.renderedConfigPath); err != nil {
 			w.log.Warn("failed to remove load-test config", "path", w.renderedConfigPath, "err", err)
@@ -200,12 +190,8 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (w *loadTestPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
-	w.log.Info("Collecting txs from load test")
-	pendingTxs := w.proxyServer.DrainPendingTxs()
-
-	w.mempool.AddTransactions(pendingTxs)
-	return len(pendingTxs), nil
+func (w *loadTestPayloadWorker) SendTxs(_ context.Context, _ int) (int, error) {
+	return 0, nil
 }
 
 func resolveConfigFilePath(benchmarkConfigPath string, loadTestConfigPath string) (string, error) {
@@ -234,9 +220,8 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 		return nil, err
 	}
 
-	proxyURL := w.proxyServer.ClientURL()
-	setMappingValue(config, "transaction_submission_rpcs", stringSequenceNode(proxyURL))
-	setMappingValue(config, "query_rpc", stringNode(proxyURL))
+	setMappingValue(config, "transaction_submission_rpcs", stringSequenceNode(w.elRPCURL))
+	setMappingValue(config, "query_rpc", stringNode(w.elRPCURL))
 
 	flashblocksURL := w.flashblocksURL
 	if flashblocksURL == "" {
@@ -293,7 +278,7 @@ func stringSequenceNode(values ...string) *yaml.Node {
 }
 
 // writeConfig generates a temporary YAML config file for the load-test binary
-// with the RPC URL pointing to the proxy server.
+// with benchmark-controlled RPC, timing, and report fields.
 func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 	config, err := w.buildConfig()
 	if err != nil {

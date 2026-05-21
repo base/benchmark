@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/base/base-bench/runner/clients/common/proxy"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -67,7 +66,7 @@ transactions:
 	worker := &loadTestPayloadWorker{
 		flashblocksURL:   "ws://benchmark-flashblocks.example",
 		targetGPS:        75_000_000,
-		proxyServer:      proxy.NewProxyServer("http://sequencer.example", nil, 18546, nil),
+		elRPCURL:         "http://sequencer.example",
 		sourceConfigPath: configPath,
 	}
 
@@ -79,8 +78,8 @@ transactions:
 	output := string(encoded)
 
 	for _, want := range []string{
-		"transaction_submission_rpcs:\n    - http://localhost:18546",
-		"query_rpc: http://localhost:18546",
+		"transaction_submission_rpcs:\n    - http://sequencer.example",
+		"query_rpc: http://sequencer.example",
 		"flashblocks_ws: ws://benchmark-flashblocks.example",
 		"target_gps: 75000000",
 		"duration: 99999s",
@@ -126,7 +125,7 @@ transactions:
 
 	worker := &loadTestPayloadWorker{
 		flashblocksURL:   "ws://benchmark-flashblocks.example",
-		proxyServer:      proxy.NewProxyServer("http://sequencer.example", nil, 18546, nil),
+		elRPCURL:         "http://sequencer.example",
 		sourceConfigPath: configPath,
 	}
 
