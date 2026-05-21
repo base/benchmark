@@ -84,6 +84,9 @@ type RunParams struct {
 	// BlockTime is the time between blocks in the benchmark run.
 	BlockTime time.Duration
 
+	// ConsensusTimingMode controls how the fake consensus client schedules FCU/getPayload calls.
+	ConsensusTimingMode string
+
 	// Env is the environment variables for the benchmark run.
 	Env map[string]string
 
@@ -98,6 +101,15 @@ type RunParams struct {
 
 	// ClientBinPath is an optional override for the client binary path.
 	ClientBinPath string
+}
+
+const (
+	ConsensusTimingModePreventLateFCU = "prevent-late-fcu"
+	ConsensusTimingModeBaseConsensus  = "base-consensus"
+)
+
+func (p RunParams) UseBaseConsensusTiming() bool {
+	return p.ConsensusTimingMode == ConsensusTimingModeBaseConsensus
 }
 
 func (p RunParams) ToConfig() map[string]interface{} {
@@ -117,6 +129,10 @@ func (p RunParams) ToConfig() map[string]interface{} {
 
 	if p.TargetGPS > 0 {
 		params["TargetGPS"] = p.TargetGPS
+	}
+
+	if p.ConsensusTimingMode != "" {
+		params["ConsensusTimingMode"] = p.ConsensusTimingMode
 	}
 
 	for k, v := range p.Tags {

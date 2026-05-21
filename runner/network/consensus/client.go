@@ -23,6 +23,8 @@ type ConsensusClientOptions struct {
 	GasLimitSetup uint64
 	// ParallelTxBatches is the number of parallel batches for sending transactions
 	ParallelTxBatches int
+	// ConsensusTimingMode controls how FCU and getPayload calls are scheduled.
+	ConsensusTimingMode string
 }
 
 // BaseConsensusClient contains common functionality shared between different consensus client implementations.

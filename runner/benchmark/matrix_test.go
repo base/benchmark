@@ -210,6 +210,10 @@ func TestResolveTestRunsFromMatrixExpandsTargetGPSValues(t *testing.T) {
 					1_200_000_000,
 				},
 			},
+			{
+				ParamType: "consensus_timing",
+				Value:     types.ConsensusTimingModeBaseConsensus,
+			},
 		},
 	}
 
@@ -223,6 +227,24 @@ func TestResolveTestRunsFromMatrixExpandsTargetGPSValues(t *testing.T) {
 	require.Equal(t, uint64(80_000_000), runs[0].Params.TargetGPS)
 	require.Equal(t, uint64(400_000_000), runs[1].Params.TargetGPS)
 	require.Equal(t, uint64(1_200_000_000), runs[2].Params.TargetGPS)
+	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[0].Params.ConsensusTimingMode)
+	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[1].Params.ConsensusTimingMode)
+	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[2].Params.ConsensusTimingMode)
+}
+
+func TestResolveTestRunsFromMatrixRejectsInvalidConsensusTiming(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "benchmark"}
+	definition := benchmark.TestDefinition{
+		Variables: []benchmark.Param{
+			{
+				ParamType: "consensus_timing",
+				Value:     "aligned",
+			},
+		},
+	}
+
+	_, err := benchmark.ResolveTestRunsFromMatrix(definition, "benchmark.yml", config)
+	require.ErrorContains(t, err, "invalid consensus timing")
 }
 
 func TestNewTestPlanFromConfigRoles(t *testing.T) {

@@ -77,7 +77,7 @@ benchmarks:
   - name: "Benchmark Name"
     description: "What this benchmark tests"
     variables:
-      - type: payload|node_type|num_blocks|gas_limit|target_gps
+      - type: payload|node_type|num_blocks|gas_limit|target_gps|consensus_timing
         value: single-value
         values: [array, of, values] # for matrix testing
 ```
