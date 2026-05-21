@@ -151,6 +151,7 @@ export interface ThroughputStats {
   total_submitted: number;
   total_confirmed: number;
   total_failed: number;
+  total_reverted: number;
   tps: number;
   gps: number;
   duration: RustDuration;
