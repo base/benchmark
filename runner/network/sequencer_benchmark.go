@@ -207,10 +207,11 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 	go func() {
 		consensusClient := consensus.NewSequencerConsensusClient(nb.log, sequencerClient.Client(), sequencerClient.AuthClient(), mempool, consensus.ConsensusClientOptions{
-			BlockTime:         params.BlockTime,
-			GasLimit:          params.GasLimit,
-			GasLimitSetup:     1e9, // 1G gas
-			ParallelTxBatches: nb.config.Config.ParallelTxBatches(),
+			BlockTime:           params.BlockTime,
+			GasLimit:            params.GasLimit,
+			GasLimitSetup:       1e9, // 1G gas
+			ParallelTxBatches:   nb.config.Config.ParallelTxBatches(),
+			ConsensusTimingMode: params.ConsensusTimingMode,
 		}, headBlockHash, headBlockNumber, l1Chain, nb.config.BatcherAddr())
 
 		payloads := make([]engine.ExecutableData, 0)
@@ -275,8 +276,10 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 				pendingTxs = 0
 			}
 
-			log.Info("Sleeping for block time", "block_time", params.BlockTime)
-			time.Sleep(params.BlockTime)
+			if !params.UseBaseConsensusTiming() {
+				log.Info("Sleeping for block time", "block_time", params.BlockTime)
+				time.Sleep(params.BlockTime)
+			}
 
 			err = metricsCollector.Collect(benchmarkCtx, blockMetrics)
 			if err != nil {
@@ -370,7 +373,9 @@ func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(
 		}
 
 		settlementBlock++
-		time.Sleep(nb.config.Params.BlockTime)
+		if !nb.config.Params.UseBaseConsensusTiming() {
+			time.Sleep(nb.config.Params.BlockTime)
+		}
 	}
 }
 
