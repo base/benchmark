@@ -8,6 +8,7 @@ import (
 )
 
 func TestPrometheusMetricNameSortsAndSanitizesLabels(t *testing.T) {
+	collector := &metricsCollector{}
 	metric := &io_prometheus_client.Metric{
 		Label: []*io_prometheus_client.LabelPair{
 			{Name: stringPtr("type"), Value: stringPtr("account.worker")},
@@ -15,7 +16,7 @@ func TestPrometheusMetricNameSortsAndSanitizesLabels(t *testing.T) {
 		},
 	}
 
-	got := prometheusMetricName("reth_example_metric", metric)
+	got := collector.prometheusMetricName("reth_example_metric", metric)
 	want := "reth_example_metric_configname_mainnet_snapshot_type_account_worker"
 	if got != want {
 		t.Fatalf("prometheusMetricName() = %q, want %q", got, want)
@@ -23,6 +24,7 @@ func TestPrometheusMetricNameSortsAndSanitizesLabels(t *testing.T) {
 }
 
 func TestHistogramQuantileUsesIntervalBuckets(t *testing.T) {
+	collector := &metricsCollector{}
 	prev := histogramMetric(
 		10,
 		bucket(1, 5),
@@ -36,7 +38,7 @@ func TestHistogramQuantileUsesIntervalBuckets(t *testing.T) {
 		bucket(3, 20),
 	)
 
-	got, ok := histogramQuantile(0.5, current.Histogram, prev.Histogram)
+	got, ok := collector.histogramQuantile(0.5, current.Histogram, prev.Histogram)
 	if !ok {
 		t.Fatal("histogramQuantile() did not return a value")
 	}
@@ -44,7 +46,7 @@ func TestHistogramQuantileUsesIntervalBuckets(t *testing.T) {
 		t.Fatalf("histogramQuantile(0.5) = %f, want 2", got)
 	}
 
-	got, ok = histogramQuantile(0.9, current.Histogram, prev.Histogram)
+	got, ok = collector.histogramQuantile(0.9, current.Histogram, prev.Histogram)
 	if !ok {
 		t.Fatal("histogramQuantile() did not return a value")
 	}
@@ -54,13 +56,14 @@ func TestHistogramQuantileUsesIntervalBuckets(t *testing.T) {
 }
 
 func TestHistogramQuantileAvoidsInfiniteUpperBound(t *testing.T) {
+	collector := &metricsCollector{}
 	current := histogramMetric(
 		10,
 		bucket(1, 5),
 		bucket(math.Inf(1), 10),
 	)
 
-	got, ok := histogramQuantile(0.9, current.Histogram, nil)
+	got, ok := collector.histogramQuantile(0.9, current.Histogram, nil)
 	if !ok {
 		t.Fatal("histogramQuantile() did not return a value")
 	}

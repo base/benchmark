@@ -121,11 +121,11 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 		if metricTypes[name] {
 			metricVal := metric.GetMetric()
 			for _, value := range metricVal {
-				metricName := prometheusMetricName(name, value)
-				addPrometheusMetric(r.log, m, metricName, value)
+				metricName := r.prometheusMetricName(name, value)
+				r.addPrometheusMetric(m, metricName, value)
 
 				if metricName != name && len(metricVal) == 1 {
-					addPrometheusMetric(r.log, m, name, value)
+					r.addPrometheusMetric(m, name, value)
 				}
 			}
 		}
@@ -136,17 +136,17 @@ func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics)
 	return nil
 }
 
-func addPrometheusMetric(log log.Logger, m *metrics.BlockMetrics, name string, metric *io_prometheus_client.Metric) {
-	addHistogramQuantiles(m, name, metric, m.PreviousPrometheusMetric(name))
+func (r *metricsCollector) addPrometheusMetric(m *metrics.BlockMetrics, name string, metric *io_prometheus_client.Metric) {
+	r.addHistogramQuantiles(m, name, metric, m.PreviousPrometheusMetric(name))
 
 	err := m.UpdatePrometheusMetric(name, metric)
 	if err != nil {
-		log.Warn("failed to add metric %s: %s", name, err)
+		r.log.Warn("failed to add metric %s: %s", name, err)
 	}
-	addSummaryQuantiles(m, name, metric)
+	r.addSummaryQuantiles(m, name, metric)
 }
 
-func prometheusMetricName(name string, metric *io_prometheus_client.Metric) string {
+func (r *metricsCollector) prometheusMetricName(name string, metric *io_prometheus_client.Metric) string {
 	labels := metric.GetLabel()
 	if len(labels) == 0 {
 		return name
@@ -154,23 +154,23 @@ func prometheusMetricName(name string, metric *io_prometheus_client.Metric) stri
 
 	parts := make([]string, 0, len(labels))
 	for _, label := range labels {
-		parts = append(parts, sanitizeMetricPart(label.GetName())+"_"+sanitizeMetricPart(label.GetValue()))
+		parts = append(parts, r.sanitizeMetricPart(label.GetName())+"_"+r.sanitizeMetricPart(label.GetValue()))
 	}
 	sort.Strings(parts)
 	return name + "_" + strings.Join(parts, "_")
 }
 
-func addSummaryQuantiles(m *metrics.BlockMetrics, name string, metric *io_prometheus_client.Metric) {
+func (r *metricsCollector) addSummaryQuantiles(m *metrics.BlockMetrics, name string, metric *io_prometheus_client.Metric) {
 	if metric.Summary == nil {
 		return
 	}
 
 	for _, quantile := range metric.Summary.GetQuantile() {
-		m.AddExecutionMetric(name+"_quantile_"+formatQuantile(quantile.GetQuantile()), quantile.GetValue())
+		m.AddExecutionMetric(name+"_quantile_"+r.formatQuantile(quantile.GetQuantile()), quantile.GetValue())
 	}
 }
 
-func addHistogramQuantiles(m *metrics.BlockMetrics, name string, metric *io_prometheus_client.Metric, prevMetric *io_prometheus_client.Metric) {
+func (r *metricsCollector) addHistogramQuantiles(m *metrics.BlockMetrics, name string, metric *io_prometheus_client.Metric, prevMetric *io_prometheus_client.Metric) {
 	if metric.Histogram == nil {
 		return
 	}
@@ -181,14 +181,14 @@ func addHistogramQuantiles(m *metrics.BlockMetrics, name string, metric *io_prom
 	}
 
 	for _, quantile := range []float64{0.5, 0.9, 0.99} {
-		value, ok := histogramQuantile(quantile, metric.Histogram, prevHistogram)
+		value, ok := r.histogramQuantile(quantile, metric.Histogram, prevHistogram)
 		if ok {
-			m.AddExecutionMetric(name+"_quantile_"+formatQuantile(quantile), value)
+			m.AddExecutionMetric(name+"_quantile_"+r.formatQuantile(quantile), value)
 		}
 	}
 }
 
-func histogramQuantile(quantile float64, histogram *io_prometheus_client.Histogram, prevHistogram *io_prometheus_client.Histogram) (float64, bool) {
+func (r *metricsCollector) histogramQuantile(quantile float64, histogram *io_prometheus_client.Histogram, prevHistogram *io_prometheus_client.Histogram) (float64, bool) {
 	if histogram == nil || histogram.SampleCount == nil || len(histogram.Bucket) == 0 {
 		return 0, false
 	}
@@ -197,7 +197,7 @@ func histogramQuantile(quantile float64, histogram *io_prometheus_client.Histogr
 	if prevHistogram != nil && prevHistogram.SampleCount != nil {
 		prevCount = *prevHistogram.SampleCount
 	}
-	count := deltaUint64(*histogram.SampleCount, prevCount)
+	count := r.deltaUint64(*histogram.SampleCount, prevCount)
 	if count == 0 {
 		return 0, false
 	}
@@ -219,7 +219,7 @@ func histogramQuantile(quantile float64, histogram *io_prometheus_client.Histogr
 			prevBucketCount = *prevHistogram.Bucket[i].CumulativeCount
 		}
 
-		bucketCount := deltaUint64(*bucket.CumulativeCount, prevBucketCount)
+		bucketCount := r.deltaUint64(*bucket.CumulativeCount, prevBucketCount)
 		if float64(bucketCount) >= rank {
 			if math.IsInf(*bucket.UpperBound, 0) {
 				return lastFiniteUpperBound, hasFiniteUpperBound
@@ -231,18 +231,18 @@ func histogramQuantile(quantile float64, histogram *io_prometheus_client.Histogr
 	return 0, false
 }
 
-func deltaUint64(current uint64, previous uint64) uint64 {
+func (r *metricsCollector) deltaUint64(current uint64, previous uint64) uint64 {
 	if current < previous {
 		return current
 	}
 	return current - previous
 }
 
-func formatQuantile(quantile float64) string {
+func (r *metricsCollector) formatQuantile(quantile float64) string {
 	return strings.ReplaceAll(strconv.FormatFloat(quantile, 'f', -1, 64), ".", "_")
 }
 
-func sanitizeMetricPart(value string) string {
+func (r *metricsCollector) sanitizeMetricPart(value string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			return r
