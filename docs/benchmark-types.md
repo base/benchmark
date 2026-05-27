@@ -25,7 +25,9 @@
 
 ## Role selection
 
-Benchmark definitions run both roles by default:
+Benchmark definitions always run the sequencer role. The sequencer phase builds the payloads used by the rest of the benchmark.
+
+By default, benchmarks also run the validator role after the sequencer phase:
 
 ```yaml
 benchmarks:
@@ -42,7 +44,7 @@ benchmarks:
       # ...
 ```
 
-The validator role cannot run without the sequencer role because validator benchmarks consume payloads produced by the sequencer phase. Proof-program benchmarks also require the validator role.
+The validator role cannot run by itself because validator benchmarks consume payloads produced by the sequencer phase. Proof-program benchmarks also require the validator role.
 
 ## op-challenger test
 

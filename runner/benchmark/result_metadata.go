@@ -61,14 +61,10 @@ func RunGroupFromTestPlans(testPlans []TestPlan, machineInfo *MachineInfo) RunGr
 	}
 
 	for _, testPlan := range testPlans {
-		roles := testPlan.Roles
-		if len(roles) == 0 {
-			roles = DefaultBenchmarkRoles()
-		}
 		for _, params := range testPlan.Runs {
 			testConfig := params.Params.ToConfig()
-			if !IsDefaultBenchmarkRoles(roles) {
-				testConfig["Roles"] = BenchmarkRolesString(roles)
+			if !testPlan.Mode.IsDefault() {
+				testConfig["Roles"] = testPlan.Mode.RolesString()
 			}
 
 			metadata.Runs = append(metadata.Runs, Run{

@@ -173,7 +173,7 @@ func TestNewTestPlanFromConfigRoles(t *testing.T) {
 
 	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
 	require.NoError(t, err)
-	require.Equal(t, []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer}, plan.Roles)
+	require.False(t, plan.Mode.RunValidator)
 
 	metadata := benchmark.RunGroupFromTestPlans([]benchmark.TestPlan{*plan}, nil)
 	require.Len(t, metadata.Runs, 1)
@@ -193,10 +193,7 @@ func TestNewTestPlanFromConfigDefaultsToBothRoles(t *testing.T) {
 
 	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
 	require.NoError(t, err)
-	require.Equal(t, []benchmark.BenchmarkRole{
-		benchmark.BenchmarkRoleSequencer,
-		benchmark.BenchmarkRoleValidator,
-	}, plan.Roles)
+	require.True(t, plan.Mode.RunValidator)
 
 	metadata := benchmark.RunGroupFromTestPlans([]benchmark.TestPlan{*plan}, nil)
 	require.Len(t, metadata.Runs, 1)
@@ -258,6 +255,49 @@ func TestNewTestPlanFromConfigRejectsProofProgramWithoutValidator(t *testing.T) 
 
 	_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
 	require.ErrorContains(t, err, "proof_program requires the validator benchmark role")
+}
+
+func TestNewTestPlanFromConfigRejectsValidatorThresholdsWithoutValidator(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		Metrics: &benchmark.ThresholdConfig{
+			Error: map[string]float64{
+				"validator/latency/new_payload": 1e9,
+			},
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.ErrorContains(t, err, `error threshold "validator/latency/new_payload" requires the validator benchmark role`)
+}
+
+func TestNewTestPlanFromConfigAllowsSequencerThresholdsWithoutValidator(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		Metrics: &benchmark.ThresholdConfig{
+			Error: map[string]float64{
+				"sequencer/latency/get_payload": 1e9,
+			},
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.NoError(t, err)
+	require.False(t, plan.Mode.RunValidator)
 }
 
 func stringPtr(s string) *string {
