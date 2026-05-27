@@ -12,17 +12,20 @@ shape into the same S3 layout.
 
 ## TL;DR
 
-- One S3 bucket. Under it: `metadata/` directory of small JSON files
-  describing runs, and `<outputDir>/` directories holding per-block
-  metrics for each run.
-- The report-api (`protocols/base-benchmarking/report-api`) merges all
-  `metadata/*.json` files into a single `GET /output/metadata.json`
-  response. The UI consumes that one response.
-- To add a benchmark run: drop one JSON file into `metadata/` and the
-  per-block metrics under its `outputDir`. No central file to update.
-- To compare across versions, time windows, or any other axis: write
-  the axis value into `testConfig` and the report-api groups
-  automatically.
+- One S3 bucket. Each run owns one prefix: `<outputDir>/metadata.json`
+  (run metadata) + `<outputDir>/metrics-<role>.json` (per-block
+  timeseries). No central file to update.
+- The report-api (`protocols/base-benchmarking/report-api`) lists all
+  top-level prefixes, reads the `metadata.json` under each, and merges
+  them into a single `GET /output/metadata.json` response. The UI
+  consumes that one response.
+- To add a benchmark run: upload metrics files first, then
+  `<outputDir>/metadata.json` last. The metadata file is the commit
+  signal — in-progress runs are invisible until it lands.
+- To compare across versions or time windows: write
+  `testConfig.ClientVersion` per build. The report-api synthesizes
+  `[Compare: Versions]` and `[Compare: Time]` groups automatically and
+  injects them into the same dropdown the user already uses.
 
 ## S3 layout
 
@@ -136,15 +139,16 @@ set. The report-api **auto-generates comparison groups** from
 
 #### Standard `testConfig` keys
 
-| Key | Meaning | Notes |
-|---|---|---|
-| `BenchmarkRun` | Cohort ID | Required. |
-| `TransactionPayload` | Payload type | One per execution variant. |
-| `GasLimit` | Block gas limit | int. |
-| `BlockTimeMilliseconds` | Target block time | int. |
-| `NodeType` | EL flavor under test | e.g., `builder`, `reth`, `geth`, `base-reth-node`. |
-| `ClientVersion` | EL binary version | Format: `<name>/v<semver>-<7sha>`. The report-api groups by exact-match — pin it to a stable identifier per build. |
-| `ValidatorNodeType` | Validator EL flavor | Optional; defaults to `NodeType`. |
+| Key | Source | Meaning | Notes |
+|---|---|---|---|
+| `BenchmarkRun` | Producer | Cohort ID | Required. All inner runs of one execution share this value. |
+| `TransactionPayload` | Producer | Payload type | One per execution variant. |
+| `GasLimit` | Producer | Block gas limit | int. |
+| `BlockTimeMilliseconds` | Producer | Target block time | int. |
+| `NodeType` | Producer | EL flavor under test | e.g., `builder`, `reth`, `geth`, `base-reth-node`. |
+| `ClientVersion` | Producer | EL binary version | Format: `<name>/v<semver>-<7sha>`. Report-api groups by exact-match — pin to a stable identifier per build. Drives `[Compare: Versions]`. |
+| `ValidatorNodeType` | Producer | Validator EL flavor | Optional; defaults to `NodeType`. |
+| `TimeBucket` | Report-api (synthetic only) | Which time window a comparison run came from | `1d`, `1w`, or `1m`. Only present on `[Compare: Time]` synthetic clones. Drives "Show Line Per: TimeBucket" in the chart UI. Never write this yourself — the report-api stamps it. |
 
 You can add any other key. The UI handles them generically — no
 frontend change required.
@@ -193,51 +197,68 @@ renders, just with raw key names.
 ## Comparison groups (automatic)
 
 The report-api automatically synthesizes two kinds of comparison
-"runs" alongside the natural ones:
+"runs" alongside the natural ones. No frontend change is needed —
+they appear in the existing dropdown, and the existing chart page
+renders them.
 
-- **`[Compare: Time] <network> <testName>`** — picks the latest run
-  per variant per time bucket (`1d`/`1w`/`1m`).
-- **`[Compare: Versions] <network> <testName>`** — picks the latest
-  run per variant per distinct `ClientVersion`.
+- **`[Compare: Time] <testName>`** — picks the most recent run
+  per variant per time window: `1d` (last 24h), `1w` (1–7 days
+  ago), `1m` (7–30 days ago). The report-api stamps
+  `testConfig.TimeBucket` (`"1d"` / `"1w"` / `"1m"`) on each clone
+  so the chart UI can split on it.
+- **`[Compare: Versions] <testName>`** — picks the most recent run
+  per variant per distinct `testConfig.ClientVersion`.
 
-These appear in the existing dropdown next to the natural
-`BenchmarkRun` IDs. Selecting one loads runs spanning the comparison
-dimension; the user picks `Show Line Per: ClientVersion` (or any
-other testConfig key) in the existing chart UI to overlay them as
-separate chart series.
+**How to use them in the UI:**
 
-For these to populate:
+1. Select a `[Compare: …]` entry from the run dropdown.
+2. On the chart comparison page, change `Show Line Per` to:
+   - **`TimeBucket`** for time comparisons (`1d` vs `1w` vs `1m`)
+   - **`ClientVersion`** for version comparisons
+3. The chart overlays one line per bucket/version per role.
 
-- **Time comparison** needs runs spanning ≥2 time buckets. Any
-  reasonable history satisfies this.
-- **Version comparison** needs runs with ≥2 distinct
-  `testConfig.ClientVersion` values. Empty/missing versions are
-  silently skipped.
+**When they appear:**
+
+- **Time comparison**: as soon as ≥2 of the three buckets have data
+  for a given `(testName, network)`. Any benchmark with a few weeks
+  of history qualifies immediately.
+- **Version comparison**: as soon as ≥2 distinct
+  `testConfig.ClientVersion` values exist for a given cohort.
+  Empty/missing versions are silently skipped. Requires the
+  `base/benchmark` runner change that populates `ClientVersion`.
 
 A cohort with fewer than 2 distinct buckets is dropped from the
-dropdown — a "comparison" of one thing isn't a comparison.
+dropdown — a comparison of one thing isn't a comparison.
+
+**Synthetic IDs are stable**: `compare-time-mainnet-base-mainnet-performance-benchmark-scale-base-over-150m-gas-limit`
+is the same `BenchmarkRun` ID across every metadata refresh, so URLs
+are bookmarkable.
+
+**Source runs are not modified**: synthetic entries are deep clones
+with rewritten `BenchmarkRun` and a `[Compare: …]` prefix on
+`testName`. The originals continue to appear under their natural IDs.
 
 ## Producer responsibilities
 
 A new producer (Rust, monorepo, whatever) needs to:
 
-1. **Write one or more `metadata-<unique>.json` files** under
-   `s3://<bucket>/metadata/`. Filename only matters in that the
-   report-api lists everything ending in `.json` and processes it in
-   listing order (later writes deduplicate earlier ones on the
-   compound key `(id, outputDir)`).
-2. **Write per-block metrics** to
-   `s3://<bucket>/<outputDir>/metrics-<role>.json` for each
-   `runs[].outputDir`. Use the role names the report knows
-   (`sequencer`, `validator`) so the frontend's per-role panels
-   populate, or document the custom role somewhere the user can find
-   it.
-3. **Populate `testConfig.ClientVersion`** with a value distinct per
-   build. Without this, version-comparison groups can't form.
-4. **Populate `createdAt`** as RFC3339. Required for retention and
-   time-comparison.
-5. Optionally populate `thresholds`, `machineInfo`, `testDescription`
-   — improves the report UI but nothing breaks without them.
+1. **Write metrics first**: upload
+   `s3://<bucket>/<outputDir>/metrics-<role>.json` for each role
+   (`sequencer`, `validator`). Use the canonical role names so the
+   frontend's per-role panels populate.
+2. **Write `metadata.json` last**: upload
+   `s3://<bucket>/<outputDir>/metadata.json` as the final step.
+   This is the **commit signal** — the run becomes visible to the
+   report-api only after this file lands. A run whose prefix exists
+   but has no `metadata.json` is silently ignored.
+3. **Populate `testConfig.ClientVersion`** with a stable per-build
+   identifier. Without this, `[Compare: Versions]` groups can't
+   form. Use `<name>/v<semver>-<7sha>` format.
+4. **Populate `createdAt`** as RFC3339. Required for retention,
+   sort order, and time-bucket comparisons.
+5. Optionally populate `thresholds`, `machineInfo`,
+   `testDescription` — improves the report UI but nothing breaks
+   without them.
 
 That's the whole contract. No registration, no schema service, no
 central file to update.
