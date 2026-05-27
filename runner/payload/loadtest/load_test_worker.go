@@ -42,6 +42,7 @@ type loadTestPayloadWorker struct {
 	mempool            *mempool.StaticWorkloadMempool
 	cmd                *exec.Cmd
 	done               chan struct{}
+	startOnce          sync.Once
 	shutdownOnce       sync.Once
 	waitErrMu          sync.Mutex
 	waitErr            error
@@ -80,6 +81,7 @@ func NewLoadTestPayloadWorker(
 		targetGPS:        params.TargetGPS,
 		params:           definition,
 		mempool:          mp,
+		done:             make(chan struct{}),
 		sourceConfigPath: sourceConfigPath,
 		outputPath:       outputPath,
 	}
@@ -98,33 +100,42 @@ func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
 	}
 	w.renderedConfigPath = configPath
 
-	w.log.Info("Starting load test", "binary", w.loadTestBin, "config", configPath)
-
-	cmd := exec.CommandContext(ctx, w.loadTestBin, configPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stdout
-	cmd.Env = append(os.Environ(), fmt.Sprintf("FUNDER_KEY=%s", w.prefundSK))
-	if w.outputPath != "" {
-		if err := os.MkdirAll(filepath.Dir(w.outputPath), 0755); err != nil {
-			return errors.Wrap(err, "failed to create load-test output directory")
-		}
-		cmd.Env = append(cmd.Env, fmt.Sprintf("LOAD_TEST_OUTPUT=%s", w.outputPath))
-	}
-
-	if err := cmd.Start(); err != nil {
-		return errors.Wrap(err, "failed to start load test binary")
-	}
-	w.cmd = cmd
-	w.done = make(chan struct{})
-	go func() {
-		err := cmd.Wait()
-		w.waitErrMu.Lock()
-		w.waitErr = err
-		w.waitErrMu.Unlock()
-		close(w.done)
-	}()
-
+	w.log.Info("Prepared load test", "binary", w.loadTestBin, "config", configPath)
 	return nil
+}
+
+func (w *loadTestPayloadWorker) start(ctx context.Context) error {
+	w.startOnce.Do(func() {
+		if w.renderedConfigPath == "" {
+			w.finish(errors.New("load-test config has not been prepared"))
+			return
+		}
+
+		w.log.Info("Starting load test", "binary", w.loadTestBin, "config", w.renderedConfigPath)
+
+		cmd := exec.CommandContext(ctx, w.loadTestBin, w.renderedConfigPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stdout
+		cmd.Env = append(os.Environ(), fmt.Sprintf("FUNDER_KEY=%s", w.prefundSK))
+		if w.outputPath != "" {
+			if err := os.MkdirAll(filepath.Dir(w.outputPath), 0755); err != nil {
+				w.finish(errors.Wrap(err, "failed to create load-test output directory"))
+				return
+			}
+			cmd.Env = append(cmd.Env, fmt.Sprintf("LOAD_TEST_OUTPUT=%s", w.outputPath))
+		}
+
+		if err := cmd.Start(); err != nil {
+			w.finish(errors.Wrap(err, "failed to start load test binary"))
+			return
+		}
+		w.cmd = cmd
+		go func() {
+			w.finish(cmd.Wait())
+		}()
+	})
+
+	return w.Err()
 }
 
 func (w *loadTestPayloadWorker) BeginGracefulShutdown(ctx context.Context) error {
@@ -156,19 +167,20 @@ func (w *loadTestPayloadWorker) BeginGracefulShutdown(ctx context.Context) error
 }
 
 func (w *loadTestPayloadWorker) Done() <-chan struct{} {
-	if w.done != nil {
-		return w.done
-	}
-
-	done := make(chan struct{})
-	close(done)
-	return done
+	return w.done
 }
 
 func (w *loadTestPayloadWorker) Err() error {
 	w.waitErrMu.Lock()
 	defer w.waitErrMu.Unlock()
 	return w.waitErr
+}
+
+func (w *loadTestPayloadWorker) finish(err error) {
+	w.waitErrMu.Lock()
+	w.waitErr = err
+	w.waitErrMu.Unlock()
+	close(w.done)
 }
 
 func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
@@ -201,7 +213,10 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 	return nil
 }
 
-func (w *loadTestPayloadWorker) SendTxs(_ context.Context, _ int) (int, error) {
+func (w *loadTestPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
+	if err := w.start(ctx); err != nil {
+		return 0, err
+	}
 	return 0, nil
 }
 
