@@ -27,6 +27,35 @@ import (
 
 const gracefulWorkerShutdownTimeout = 90 * time.Second
 
+type benchmarkRunController struct {
+	maxBlocks  int
+	completion payloadworker.CompletionWorker
+}
+
+func newBenchmarkRunController(transactionWorker payloadworker.Worker, params benchtypes.RunParams) benchmarkRunController {
+	completion, ok := transactionWorker.(payloadworker.CompletionWorker)
+	if ok {
+		return benchmarkRunController{completion: completion}
+	}
+	return benchmarkRunController{maxBlocks: params.NumBlocks}
+}
+
+func (c benchmarkRunController) shouldStop(nextBlockIndex uint64) (bool, error) {
+	if c.completion != nil {
+		select {
+		case <-c.completion.Done():
+			return true, c.completion.Err()
+		default:
+			return false, nil
+		}
+	}
+	return int(nextBlockIndex) > c.maxBlocks, nil
+}
+
+func (c benchmarkRunController) usesWorkerCompletion() bool {
+	return c.completion != nil
+}
+
 type sequencerBenchmark struct {
 	log                log.Logger
 	sequencerClient    types.ExecutionClient
@@ -241,58 +270,45 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 		payloads = append(payloads, *lastSetupPayload)
 
 		pendingTxs := 0
-		completionWorker, runUntilWorkerDone := transactionWorker.(payloadworker.CompletionWorker)
-		if runUntilWorkerDone {
+		runController := newBenchmarkRunController(transactionWorker, params)
+		if runController.usesWorkerCompletion() {
 			nb.log.Info("Running benchmark blocks until payload worker completes")
-			blockIndex := uint64(1)
-		runUntilDoneLoop:
-			for {
-				select {
-				case <-completionWorker.Done():
-					if err := completionWorker.Err(); err != nil {
-						errChan <- errors.Wrap(err, "payload worker failed")
-						return
-					}
+		}
+
+		blockIndex := uint64(1)
+		for {
+			stop, err := runController.shouldStop(blockIndex)
+			if err != nil {
+				errChan <- errors.Wrap(err, "payload worker failed")
+				return
+			}
+			if stop {
+				if runController.usesWorkerCompletion() {
 					nb.log.Info("Payload worker completed", "blocks", blockIndex-1)
-					break runUntilDoneLoop
-				default:
 				}
-
-				payload, updatedPendingTxs, err := nb.proposeBenchmarkBlock(
-					benchmarkCtx,
-					transactionWorker,
-					consensusClient,
-					metricsCollector,
-					blockIndex,
-					pendingTxs,
-				)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				pendingTxs = updatedPendingTxs
-				payloads = append(payloads, *payload)
-				blockIndex++
-			}
-		} else {
-			// run for a few blocks
-			for i := 0; i < params.NumBlocks; i++ {
-				payload, updatedPendingTxs, err := nb.proposeBenchmarkBlock(
-					benchmarkCtx,
-					transactionWorker,
-					consensusClient,
-					metricsCollector,
-					uint64(i)+1,
-					pendingTxs,
-				)
-				if err != nil {
-					errChan <- err
-					return
-				}
-				pendingTxs = updatedPendingTxs
-				payloads = append(payloads, *payload)
+				break
 			}
 
+			payload, updatedPendingTxs, err := nb.proposeBlock(
+				benchmarkCtx,
+				transactionWorker,
+				consensusClient,
+				metricsCollector,
+				blockIndex,
+				pendingTxs,
+				false,
+				true,
+			)
+			if err != nil {
+				errChan <- err
+				return
+			}
+			pendingTxs = updatedPendingTxs
+			payloads = append(payloads, *payload)
+			blockIndex++
+		}
+
+		if !runController.usesWorkerCompletion() {
 			if err := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs); err != nil {
 				errChan <- err
 				return
@@ -325,13 +341,15 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 	}
 }
 
-func (nb *sequencerBenchmark) proposeBenchmarkBlock(
+func (nb *sequencerBenchmark) proposeBlock(
 	ctx context.Context,
 	transactionWorker payloadworker.Worker,
 	consensusClient *consensus.SequencerConsensusClient,
 	metricsCollector metrics.Collector,
 	blockIndex uint64,
 	pendingTxs int,
+	isSetupPayload bool,
+	collectMetrics bool,
 ) (*engine.ExecutableData, int, error) {
 	blockMetrics := metrics.NewBlockMetrics()
 	blockMetrics.SetBlockNumber(blockIndex)
@@ -342,7 +360,7 @@ func (nb *sequencerBenchmark) proposeBenchmarkBlock(
 		return nil, pendingTxs, err
 	}
 
-	payload, err := consensusClient.Propose(ctx, blockMetrics, false)
+	payload, err := consensusClient.Propose(ctx, blockMetrics, isSetupPayload)
 	if err != nil {
 		return nil, pendingTxs, err
 	}
@@ -366,8 +384,10 @@ func (nb *sequencerBenchmark) proposeBenchmarkBlock(
 		time.Sleep(nb.config.Params.BlockTime)
 	}
 
-	if err := metricsCollector.Collect(ctx, blockMetrics); err != nil {
-		nb.log.Error("Failed to collect metrics", "error", err)
+	if collectMetrics {
+		if err := metricsCollector.Collect(ctx, blockMetrics); err != nil {
+			nb.log.Error("Failed to collect metrics", "error", err)
+		}
 	}
 
 	return payload, updatedPendingTxs, nil
@@ -403,13 +423,9 @@ func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(
 		default:
 		}
 
-		blockMetrics := metrics.NewBlockMetrics()
-		txsSent, err := transactionWorker.SendTxs(ctx, pendingTxs)
-		if err != nil {
-			return errors.Wrap(err, "failed to collect settlement transactions")
-		}
-
-		payload, err := consensusClient.Propose(ctx, blockMetrics, true)
+		var payload *engine.ExecutableData
+		var err error
+		payload, pendingTxs, err = nb.proposeBlock(ctx, transactionWorker, consensusClient, nil, uint64(settlementBlock+1), pendingTxs, true, false)
 		if err != nil {
 			return errors.Wrap(err, "failed to propose settlement block")
 		}
@@ -417,19 +433,7 @@ func (nb *sequencerBenchmark) settleGracefulWorkerShutdown(
 			return errors.New("received nil settlement payload from consensus client")
 		}
 
-		userTxsIncluded := len(payload.Transactions) - 1
-		if userTxsIncluded < 0 {
-			userTxsIncluded = 0
-		}
-		pendingTxs = pendingTxs + txsSent - userTxsIncluded
-		if pendingTxs < 0 {
-			pendingTxs = 0
-		}
-
 		settlementBlock++
-		if !nb.config.Params.UseBaseConsensusTiming() {
-			time.Sleep(nb.config.Params.BlockTime)
-		}
 	}
 }
 

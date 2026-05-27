@@ -1,10 +1,12 @@
 package loadtest
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -137,6 +139,42 @@ transactions:
 
 	require.Contains(t, output, "target_gps: 123")
 	require.Contains(t, output, "duration: \"60s\"")
+}
+
+func TestSetupPreparesConfigWithoutStartingProcess(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
+	err := os.WriteFile(configPath, []byte(`
+transaction_submission_rpcs:
+  - "http://standalone-submitter.invalid"
+query_rpc: "http://standalone-query.invalid"
+duration: "60s"
+transactions:
+  - weight: 100
+    type: transfer
+`), 0644)
+	require.NoError(t, err)
+
+	worker := &loadTestPayloadWorker{
+		log:              log.New(),
+		elRPCURL:         "http://sequencer.example",
+		sourceConfigPath: configPath,
+		done:             make(chan struct{}),
+	}
+	t.Cleanup(func() {
+		if worker.renderedConfigPath != "" {
+			require.NoError(t, os.Remove(worker.renderedConfigPath))
+		}
+	})
+
+	require.NoError(t, worker.Setup(context.Background()))
+	require.NotEmpty(t, worker.renderedConfigPath)
+	require.Nil(t, worker.cmd)
+
+	select {
+	case <-worker.Done():
+		t.Fatal("load-test worker should not be done before it starts")
+	default:
+	}
 }
 
 func TestResolveConfigFilePath(t *testing.T) {

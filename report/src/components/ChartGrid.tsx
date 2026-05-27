@@ -27,13 +27,13 @@ function resolveMetricKey(
     const metricPrefix = quantileSuffix
       ? key.slice(0, -quantileSuffix.length)
       : key;
-    const labeledMetricKey = metricKeys.find(
+    const labeledMetricKeys = metricKeys.filter(
       (metricKey) =>
         metricKey.startsWith(`${metricPrefix}_`) &&
         (!quantileSuffix || metricKey.endsWith(quantileSuffix)),
     );
-    if (labeledMetricKey) {
-      return labeledMetricKey;
+    if (labeledMetricKeys.length === 1) {
+      return labeledMetricKeys[0];
     }
   }
   return primaryKey;
