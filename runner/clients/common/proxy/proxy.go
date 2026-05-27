@@ -80,28 +80,11 @@ func (p *ProxyServer) Run(ctx context.Context) error {
 	return nil
 }
 
-func (p *ProxyServer) PendingTxs() []*ethTypes.Transaction {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	txs := make([]*ethTypes.Transaction, len(p.pendingTxs))
-	copy(txs, p.pendingTxs)
-	return txs
-}
-
-func (p *ProxyServer) ClearPendingTxs() {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	p.pendingTxs = make([]*ethTypes.Transaction, 0)
-}
-
 func (p *ProxyServer) DrainPendingTxs() []*ethTypes.Transaction {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	txs := make([]*ethTypes.Transaction, len(p.pendingTxs))
-	copy(txs, p.pendingTxs)
+	txs := p.pendingTxs
 	p.pendingTxs = make([]*ethTypes.Transaction, 0)
 	return txs
 }
