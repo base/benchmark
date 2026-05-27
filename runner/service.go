@@ -637,6 +637,7 @@ outerLoop:
 			} else {
 				numSuccess++
 			}
+			applyClientVersion(&metadata.Runs[runIdx], metricSummary, os.Getenv("BASE_BENCH_CLIENT_VERSION"))
 			metadata.AddResult(runIdx, *metricSummary)
 
 			err = s.writeTestMetadata(metadata)
@@ -679,4 +680,27 @@ outerLoop:
 	}
 
 	return nil
+}
+
+// applyClientVersion stamps the client version onto a single run's
+// result + TestConfig before it is recorded into the metadata. The
+// envOverride parameter, when non-empty, takes precedence over the
+// auto-detected value from the EL binary — this lets deployment
+// scripts pin a human-readable label (e.g. "v1.2.3-rc1") even when
+// the binary's --version output is opaque or shared across CI
+// builds. Mutates both the run and the result in place. The mirror
+// into TestConfig exists so the report-api comparison endpoint and
+// the existing filter UI (which auto-discovers dropdowns from
+// testConfig keys) can both group on it.
+func applyClientVersion(run *benchmark.Run, result *benchmark.RunResult, envOverride string) {
+	if envOverride != "" {
+		result.ClientVersion = envOverride
+	}
+	if result.ClientVersion == "" {
+		return
+	}
+	if run.TestConfig == nil {
+		run.TestConfig = make(map[string]interface{})
+	}
+	run.TestConfig["ClientVersion"] = result.ClientVersion
 }
