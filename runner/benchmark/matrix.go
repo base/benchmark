@@ -19,9 +19,21 @@ type TestPlan struct {
 	Snapshot     *SnapshotDefinition
 	ProofProgram *ProofProgramOptions
 	Thresholds   *ThresholdConfig
+	// Mode is normalized from the YAML roles field. The sequencer phase is
+	// always part of a test plan; Mode only controls whether validator replay runs.
+	Mode BenchmarkExecutionMode
 }
 
 func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *BenchmarkConfig) (*TestPlan, error) {
+	if err := c.Check(); err != nil {
+		return nil, err
+	}
+
+	mode, err := c.ExecutionMode()
+	if err != nil {
+		return nil, err
+	}
+
 	testRuns, err := ResolveTestRunsFromMatrix(c, testFileName, config)
 	if err != nil {
 		return nil, err
@@ -44,6 +56,7 @@ func NewTestPlanFromConfig(c TestDefinition, testFileName string, config *Benchm
 		Snapshot:     c.Snapshot,
 		ProofProgram: proofProgram,
 		Thresholds:   c.Metrics,
+		Mode:         mode,
 	}, nil
 }
 

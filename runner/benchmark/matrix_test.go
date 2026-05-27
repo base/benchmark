@@ -235,6 +235,147 @@ func TestResolveTestRunsFromMatrixExpandsTargetGPSValues(t *testing.T) {
 	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[2].Params.ConsensusTimingMode)
 }
 
+func TestNewTestPlanFromConfigRoles(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.NoError(t, err)
+	require.False(t, plan.Mode.RunValidator)
+
+	metadata := benchmark.RunGroupFromTestPlans([]benchmark.TestPlan{*plan}, nil)
+	require.Len(t, metadata.Runs, 1)
+	require.Equal(t, "sequencer", metadata.Runs[0].TestConfig["Roles"])
+}
+
+func TestNewTestPlanFromConfigDefaultsToBothRoles(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.NoError(t, err)
+	require.True(t, plan.Mode.RunValidator)
+
+	metadata := benchmark.RunGroupFromTestPlans([]benchmark.TestPlan{*plan}, nil)
+	require.Len(t, metadata.Runs, 1)
+	require.NotContains(t, metadata.Runs[0].TestConfig, "Roles")
+}
+
+func TestNewTestPlanFromConfigRejectsInvalidRoles(t *testing.T) {
+	tests := []struct {
+		name  string
+		roles []benchmark.BenchmarkRole
+	}{
+		{
+			name:  "unknown role",
+			roles: []benchmark.BenchmarkRole{"other"},
+		},
+		{
+			name:  "duplicate role",
+			roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer, benchmark.BenchmarkRoleSequencer},
+		},
+		{
+			name:  "validator without sequencer",
+			roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleValidator},
+		},
+	}
+
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			definition := benchmark.TestDefinition{
+				Roles: tt.roles,
+				Variables: []benchmark.Param{
+					{
+						ParamType: "payload",
+						Value:     "simple",
+					},
+				},
+			}
+
+			_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestNewTestPlanFromConfigRejectsProofProgramWithoutValidator(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		ProofProgram: &benchmark.ProofProgramOptions{
+			Enabled: boolPtr(true),
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.ErrorContains(t, err, "proof_program requires the validator benchmark role")
+}
+
+func TestNewTestPlanFromConfigRejectsValidatorThresholdsWithoutValidator(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		Metrics: &benchmark.ThresholdConfig{
+			Error: map[string]float64{
+				"validator/latency/new_payload": 1e9,
+			},
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	_, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.ErrorContains(t, err, `error threshold "validator/latency/new_payload" requires the validator benchmark role`)
+}
+
+func TestNewTestPlanFromConfigAllowsSequencerThresholdsWithoutValidator(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "test"}
+	definition := benchmark.TestDefinition{
+		Roles: []benchmark.BenchmarkRole{benchmark.BenchmarkRoleSequencer},
+		Metrics: &benchmark.ThresholdConfig{
+			Error: map[string]float64{
+				"sequencer/latency/get_payload": 1e9,
+			},
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "simple",
+			},
+		},
+	}
+
+	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
+	require.NoError(t, err)
+	require.False(t, plan.Mode.RunValidator)
+}
+
 func TestResolveTestRunsFromMatrixDefaultsSnapshotLoadTestsToBaseConsensusTiming(t *testing.T) {
 	config := &benchmark.BenchmarkConfig{
 		Name: "snapshot load test",
@@ -312,4 +453,8 @@ func TestResolveTestRunsFromMatrixRejectsInvalidConsensusTiming(t *testing.T) {
 
 func stringPtr(s string) *string {
 	return &s
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

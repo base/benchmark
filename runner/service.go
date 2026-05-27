@@ -340,7 +340,7 @@ func (s *service) getGenesisForSnapshotConfig(snapshotConfig *benchmark.Snapshot
 	return genesis, nil
 }
 
-func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, datadirsConfig *benchmark.DatadirConfig) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
+func (s *service) setupDataDirs(workingDir string, params types.RunParams, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition, datadirsConfig *benchmark.DatadirConfig, mode benchmark.BenchmarkExecutionMode) (*config.InternalClientOptions, *config.InternalClientOptions, error) {
 	// create temp directory for this test
 	testName := fmt.Sprintf("%d-%s-test", time.Now().Unix(), params.NodeType)
 	sequencerTestDir := path.Join(workingDir, fmt.Sprintf("%s-sequencer", testName))
@@ -351,9 +351,14 @@ func (s *service) setupDataDirs(workingDir string, params types.RunParams, genes
 		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
 	}
 
-	validatorOptions, err := s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator", datadirsConfig)
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to setup internal directories")
+	var validatorOptions *config.InternalClientOptions
+	// The sequencer datadir is always required. Only create validator state when
+	// the normalized execution mode includes validator replay.
+	if mode.RunValidator {
+		validatorOptions, err = s.setupInternalDirectories(validatorTestDir, params, genesis, snapshot, "validator", datadirsConfig)
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to setup internal directories")
+		}
 	}
 
 	return sequencerOptions, validatorOptions, nil
@@ -417,7 +422,7 @@ func (s *service) loadTestOutputPath(genesis *core.Genesis, transactionPayload p
 	}
 }
 
-func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig, flashblocksBlockTime string) (*benchmark.RunResult, error) {
+func (s *service) runTest(ctx context.Context, params types.RunParams, workingDir string, outputDir string, snapshotConfig *benchmark.SnapshotDefinition, proofConfig *benchmark.ProofProgramOptions, transactionPayload payload.Definition, datadirsConfig *benchmark.DatadirConfig, mode benchmark.BenchmarkExecutionMode, flashblocksBlockTime string) (*benchmark.RunResult, error) {
 
 	s.log.Info(fmt.Sprintf("Running benchmark with params: %+v", params))
 
@@ -433,7 +438,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	validatorTestDir := path.Join(workingDir, fmt.Sprintf("%s-validator", testName))
 
 	// setup data directories (restore from snapshot if needed)
-	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig, datadirsConfig)
+	sequencerOptions, validatorOptions, err := s.setupDataDirs(workingDir, params, genesis, snapshotConfig, datadirsConfig, mode)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to setup data dirs")
 	}
@@ -482,7 +487,7 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 	}
 
 	// Run benchmark
-	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState, flashblocksBlockTime)
+	benchmark, err := network.NewNetworkBenchmark(config, s.log, sequencerOptions, validatorOptions, proofConfig, transactionPayload, s.portState, mode, flashblocksBlockTime)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create network benchmark")
 	}
@@ -494,13 +499,17 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		s.log.Error("failed to export sequencer output", "err", exportErr)
 	}
 
-	if exportErr := s.exportOutput(testName, runErr, validatorOptions, outputDir, "validator"); exportErr != nil {
-		s.log.Error("failed to export validator output", "err", exportErr)
+	if validatorOptions != nil {
+		if exportErr := s.exportOutput(testName, runErr, validatorOptions, outputDir, "validator"); exportErr != nil {
+			s.log.Error("failed to export validator output", "err", exportErr)
+		}
 	}
 
 	if runErr != nil {
 		s.dumpLogFile(sequencerOptions, "sequencer")
-		s.dumpLogFile(validatorOptions, "validator")
+		if validatorOptions != nil {
+			s.dumpLogFile(validatorOptions, "validator")
+		}
 		return nil, errors.Wrap(runErr, "failed to run benchmark")
 	}
 
@@ -667,7 +676,7 @@ outerLoop:
 				return errors.Wrap(err, "failed to create output directory")
 			}
 
-			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir, config.FlashblocksBlockTime())
+			metricSummary, err := s.runTest(ctx, c.Params, s.config.DataDir(), outputDir, testPlan.Snapshot, testPlan.ProofProgram, transactionPayloads[c.Params.PayloadID], testPlan.Datadir, testPlan.Mode, config.FlashblocksBlockTime())
 			if err != nil {
 				log.Error("Failed to run test", "err", err)
 				metricSummary = &benchmark.RunResult{
