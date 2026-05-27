@@ -28,17 +28,27 @@ shape into the same S3 layout.
 
 ```
 s3://<bucket>/
-├── metadata/
-│   ├── metadata-<timestamp>.json        # one file per run group
-│   ├── metadata-<timestamp>.json
-│   └── ...
 └── <outputDir>/                         # one directory per inner run
+    ├── metadata.json                    # this one run's metadata
     ├── metrics-sequencer.json           # per-block sequencer metrics
     ├── metrics-validator.json           # per-block validator metrics
     └── metrics-<other-role>.json
 ```
 
-### `metadata/` directory
+Each run owns one prefix. The presence of `metadata.json` under a
+prefix is the **commit signal**: the report-api treats a prefix
+without one as an in-progress (or aborted) run and ignores it. The
+producer must therefore upload metrics files first and `metadata.json`
+last.
+
+> **Legacy note**: prior to the per-run-directory cutover, the layout
+> was a central `metadata/metadata-<timestamp>.json` directory plus
+> `<outputDir>/` subdirectories. The report-api ignores anything
+> under the top-level `metadata/` prefix. The `backend migrate`
+> command splits any remaining legacy files into the new layout —
+> see the cutover runbook in the project NOTES.
+
+### `<outputDir>/metadata.json`
 
 Every file is a **small JSON document** with this shape:
 
@@ -90,12 +100,12 @@ Every file is a **small JSON document** with this shape:
 }
 ```
 
-The current Go runner writes **one file per run group**, where a "run
-group" is one execution of `base-bench run` and typically contains
-8–24 inner runs (one per payload × gas × node type variant). The
-report-api merges across files, so the contract permits any
-granularity — including one file per inner run (see "Future: one file
-per run" below).
+Every `<outputDir>/metadata.json` contains a **one-element `runs`
+array**. The plural shape is preserved for forward-compat — the
+report-api's parser accepts any length — but per-run files always
+write exactly one element. Producers must not pack multiple runs
+into one file in the new layout; that's a vestige of the legacy
+central-`metadata/` directory.
 
 #### Required fields
 
@@ -232,36 +242,30 @@ A new producer (Rust, monorepo, whatever) needs to:
 That's the whole contract. No registration, no schema service, no
 central file to update.
 
-## Future: one file per run
+## Migration from the legacy central-`metadata/` layout
 
-Today the Go runner writes one `metadata.json` per `base-bench run`
-execution containing all inner runs. The watcher uploads that whole
-file as one S3 object. This is a vestige of the runner's loop
-structure, not a contract requirement.
+Prior to the per-run cutover, the watcher uploaded the whole local
+`metadata.json` (containing N inner runs) to a central
+`metadata/metadata-<datetime>.json` directory on S3. The report-api
+listed every file in that directory, parsed each, and deduplicated
+runs by `(id, outputDir)`.
 
-Once we move to the Rust runner, the cleaner pattern is:
+The per-run-directory layout is strictly better:
 
-- Each inner run emits its own tiny `metadata-<runID>.json` file
-  containing `{"runs": [<one run>]}`.
-- The watcher uploads each immediately on completion.
-- The report-api's merger already works exactly the same way — it
-  treats all `metadata-*.json` files as a flat input pool to dedupe
-  and sort.
+- **Co-location**: each run's metadata sits next to its metrics
+  files. Deleting a run is one `aws s3 rm --recursive <outputDir>/`.
+- **Atomic commit**: the producer writes `metadata.json` last, so an
+  in-progress (or aborted) run is invisible until completion. No
+  half-written metadata can ever reach the report-api.
+- **Per-run isolation**: producers never write to a shared prefix.
+- **No central file to update**: critical for the Rust runner — each
+  inner run is a self-contained write-then-exit operation.
 
-Two upgrades make this even cleaner:
-
-1. **Accept singular `{"run": {...}}`** in the merger alongside the
-   plural `{"runs": [...]}` form. Saves the producer from wrapping a
-   single run in a one-element array.
-2. **Stream uploads** as runs complete instead of batch-uploading at
-   the end. The current watcher already does this for the per-run
-   metrics files; extending it to the metadata file is the same
-   pattern.
-
-With those two changes, the runner becomes write-only and stateless:
-each inner run produces two S3 objects, then exits. The watcher
-becomes a thin S3 multipart-upload helper. The report-api stays as
-it is — no merger change needed.
+The `backend migrate` command is a one-shot script that splits any
+remaining `metadata/metadata-*.json` files into per-run files and
+optionally removes the legacy directory. See the cutover runbook in
+the project NOTES for the exact sequence (pause the cron, run the
+migration, deploy, resume).
 
 ## Long-term: drop the merger
 
