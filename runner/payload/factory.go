@@ -38,7 +38,7 @@ func NewPayloadWorker(ctx context.Context, log log.Logger, testConfig *benchtype
 			def = &loadtest.LoadTestPayloadDefinition{}
 		}
 		worker, err = loadtest.NewLoadTestPayloadWorker(
-			log, sequencerClient.ClientURL(), params, privateKey, amount, config, genesis.Config.ChainID, *def)
+			log, sequencerClient.ClientURL(), sequencerClient.FlashblocksWsURL(), params, privateKey, amount, config, genesis.Config.ChainID, *def)
 	case "transfer-only":
 		worker, err = transferonly.NewTransferPayloadWorker(
 			ctx, log, sequencerClient.ClientURL(), params, privateKey, amount, &genesis, definition.Params)
