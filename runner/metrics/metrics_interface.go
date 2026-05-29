@@ -19,18 +19,36 @@ type Collector interface {
 }
 
 type BlockMetrics struct {
-	BlockNumber      uint64
-	Timestamp        time.Time
-	prevMetrics      map[string]*io_prometheus_client.Metric
-	ExecutionMetrics map[string]interface{}
+	BlockNumber       uint64
+	Timestamp         time.Time
+	prevMetrics       map[string]*io_prometheus_client.Metric
+	ExecutionMetrics  map[string]interface{}
+	PrometheusMetrics []PrometheusMetricSample `json:",omitempty"`
+}
+
+// PrometheusMetricSample preserves a raw Prometheus sample alongside the
+// flattened ExecutionMetrics values used by the report UI.
+type PrometheusMetricSample struct {
+	Name       string             `json:"name"`
+	Key        string             `json:"key,omitempty"`
+	Labels     map[string]string  `json:"labels,omitempty"`
+	Type       string             `json:"type"`
+	Value      *float64           `json:"value,omitempty"`
+	Delta      *float64           `json:"delta,omitempty"`
+	Sum        *float64           `json:"sum,omitempty"`
+	Count      *uint64            `json:"count,omitempty"`
+	SumDelta   *float64           `json:"sumDelta,omitempty"`
+	CountDelta *uint64            `json:"countDelta,omitempty"`
+	Quantiles  map[string]float64 `json:"quantiles,omitempty"`
 }
 
 func NewBlockMetrics() *BlockMetrics {
 	return &BlockMetrics{
-		BlockNumber:      0,
-		prevMetrics:      make(map[string]*io_prometheus_client.Metric),
-		ExecutionMetrics: make(map[string]interface{}),
-		Timestamp:        time.Now(),
+		BlockNumber:       0,
+		prevMetrics:       make(map[string]*io_prometheus_client.Metric),
+		ExecutionMetrics:  make(map[string]interface{}),
+		PrometheusMetrics: make([]PrometheusMetricSample, 0),
+		Timestamp:         time.Now(),
 	}
 }
 
@@ -43,12 +61,45 @@ func (m *BlockMetrics) Copy() *BlockMetrics {
 	newPrevMetrics := make(map[string]*io_prometheus_client.Metric)
 	maps.Copy(newMetrics, m.ExecutionMetrics)
 	maps.Copy(newPrevMetrics, m.prevMetrics)
-	return &BlockMetrics{
-		BlockNumber:      m.BlockNumber,
-		prevMetrics:      newPrevMetrics,
-		ExecutionMetrics: newMetrics,
-		Timestamp:        m.Timestamp,
+	newPrometheusMetrics := make([]PrometheusMetricSample, len(m.PrometheusMetrics))
+	for i, sample := range m.PrometheusMetrics {
+		newPrometheusMetrics[i] = sample.Copy()
 	}
+	return &BlockMetrics{
+		BlockNumber:       m.BlockNumber,
+		prevMetrics:       newPrevMetrics,
+		ExecutionMetrics:  newMetrics,
+		PrometheusMetrics: newPrometheusMetrics,
+		Timestamp:         m.Timestamp,
+	}
+}
+
+func (s PrometheusMetricSample) Copy() PrometheusMetricSample {
+	copied := s
+	if s.Labels != nil {
+		copied.Labels = make(map[string]string, len(s.Labels))
+		maps.Copy(copied.Labels, s.Labels)
+	}
+	if s.Quantiles != nil {
+		copied.Quantiles = make(map[string]float64, len(s.Quantiles))
+		maps.Copy(copied.Quantiles, s.Quantiles)
+	}
+	return copied
+}
+
+func (m *BlockMetrics) SetPreviousPrometheusMetrics(prev map[string]*io_prometheus_client.Metric) {
+	m.prevMetrics = make(map[string]*io_prometheus_client.Metric, len(prev))
+	maps.Copy(m.prevMetrics, prev)
+}
+
+func (m *BlockMetrics) PreviousPrometheusMetrics() map[string]*io_prometheus_client.Metric {
+	prevMetrics := make(map[string]*io_prometheus_client.Metric, len(m.prevMetrics))
+	maps.Copy(prevMetrics, m.prevMetrics)
+	return prevMetrics
+}
+
+func (m *BlockMetrics) PreviousPrometheusMetric(name string) *io_prometheus_client.Metric {
+	return m.prevMetrics[name]
 }
 
 func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_client.Metric) error {
@@ -141,6 +192,10 @@ func (m *BlockMetrics) UpdatePrometheusMetric(name string, value *io_prometheus_
 }
 func (m *BlockMetrics) AddExecutionMetric(name string, value interface{}) {
 	m.ExecutionMetrics[name] = value
+}
+
+func (m *BlockMetrics) AddPrometheusMetricSample(sample PrometheusMetricSample) {
+	m.PrometheusMetrics = append(m.PrometheusMetrics, sample)
 }
 
 func (m *BlockMetrics) GetMetricTypes() map[string]bool {

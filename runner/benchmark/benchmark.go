@@ -70,6 +70,15 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 			} else {
 				return nil, fmt.Errorf("invalid gas limit %s", v)
 			}
+		case "consensus_timing":
+			if vStr, ok := v.(string); ok {
+				if vStr != "" && vStr != types.ConsensusTimingModePreventLateFCU && vStr != types.ConsensusTimingModeBaseConsensus {
+					return nil, fmt.Errorf("invalid consensus timing %s", v)
+				}
+				params.ConsensusTimingMode = vStr
+			} else {
+				return nil, fmt.Errorf("invalid consensus timing %s", v)
+			}
 		case "env":
 			if vStr, ok := v.(string); ok {
 				entries := strings.Split(vStr, ";")

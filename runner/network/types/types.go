@@ -40,6 +40,10 @@ type TestConfig struct {
 
 	PrefundPrivateKey ecdsa.PrivateKey
 	PrefundAmount     big.Int
+
+	// LoadTestOutputPath is the optional normal load-test report JSON path used
+	// by the load-test payload worker.
+	LoadTestOutputPath string
 }
 
 // BatcherAddr returns the batcher address, computing it if necessary
@@ -77,6 +81,9 @@ type RunParams struct {
 	// BlockTime is the time between blocks in the benchmark run.
 	BlockTime time.Duration
 
+	// ConsensusTimingMode controls how the fake consensus client schedules FCU/getPayload calls.
+	ConsensusTimingMode string
+
 	// Env is the environment variables for the benchmark run.
 	Env map[string]string
 
@@ -93,6 +100,15 @@ type RunParams struct {
 	ClientBinPath string
 }
 
+const (
+	ConsensusTimingModePreventLateFCU = "prevent-late-fcu"
+	ConsensusTimingModeBaseConsensus  = "base-consensus"
+)
+
+func (p RunParams) UseBaseConsensusTiming() bool {
+	return p.ConsensusTimingMode == ConsensusTimingModeBaseConsensus
+}
+
 func (p RunParams) ToConfig() map[string]interface{} {
 	params := map[string]interface{}{
 		"NodeType":              p.NodeType,
@@ -106,6 +122,10 @@ func (p RunParams) ToConfig() map[string]interface{} {
 	// Include ValidatorNodeType if it's set and different from NodeType
 	if p.ValidatorNodeType != "" && p.ValidatorNodeType != p.NodeType {
 		params["ValidatorNodeType"] = p.ValidatorNodeType
+	}
+
+	if p.ConsensusTimingMode != "" {
+		params["ConsensusTimingMode"] = p.ConsensusTimingMode
 	}
 
 	for k, v := range p.Tags {

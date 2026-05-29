@@ -279,6 +279,17 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 		result.ValidatorMetrics = nb.collectedValidatorMetrics
 	}
 
+	artifacts := make(map[string]string)
+	if nb.testConfig.LoadTestOutputPath != "" {
+		if _, err := os.Stat(nb.testConfig.LoadTestOutputPath); err == nil {
+			artifacts[benchmark.LoadTestResultArtifactKey] = benchmark.LoadTestResultFileName
+		}
+	}
+	if len(artifacts) == 0 {
+		artifacts = nil
+	}
+	result.Artifacts = artifacts
+
 	return result, nil
 }
 

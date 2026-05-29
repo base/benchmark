@@ -18,3 +18,17 @@ type Worker interface {
 	Stop(ctx context.Context) error
 	Mempool() mempool.FakeMempool
 }
+
+// GracefulShutdownWorker can stop generating transactions while the benchmark
+// sequencer keeps producing settlement blocks.
+type GracefulShutdownWorker interface {
+	BeginGracefulShutdown(ctx context.Context) error
+	Done() <-chan struct{}
+}
+
+// CompletionWorker owns its own run duration. The benchmark sequencer keeps
+// producing blocks until Done closes, then treats Err as the worker result.
+type CompletionWorker interface {
+	Done() <-chan struct{}
+	Err() error
+}

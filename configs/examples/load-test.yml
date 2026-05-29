@@ -4,16 +4,8 @@ payloads:
   - name: Load Test
     type: load-test
     id: load-test
-    sender_count: 10
-    transactions:
-      - weight: 70
-        type: transfer
-      - weight: 20
-        type: calldata
-        max_size: 256
-      - weight: 10
-        type: precompile
-        target: sha256
+    network: devnet
+    config_file: ./load-test-config.yml
 
 benchmarks:
   - variables:
@@ -27,3 +19,5 @@ benchmarks:
         value: 10
       - type: gas_limit
         value: 1000000000
+      - type: target_gps
+        value: 500000000

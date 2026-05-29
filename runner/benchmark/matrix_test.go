@@ -6,6 +6,7 @@ import (
 
 	"github.com/base/base-bench/runner/benchmark"
 	"github.com/base/base-bench/runner/network/types"
+	"github.com/base/base-bench/runner/payload"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,10 +30,11 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			want: []benchmark.TestRun{
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						PayloadID: "simple",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						PayloadID:           "simple",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 			},
@@ -55,34 +57,38 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 			want: []benchmark.TestRun{
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "simple",
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "simple",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 				{
 					Params: types.RunParams{
-						NodeType:  "erigon",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "simple",
-						BlockTime: 1 * time.Second,
+						NodeType:            "erigon",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "simple",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 				{
 					Params: types.RunParams{
-						NodeType:  "geth",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "complex",
-						BlockTime: 1 * time.Second,
+						NodeType:            "geth",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "complex",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 				{
 					Params: types.RunParams{
-						NodeType:  "erigon",
-						GasLimit:  benchmark.DefaultParams.GasLimit,
-						PayloadID: "complex",
-						BlockTime: 1 * time.Second,
+						NodeType:            "erigon",
+						GasLimit:            benchmark.DefaultParams.GasLimit,
+						PayloadID:           "complex",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
 					},
 				},
 			},
@@ -182,6 +188,7 @@ func TestNewTestPlanFromConfigRoles(t *testing.T) {
 
 func TestNewTestPlanFromConfigDefaultsToBothRoles(t *testing.T) {
 	config := &benchmark.BenchmarkConfig{Name: "test"}
+
 	definition := benchmark.TestDefinition{
 		Variables: []benchmark.Param{
 			{
@@ -298,6 +305,81 @@ func TestNewTestPlanFromConfigAllowsSequencerThresholdsWithoutValidator(t *testi
 	plan, err := benchmark.NewTestPlanFromConfig(definition, "config.yml", config)
 	require.NoError(t, err)
 	require.False(t, plan.Mode.RunValidator)
+}
+
+func TestResolveTestRunsFromMatrixDefaultsSnapshotLoadTestsToBaseConsensusTiming(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{
+		Name: "snapshot load test",
+		TransactionPayloads: []payload.Definition{
+			{
+				ID:   "mainnet-snapshot-load-test",
+				Type: "load-test",
+			},
+		},
+	}
+	definition := benchmark.TestDefinition{
+		Snapshot: &benchmark.SnapshotDefinition{
+			Command: "./setup-initial-snapshot.sh --network mainnet",
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "mainnet-snapshot-load-test",
+			},
+		},
+	}
+
+	runs, err := benchmark.ResolveTestRunsFromMatrix(definition, "snapshot-load-test.yml", config)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, types.ConsensusTimingModeBaseConsensus, runs[0].Params.ConsensusTimingMode)
+}
+
+func TestResolveTestRunsFromMatrixAllowsSnapshotLoadTestsToOverrideConsensusTiming(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{
+		Name: "snapshot load test",
+		TransactionPayloads: []payload.Definition{
+			{
+				ID:   "mainnet-snapshot-load-test",
+				Type: "load-test",
+			},
+		},
+	}
+	definition := benchmark.TestDefinition{
+		Snapshot: &benchmark.SnapshotDefinition{
+			Command: "./setup-initial-snapshot.sh --network mainnet",
+		},
+		Variables: []benchmark.Param{
+			{
+				ParamType: "payload",
+				Value:     "mainnet-snapshot-load-test",
+			},
+			{
+				ParamType: "consensus_timing",
+				Value:     types.ConsensusTimingModePreventLateFCU,
+			},
+		},
+	}
+
+	runs, err := benchmark.ResolveTestRunsFromMatrix(definition, "snapshot-load-test.yml", config)
+	require.NoError(t, err)
+	require.Len(t, runs, 1)
+	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[0].Params.ConsensusTimingMode)
+}
+
+func TestResolveTestRunsFromMatrixRejectsInvalidConsensusTiming(t *testing.T) {
+	config := &benchmark.BenchmarkConfig{Name: "benchmark"}
+	definition := benchmark.TestDefinition{
+		Variables: []benchmark.Param{
+			{
+				ParamType: "consensus_timing",
+				Value:     "aligned",
+			},
+		},
+	}
+
+	_, err := benchmark.ResolveTestRunsFromMatrix(definition, "benchmark.yml", config)
+	require.ErrorContains(t, err, "invalid consensus timing")
 }
 
 func stringPtr(s string) *string {

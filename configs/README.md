@@ -77,10 +77,12 @@ benchmarks:
   - name: "Benchmark Name"
     description: "What this benchmark tests"
     variables:
-      - type: payload|node_type|num_blocks|gas_limit
+      - type: payload|node_type|num_blocks|gas_limit|target_gps|consensus_timing
         value: single-value
         values: [array, of, values] # for matrix testing
 ```
+
+`consensus_timing` can be `prevent-late-fcu` or `base-consensus`. Snapshot load-test runs default to `base-consensus`; other benchmark runs default to `prevent-late-fcu`.
 
 ## 🎯 Choosing the Right Configuration
 
