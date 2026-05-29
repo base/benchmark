@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
@@ -67,7 +68,8 @@ transactions:
 
 	worker := &loadTestPayloadWorker{
 		flashblocksURL:   "ws://benchmark-flashblocks.example",
-		targetGPS:        75_000_000,
+		gasLimit:         150_000_000,
+		blockTime:        2 * time.Second,
 		elRPCURL:         "http://sequencer.example",
 		sourceConfigPath: configPath,
 	}
@@ -109,7 +111,7 @@ transactions:
 	}
 }
 
-func TestBuildConfigPreservesNativeTargetGPSWhenBenchmarkTargetUnset(t *testing.T) {
+func TestBuildConfigPreservesNativeTargetGPSWhenGasLimitOrBlockTimeIsZero(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
 	err := os.WriteFile(configPath, []byte(`
 transaction_submission_rpcs:

@@ -37,7 +37,8 @@ type loadTestPayloadWorker struct {
 	loadTestBin        string
 	elRPCURL           string
 	flashblocksURL     string
-	targetGPS          uint64
+	gasLimit           uint64
+	blockTime          time.Duration
 	params             LoadTestPayloadDefinition
 	mempool            *mempool.StaticWorkloadMempool
 	cmd                *exec.Cmd
@@ -78,7 +79,8 @@ func NewLoadTestPayloadWorker(
 		loadTestBin:      cfg.LoadTestBinary(),
 		elRPCURL:         elRPCURL,
 		flashblocksURL:   flashblocksURL,
-		targetGPS:        params.TargetGPS,
+		gasLimit:         params.GasLimit,
+		blockTime:        params.BlockTime,
 		params:           definition,
 		mempool:          mp,
 		done:             make(chan struct{}),
@@ -254,8 +256,9 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 		flashblocksURL = "ws://localhost:7111"
 	}
 	setMappingValue(config, "flashblocks_ws", stringNode(flashblocksURL))
-	if w.targetGPS > 0 {
-		setMappingValue(config, "target_gps", uintNode(w.targetGPS))
+	if w.blockTime > 0 && w.gasLimit > 0 {
+		targetGPS := w.gasLimit / uint64(w.blockTime.Seconds())
+		setMappingValue(config, "target_gps", uintNode(targetGPS))
 	}
 
 	return config, nil
@@ -330,7 +333,8 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 
 	w.log.Info("Generated load-test config",
 		"source_config", w.sourceConfigPath,
-		"target_gps", w.targetGPS,
+		"gas_limit", w.gasLimit,
+		"block_time", w.blockTime,
 	)
 
 	return tmpFile.Name(), nil

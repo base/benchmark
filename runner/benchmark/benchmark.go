@@ -70,12 +70,6 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 			} else {
 				return nil, fmt.Errorf("invalid gas limit %s", v)
 			}
-		case "target_gps":
-			if vInt, ok := v.(int); ok {
-				params.TargetGPS = uint64(vInt)
-			} else {
-				return nil, fmt.Errorf("invalid target gps %s", v)
-			}
 		case "consensus_timing":
 			if vStr, ok := v.(string); ok {
 				if vStr != "" && vStr != types.ConsensusTimingModePreventLateFCU && vStr != types.ConsensusTimingModeBaseConsensus {
