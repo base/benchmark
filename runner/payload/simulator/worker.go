@@ -389,7 +389,11 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	t.log.Info("Calculated num calls per block", "numCalls", t.numCallsPerBlock, "gas", gas, "gasLimit", t.params.GasLimit, "buffer", buffer)
 
-	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * t.scaleFactor * 1.05).ToConfig()
+	// 2.0x safety multiplier (was 1.05). The 5% buffer was not enough to cover
+	// real on-chain consumption for base-mainnet-simulation @ 25M after PR #184,
+	// causing CI to revert with "Not enough accounts to load/update" mid-run.
+	// Pre-init is cheap relative to test runtime; err on the side of generous.
+	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * t.scaleFactor * 2.0).ToConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload params to config")
 	}
