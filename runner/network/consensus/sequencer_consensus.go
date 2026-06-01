@@ -148,7 +148,11 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 		BlobBaseFeeScalar:    1,
 		OperatorFeeScalar:    0,
 		OperatorFeeConstant:  0,
-		DAFootprintGasScalar: 400,
+		// Intentionally 0: disables the post-Jovian DA footprint cap so
+		// the benchmark measures raw EL gas throughput rather than L1 DA
+		// budget. With a non-zero scalar, cheap-tx workloads plateau at
+		// ~50% of the configured gas limit regardless of EL capacity.
+		DAFootprintGasScalar: 0,
 	}
 
 	source := derive.L1InfoDepositSource{
