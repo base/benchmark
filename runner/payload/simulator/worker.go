@@ -72,6 +72,7 @@ type simulatorPayloadWorker struct {
 	setupTransactor *bind.TransactOpts
 
 	numCallsPerBlock uint64
+	recalibrated     bool
 	numCallers       int
 }
 
@@ -389,7 +390,11 @@ func (t *simulatorPayloadWorker) testForBlocks(ctx context.Context, simulator *a
 
 	t.log.Info("Calculated num calls per block", "numCalls", t.numCallsPerBlock, "gas", gas, "gasLimit", t.params.GasLimit, "buffer", buffer)
 
-	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * t.scaleFactor * 1.05).ToConfig()
+	// 2.0x safety multiplier (was 1.05). The 5% buffer was not enough to cover
+	// real on-chain consumption for base-mainnet-simulation @ 25M after PR #184,
+	// causing CI to revert with "Not enough accounts to load/update" mid-run.
+	// Pre-init is cheap relative to test runtime; err on the side of generous.
+	configForAllBlocks, err := t.payloadParams.Mul(float64(t.numCallsPerBlock) * float64(t.params.NumBlocks) * t.scaleFactor * 2.0).ToConfig()
 	if err != nil {
 		return errors.Wrap(err, "failed to convert payload params to config")
 	}
@@ -692,4 +697,33 @@ func (t *simulatorPayloadWorker) SendTxs(ctx context.Context, pendingTxs int) (i
 		return 0, err
 	}
 	return n, nil
+}
+
+func (t *simulatorPayloadWorker) OnBlockBuilt(gasUsed uint64, userTxsIncluded int) {
+	if t.recalibrated || gasUsed == 0 || userTxsIncluded <= 0 {
+		return
+	}
+	t.recalibrated = true
+
+	actualGasPerCall := float64(gasUsed) / float64(userTxsIncluded)
+	if actualGasPerCall <= 0 {
+		return
+	}
+
+	targetCalls := uint64(math.Floor((float64(t.params.GasLimit) - buffer) / actualGasPerCall))
+	if t.payloadParams.CallsPerBlock != "fill" {
+		if userMax, err := strconv.ParseUint(t.payloadParams.CallsPerBlock, 10, 64); err == nil && userMax < targetCalls {
+			targetCalls = userMax
+		}
+	}
+
+	if targetCalls > 0 && targetCalls != t.numCallsPerBlock {
+		t.log.Info("Recalibrated numCallsPerBlock from observed block gas",
+			"old", t.numCallsPerBlock,
+			"new", targetCalls,
+			"observed_gas_per_call", uint64(actualGasPerCall),
+			"observed_block_gas", gasUsed,
+			"txs_in_block", userTxsIncluded)
+		t.numCallsPerBlock = targetCalls
+	}
 }
