@@ -72,6 +72,7 @@ type simulatorPayloadWorker struct {
 	setupTransactor *bind.TransactOpts
 
 	numCallsPerBlock uint64
+	recalibrated     bool
 	numCallers       int
 }
 
@@ -696,4 +697,33 @@ func (t *simulatorPayloadWorker) SendTxs(ctx context.Context, pendingTxs int) (i
 		return 0, err
 	}
 	return n, nil
+}
+
+func (t *simulatorPayloadWorker) OnBlockBuilt(gasUsed uint64, userTxsIncluded int) {
+	if t.recalibrated || gasUsed == 0 || userTxsIncluded <= 0 {
+		return
+	}
+	t.recalibrated = true
+
+	actualGasPerCall := float64(gasUsed) / float64(userTxsIncluded)
+	if actualGasPerCall <= 0 {
+		return
+	}
+
+	targetCalls := uint64(math.Floor((float64(t.params.GasLimit) - buffer) / actualGasPerCall))
+	if t.payloadParams.CallsPerBlock != "fill" {
+		if userMax, err := strconv.ParseUint(t.payloadParams.CallsPerBlock, 10, 64); err == nil && userMax < targetCalls {
+			targetCalls = userMax
+		}
+	}
+
+	if targetCalls > 0 && targetCalls != t.numCallsPerBlock {
+		t.log.Info("Recalibrated numCallsPerBlock from observed block gas",
+			"old", t.numCallsPerBlock,
+			"new", targetCalls,
+			"observed_gas_per_call", uint64(actualGasPerCall),
+			"observed_block_gas", gasUsed,
+			"txs_in_block", userTxsIncluded)
+		t.numCallsPerBlock = targetCalls
+	}
 }

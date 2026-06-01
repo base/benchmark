@@ -379,6 +379,12 @@ func (nb *sequencerBenchmark) proposeBlock(
 		updatedPendingTxs = 0
 	}
 
+	if collectMetrics {
+		if observer, ok := transactionWorker.(payloadworker.BlockObserver); ok {
+			observer.OnBlockBuilt(payload.GasUsed, userTxsIncluded)
+		}
+	}
+
 	if !nb.config.Params.UseBaseConsensusTiming() {
 		log.Info("Sleeping for block time", "block_time", nb.config.Params.BlockTime)
 		time.Sleep(nb.config.Params.BlockTime)
