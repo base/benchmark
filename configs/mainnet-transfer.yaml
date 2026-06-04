@@ -1,0 +1,23 @@
+name: mainnet-transfer
+block_time_ms: 2000
+num_blocks: 20
+
+benchmarks:
+  - node_type: reth
+    datadir: {}
+    snapshot:
+      command: ./scripts/zfs-clone.sh
+      force_clean: false
+    payload:
+      id: transfer
+      type: load-test
+      params:
+        sender_count: 50
+        funding_amount: "1000000000000000000"
+        transactions:
+          - weight: 1
+            type: transfer
+    metrics:
+      warning:
+        - metric: gas/per_second
+          min: 100000000
