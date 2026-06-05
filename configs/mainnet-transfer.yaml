@@ -4,6 +4,7 @@ num_blocks: 20
 
 benchmarks:
   - node_type: reth
+    chain: base
     datadir: {}
     snapshot:
       command: ./scripts/zfs-clone.sh
