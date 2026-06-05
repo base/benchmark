@@ -15,6 +15,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 )
 
+const defaultMergedTTL = time.Hour
+
 // BenchmarkRuns represents the metadata structure
 type BenchmarkRuns struct {
 	Runs      []BenchmarkRun `json:"runs"`
@@ -151,10 +153,7 @@ func NewS3Service(bucketName, region, endpoint string, cache *MemoryCache, l log
 		return nil, fmt.Errorf("failed to create AWS session: %w", err)
 	}
 
-	const (
-		defaultMaxMetadataFiles = 2000
-		defaultMergedTTL        = time.Hour
-	)
+	const defaultMaxMetadataFiles = 2000
 
 	return &S3Service{
 		client:     s3.New(sess),
@@ -279,54 +278,13 @@ func (s *S3Service) GetMetadata() (*BenchmarkRuns, error) {
 	}
 	s.l.Info("Metadata file fetch complete", "fetched", fetched, "cacheHits", cacheHits)
 
-	// Deduplicate by compound key (ID + outputDir), keeping the last occurrence
-	seen := make(map[string]int) // compound key -> index in deduped slice
-	var deduped []BenchmarkRun
-	for _, run := range allRuns {
-		key := run.ID + "|" + run.OutputDir
-		if idx, exists := seen[key]; exists {
-			// Replace with newer version
-			deduped[idx] = run
-		} else {
-			seen[key] = len(deduped)
-			deduped = append(deduped, run)
-		}
-	}
-
-	// Sort chronologically by CreatedAt
-	sort.Slice(deduped, func(i, j int) bool {
-		if deduped[i].CreatedAt == nil && deduped[j].CreatedAt == nil {
-			return false
-		}
-		if deduped[i].CreatedAt == nil {
-			return true
-		}
-		if deduped[j].CreatedAt == nil {
-			return false
-		}
-		return deduped[i].CreatedAt.Before(*deduped[j].CreatedAt)
-	})
-
-	// Apply retention policy
-	deduped = s.applyRetentionPolicy(deduped)
-
-	now := time.Now()
-
-	// Append synthetic comparison groups so the existing frontend
-	// dropdown surfaces multi-version and multi-time-window views
-	// alongside the natural BenchmarkRun IDs. See comparison.go.
-	deduped = append(deduped, synthesizeComparisonGroups(deduped, now)...)
-
-	metadata := &BenchmarkRuns{
-		Runs:      deduped,
-		CreatedAt: &now,
-	}
+	metadata := mergeRuns(allRuns, s.l)
 
 	s.metadataCache.cachedResult = metadata
 	s.metadataCache.cachedKeyFingerprint = fingerprint
-	s.metadataCache.cachedAt = now
+	s.metadataCache.cachedAt = *metadata.CreatedAt
 
-	s.l.Info("Built merged metadata", "totalRuns", len(deduped), "metadataFiles", len(objects))
+	s.l.Info("Built merged metadata", "totalRuns", len(metadata.Runs), "metadataFiles", len(objects))
 	return metadata, nil
 }
 
@@ -425,7 +383,7 @@ func (s *S3Service) getObjectDirect(key string) ([]byte, error) {
 // - Keep one run per month for the past 6 months (the run closest to the 1st of each month)
 // - Drop everything older
 // Retained monthly runs get their TestName prefixed with the month label.
-func (s *S3Service) applyRetentionPolicy(runs []BenchmarkRun) []BenchmarkRun {
+func applyRetentionPolicy(runs []BenchmarkRun, l log.Logger) []BenchmarkRun {
 	now := time.Now()
 	recentCutoff := now.AddDate(0, 0, -14) // 2 weeks ago
 	monthlyCutoff := now.AddDate(0, -6, 0) // 6 months ago
@@ -440,7 +398,7 @@ func (s *S3Service) applyRetentionPolicy(runs []BenchmarkRun) []BenchmarkRun {
 
 	for _, run := range runs {
 		if run.CreatedAt == nil {
-			s.l.Debug("Dropping run with nil CreatedAt during retention", "runID", run.ID)
+			l.Debug("Dropping run with nil CreatedAt during retention", "runID", run.ID)
 			continue
 		}
 
@@ -450,7 +408,7 @@ func (s *S3Service) applyRetentionPolicy(runs []BenchmarkRun) []BenchmarkRun {
 		}
 
 		if run.CreatedAt.Before(monthlyCutoff) {
-			s.l.Debug("Dropping run outside retention window", "runID", run.ID, "createdAt", run.CreatedAt)
+			l.Debug("Dropping run outside retention window", "runID", run.ID, "createdAt", run.CreatedAt)
 			continue
 		}
 
@@ -486,13 +444,43 @@ func (s *S3Service) applyRetentionPolicy(runs []BenchmarkRun) []BenchmarkRun {
 		return monthlyRuns[i].CreatedAt.Before(*monthlyRuns[j].CreatedAt)
 	})
 
-	// Combine: monthly (older) first, then recent
 	result := append(monthlyRuns, recentRuns...)
-
-	s.l.Info("Applied retention policy", "input", len(runs), "kept", len(result),
+	l.Info("Applied retention policy", "input", len(runs), "kept", len(result),
 		"recent", len(recentRuns), "monthly", len(monthlyRuns))
-
 	return result
+}
+
+// mergeRuns deduplicates, sorts, applies retention, and synthesizes
+// comparison groups from a flat list of parsed BenchmarkRun values.
+// It is the shared pipeline used by both S3Service and LocalService.
+func mergeRuns(allRuns []BenchmarkRun, l log.Logger) *BenchmarkRuns {
+	seen := make(map[string]int)
+	var deduped []BenchmarkRun
+	for _, run := range allRuns {
+		key := run.ID + "|" + run.OutputDir
+		if idx, exists := seen[key]; exists {
+			deduped[idx] = run
+		} else {
+			seen[key] = len(deduped)
+			deduped = append(deduped, run)
+		}
+	}
+
+	sort.Slice(deduped, func(i, j int) bool {
+		if deduped[i].CreatedAt == nil {
+			return true
+		}
+		if deduped[j].CreatedAt == nil {
+			return false
+		}
+		return deduped[i].CreatedAt.Before(*deduped[j].CreatedAt)
+	})
+
+	deduped = applyRetentionPolicy(deduped, l)
+
+	now := time.Now()
+	deduped = append(deduped, synthesizeComparisonGroups(deduped, now)...)
+	return &BenchmarkRuns{Runs: deduped, CreatedAt: &now}
 }
 
 // GetMetrics retrieves metrics data for a specific run and node type.

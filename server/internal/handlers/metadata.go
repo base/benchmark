@@ -10,7 +10,7 @@ import (
 )
 
 // MetadataHandler returns a handler function for serving benchmark metadata
-func MetadataHandler(s3Service *services.S3Service, l log.Logger) gin.HandlerFunc {
+func MetadataHandler(s3Service services.BackendStorage, l log.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		metadata, err := s3Service.GetMetadata()
 		if err != nil {

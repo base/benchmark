@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -12,7 +13,7 @@ import (
 
 // StaticEmulationHandler serves metrics files using the same URL structure as static files
 // This allows the API to emulate the static file structure: /output/<outputDir>/metrics-<nodeType>.json
-func StaticEmulationHandler(s3Service *services.S3Service, l log.Logger) gin.HandlerFunc {
+func StaticEmulationHandler(s3Service services.BackendStorage, l log.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		outputDir := c.Param("outputDir")
 		filename := c.Param("filename")
@@ -35,7 +36,7 @@ func StaticEmulationHandler(s3Service *services.S3Service, l log.Logger) gin.Han
 			return
 		}
 
-		data, err := s3Service.GetMetrics(outputDir, nodeType)
+		data, err := s3Service.GetObject(fmt.Sprintf("%s/metrics-%s.json", outputDir, nodeType))
 		if err != nil {
 			l.Error("Failed to get metrics", "error", err, "outputDir", outputDir, "nodeType", nodeType)
 

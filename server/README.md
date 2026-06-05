@@ -17,9 +17,26 @@ make build-server          # outputs ./bin/report-server
 
 ## Run locally
 
-See `../local-stack/` in the `base-benchmarking-version-comparison` project for
-a docker-compose setup that loads S3 data into MinIO and runs the server
-against it.
+### Against a local output directory (no S3 required)
+
+Point the server at the directory written by `base-bench run --output-dir`:
+
+```bash
+# Run a benchmark
+./bin/base-bench run \
+  --config configs/local-devnet-config.yml \
+  --output-dir ./output \
+  --builder-bin ./bin/base-builder \
+  --base-node-reth-bin ./bin/base-node-reth
+
+# Start the report server against that output
+./bin/report-server --local-dir ./output
+
+# Open the report UI (in another shell)
+cd report && VITE_DATA_SOURCE=api VITE_API_BASE_URL=http://localhost:8080/ yarn dev
+```
+
+### Against S3 / MinIO
 
 ```bash
 export BASE_BENCH_API_S3_BUCKET=<bucket>
@@ -29,6 +46,8 @@ export AWS_SECRET_ACCESS_KEY=...
 
 ./bin/report-server
 ```
+
+`--s3-bucket` and `--local-dir` are mutually exclusive.
 
 ## Endpoints
 
