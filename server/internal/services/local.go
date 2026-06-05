@@ -126,11 +126,18 @@ func (ls *LocalService) GetMetadata() (*BenchmarkRuns, error) {
 }
 
 func (ls *LocalService) GetObject(key string) ([]byte, error) {
-	return os.ReadFile(filepath.Join(ls.dir, key))
+	path, err := ls.safePath(key)
+	if err != nil {
+		return nil, err
+	}
+	return os.ReadFile(path)
 }
 
 func (ls *LocalService) ListLoadTests(network string) ([]LoadTestEntry, error) {
-	dir := filepath.Join(ls.dir, "load-tests", network)
+	dir, err := ls.safePath(filepath.Join("load-tests", network))
+	if err != nil {
+		return nil, err
+	}
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -155,8 +162,23 @@ func (ls *LocalService) ListLoadTests(network string) ([]LoadTestEntry, error) {
 }
 
 func (ls *LocalService) GetLoadTest(network, timestamp string) ([]byte, error) {
-	path := filepath.Join(ls.dir, "load-tests", network, timestamp+".json")
+	path, err := ls.safePath(filepath.Join("load-tests", network, timestamp+".json"))
+	if err != nil {
+		return nil, err
+	}
 	return os.ReadFile(path)
+}
+
+// safePath resolves rel against ls.dir and returns an error if the
+// result escapes ls.dir, preventing path-traversal attacks when rel
+// contains user-provided values like HTTP path parameters.
+func (ls *LocalService) safePath(rel string) (string, error) {
+	abs := filepath.Clean(filepath.Join(ls.dir, rel))
+	base := filepath.Clean(ls.dir) + string(filepath.Separator)
+	if abs != filepath.Clean(ls.dir) && !strings.HasPrefix(abs, base) {
+		return "", fmt.Errorf("path %q escapes root directory", rel)
+	}
+	return abs, nil
 }
 
 // listLocalMetadataObjects walks the local directory for
