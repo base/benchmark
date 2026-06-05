@@ -48,24 +48,34 @@ func Main() cliapp.LifecycleAction {
 
 		opservice.ValidateEnvVars(config.EnvVarPrefix, config.CLIFlags(), l)
 
-		// Setup logging using the config method
-		l.Info("Starting benchmark report API server",
-			"port", cfg.Port,
-			"bucket", cfg.S3Bucket,
-			"region", cfg.S3Region,
-			"cache", cfg.EnableCache,
-			"cacheTTL", cfg.CacheTTL)
-
-		// Initialize services
-		cache := services.NewMemoryCache(cfg.CacheTTL, l)
-		if !cfg.EnableCache {
-			cache = services.NewMemoryCache(0, l) // Disable caching
-		}
-
-		s3Service, err := services.NewS3Service(cfg.S3Bucket, cfg.S3Region, cfg.S3Endpoint, cache, l)
-		if err != nil {
-			l.Error("Failed to initialize S3 service", "error", err)
-			return nil, err
+		var backend services.BackendStorage
+		if cfg.LocalDir != "" {
+			l.Info("Starting benchmark report server (local mode)",
+				"port", cfg.Port,
+				"localDir", cfg.LocalDir)
+			svc, err := services.NewLocalService(cfg.LocalDir, l)
+			if err != nil {
+				l.Error("Failed to initialize local service", "error", err)
+				return nil, err
+			}
+			backend = svc
+		} else {
+			l.Info("Starting benchmark report server (S3 mode)",
+				"port", cfg.Port,
+				"bucket", cfg.S3Bucket,
+				"region", cfg.S3Region,
+				"cache", cfg.EnableCache,
+				"cacheTTL", cfg.CacheTTL)
+			cache := services.NewMemoryCache(cfg.CacheTTL, l)
+			if !cfg.EnableCache {
+				cache = services.NewMemoryCache(0, l)
+			}
+			svc, err := services.NewS3Service(cfg.S3Bucket, cfg.S3Region, cfg.S3Endpoint, cache, l)
+			if err != nil {
+				l.Error("Failed to initialize S3 service", "error", err)
+				return nil, err
+			}
+			backend = svc
 		}
 
 		// Setup Gin
@@ -79,7 +89,7 @@ func Main() cliapp.LifecycleAction {
 		router.Use(cfg.CORS())
 
 		// Setup routes
-		setupRoutes(router, s3Service, l)
+		setupRoutes(router, backend, l)
 
 		// Configure server
 		server := &http.Server{
@@ -183,7 +193,7 @@ func main() {
 }
 
 // setupRoutes configures all API routes
-func setupRoutes(router *gin.Engine, s3Service *services.S3Service, l log.Logger) {
+func setupRoutes(router *gin.Engine, s3Service services.BackendStorage, l log.Logger) {
 	api := router.Group("/api/v1")
 	{
 		api.GET("/health", handlers.Health)

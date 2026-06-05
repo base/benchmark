@@ -31,10 +31,9 @@ var (
 		EnvVars: prefixEnvVars("PORT"),
 	}
 	S3BucketFlag = &cli.StringFlag{
-		Name:     "s3-bucket",
-		Usage:    "AWS S3 bucket name for benchmark data",
-		Required: true,
-		EnvVars:  prefixEnvVars("S3_BUCKET"),
+		Name:    "s3-bucket",
+		Usage:   "AWS S3 bucket name for benchmark data (required unless --local-dir is set)",
+		EnvVars: prefixEnvVars("S3_BUCKET"),
 	}
 	S3RegionFlag = &cli.StringFlag{
 		Name:    "s3-region",
@@ -47,6 +46,11 @@ var (
 		Usage:   "Override S3 endpoint URL (use with MinIO or other S3-compatible stores; leave empty for AWS)",
 		Value:   "",
 		EnvVars: prefixEnvVars("S3_ENDPOINT"),
+	}
+	LocalDirFlag = &cli.StringFlag{
+		Name:    "local-dir",
+		Usage:   "Read benchmark output from this local directory instead of S3. Mutually exclusive with --s3-bucket. Use the directory written by 'base-bench run --output-dir <dir>'.",
+		EnvVars: prefixEnvVars("LOCAL_DIR"),
 	}
 	CacheTTLFlag = &cli.StringFlag{
 		Name:    "cache-ttl",
@@ -80,6 +84,7 @@ func CLIFlags() []cli.Flag {
 		S3BucketFlag,
 		S3RegionFlag,
 		S3EndpointFlag,
+		LocalDirFlag,
 		CacheTTLFlag,
 		EnableCacheFlag,
 		AllowedOriginsFlag,

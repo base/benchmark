@@ -16,6 +16,7 @@ type FlagsConfig struct {
 	S3Bucket       string
 	S3Region       string
 	S3Endpoint     string
+	LocalDir       string
 	CacheTTL       time.Duration
 	EnableCache    bool
 	AllowedOrigins []string
@@ -34,6 +35,7 @@ func NewConfigFromFlags(ctx *cli.Context) (*FlagsConfig, error) {
 		S3Bucket:       ctx.String("s3-bucket"),
 		S3Region:       ctx.String("s3-region"),
 		S3Endpoint:     ctx.String("s3-endpoint"),
+		LocalDir:       ctx.String("local-dir"),
 		CacheTTL:       cacheTTL,
 		EnableCache:    ctx.Bool("enable-cache"),
 		AllowedOrigins: strings.Split(ctx.String("allowed-origins"), ","),
@@ -43,8 +45,11 @@ func NewConfigFromFlags(ctx *cli.Context) (*FlagsConfig, error) {
 
 // Validate checks if the configuration is valid
 func (c *FlagsConfig) Validate() error {
-	if c.S3Bucket == "" {
-		return errors.New("BASE_BENCH_API_S3_BUCKET environment variable is required")
+	if c.LocalDir == "" && c.S3Bucket == "" {
+		return errors.New("either --s3-bucket or --local-dir is required")
+	}
+	if c.LocalDir != "" && c.S3Bucket != "" {
+		return errors.New("--s3-bucket and --local-dir are mutually exclusive")
 	}
 	return nil
 }

@@ -10,7 +10,7 @@ import (
 )
 
 // LoadTestListHandler returns the list of available load test results for a network.
-func LoadTestListHandler(s3Service *services.S3Service, l log.Logger) gin.HandlerFunc {
+func LoadTestListHandler(s3Service services.BackendStorage, l log.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		network := c.Param("network")
 		if network == "" {
@@ -30,7 +30,7 @@ func LoadTestListHandler(s3Service *services.S3Service, l log.Logger) gin.Handle
 }
 
 // LoadTestResultHandler returns a single load test result JSON.
-func LoadTestResultHandler(s3Service *services.S3Service, l log.Logger) gin.HandlerFunc {
+func LoadTestResultHandler(s3Service services.BackendStorage, l log.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		network := c.Param("network")
 		timestamp := c.Param("timestamp")
