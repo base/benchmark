@@ -9,9 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	// nolint directives on the following three lines suppress SA1019 (aws-sdk-go v1 deprecated).
+	// Migration to aws-sdk-go-v2 is a larger change tracked separately.
+	"github.com/aws/aws-sdk-go/aws"         //nolint:staticcheck
+	"github.com/aws/aws-sdk-go/aws/session" //nolint:staticcheck
+	"github.com/aws/aws-sdk-go/service/s3"  //nolint:staticcheck
 	"github.com/ethereum/go-ethereum/log"
 )
 
@@ -187,7 +189,7 @@ func (s *S3Service) GetObject(key string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object %s: %w", key, err)
 	}
-	defer result.Body.Close()
+	defer result.Body.Close() //nolint:errcheck
 
 	// Read the entire body
 	data, err := io.ReadAll(result.Body)
@@ -373,7 +375,7 @@ func (s *S3Service) getObjectDirect(key string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get object %s: %w", key, err)
 	}
-	defer result.Body.Close()
+	defer result.Body.Close() //nolint:errcheck
 
 	return io.ReadAll(result.Body)
 }
