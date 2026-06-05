@@ -172,10 +172,14 @@ func (ls *LocalService) GetLoadTest(network, timestamp string) ([]byte, error) {
 // safePath resolves rel against ls.dir and returns an error if the
 // result escapes ls.dir, preventing path-traversal attacks when rel
 // contains user-provided values like HTTP path parameters.
+// filepath.Rel is used intentionally: if the relative path from
+// ls.dir to the resolved target starts with "..", the target is
+// outside the root and the request is rejected.
 func (ls *LocalService) safePath(rel string) (string, error) {
 	abs := filepath.Clean(filepath.Join(ls.dir, rel))
-	base := filepath.Clean(ls.dir) + string(filepath.Separator)
-	if abs != filepath.Clean(ls.dir) && !strings.HasPrefix(abs, base) {
+	rootClean := filepath.Clean(ls.dir)
+	relPath, err := filepath.Rel(rootClean, abs)
+	if err != nil || strings.HasPrefix(relPath, "..") {
 		return "", fmt.Errorf("path %q escapes root directory", rel)
 	}
 	return abs, nil
