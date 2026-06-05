@@ -201,6 +201,23 @@ func TestLocalService_ListAndGetLoadTests(t *testing.T) {
 	}
 }
 
+func TestLocalService_PathTraversalBlocked(t *testing.T) {
+	dir := t.TempDir()
+	l := log.New("t", "local_test")
+	svc, _ := NewLocalService(dir, l)
+
+	for _, dangerous := range []string{
+		"../etc/passwd",
+		"../../secret",
+		"run-a/../../outside",
+	} {
+		_, err := svc.GetObject(dangerous)
+		if err == nil {
+			t.Errorf("GetObject(%q) should have returned an error (path traversal)", dangerous)
+		}
+	}
+}
+
 func hasSyntheticPrefix(name string) bool {
 	return len(name) > 0 && name[0] == '['
 }
