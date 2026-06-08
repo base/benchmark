@@ -72,8 +72,16 @@ function RunComparison() {
     });
   }, [dataPerFile, selection.data]);
 
-  if (!benchmarkRuns || isLoadingBenchmarkRuns) {
-    return <div>Loading...</div>;
+  if (isLoadingBenchmarkRuns) {
+    return (
+      <div className="flex flex-col w-full min-h-screen">
+        <Navbar urlPrefix="/run-comparison" />
+        <div className="flex flex-col w-full flex-grow p-8 gap-4">
+          <div className="animate-pulse bg-slate-200 rounded h-6 w-48" />
+          <div className="animate-pulse bg-slate-100 rounded h-64 w-full" />
+        </div>
+      </div>
+    );
   }
 
   return (
