@@ -40,6 +40,11 @@ type NetworkBenchmark struct {
 
 	collectedSequencerMetrics *benchtypes.SequencerKeyMetrics
 	collectedValidatorMetrics *benchtypes.ValidatorKeyMetrics
+	// collectedClientVersion is the EL binary version captured from
+	// the sequencer client (the EL under test). Best-effort: if the
+	// version probe fails we record an empty string and the caller
+	// falls back to operator overrides or marks the run unversioned.
+	collectedClientVersion string
 
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
@@ -112,6 +117,15 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	sequencerClient, err := setupNode(ctx, nb.log, nb.testConfig.Params.NodeType, nb.testConfig.Params, nb.sequencerOptions, nb.ports, "", nb.flashblocksBlockTime)
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to setup sequencer node: %w", err)
+	}
+
+	// Capture the EL binary version. This is best-effort — version
+	// probing shells out to `<bin> --version`, so a binary that hangs
+	// or returns garbage shouldn't fail an otherwise-good benchmark.
+	if version, vErr := sequencerClient.GetVersion(ctx); vErr != nil {
+		nb.log.Warn("Failed to capture client version; comparison/version grouping will skip this run", "error", vErr)
+	} else {
+		nb.collectedClientVersion = version
 	}
 
 	// Create metrics collector and writer
@@ -268,6 +282,7 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 
 	result := &benchmark.RunResult{
 		SequencerMetrics: nb.collectedSequencerMetrics,
+		ClientVersion:    nb.collectedClientVersion,
 		Success:          true,
 		Complete:         true,
 	}

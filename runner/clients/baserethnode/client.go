@@ -224,29 +224,15 @@ func (r *BaseRethNodeClient) MetricsPort() int {
 	return int(r.metricsPort)
 }
 
-// GetVersion returns the version of the base-reth-node client
+// GetVersion returns the version of the base-reth-node client. See
+// common.ParseRethVersionOutput for the format contract.
 func (r *BaseRethNodeClient) GetVersion(ctx context.Context) (string, error) {
 	cmd := exec.CommandContext(ctx, r.options.BaseRethNodeBin, "--version")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get base-reth-node version")
 	}
-
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if strings.Contains(line, "Version:") {
-			parts := strings.Split(line, "Version:")
-			if len(parts) >= 2 {
-				versionPart := strings.TrimSpace(parts[1])
-				versionFields := strings.Fields(versionPart)
-				if len(versionFields) > 0 {
-					return versionFields[0], nil
-				}
-			}
-		}
-	}
-	return "unknown", nil
+	return common.ParseRethVersionOutput(string(output)), nil
 }
 
 // SetHead resets the blockchain to a specific block using debug.setHead
