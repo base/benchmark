@@ -52,6 +52,9 @@ func (r *BuilderClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error
 	if cfg.FlashblocksBlockTime != "" {
 		cfg2.Args = append(cfg2.Args, "--flashblocks.block-time", cfg.FlashblocksBlockTime)
 	}
+	if cfg.FlashblocksLeewayTime != "" {
+		cfg2.Args = append(cfg2.Args, "--flashblocks.leeway-time", cfg.FlashblocksLeewayTime)
+	}
 	if cfg.BlockTimeMs > 0 {
 		cfg2.Args = append(cfg2.Args, "--rollup.chain-block-time", fmt.Sprintf("%d", cfg.BlockTimeMs))
 	}

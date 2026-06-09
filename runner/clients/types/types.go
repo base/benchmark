@@ -10,12 +10,13 @@ import (
 )
 
 type RuntimeConfig struct {
-	Stdout               io.WriteCloser
-	Stderr               io.WriteCloser
-	Args                 []string
-	FlashblocksURL       *string // Optional URL for flashblocks websocket server (only used by clients that support it)
-	FlashblocksBlockTime string  // Block time for flashblocks in milliseconds (e.g. "250")
-	BlockTimeMs          uint64  // L2 block time in milliseconds
+	Stdout                io.WriteCloser
+	Stderr                io.WriteCloser
+	Args                  []string
+	FlashblocksURL        *string // Optional URL for flashblocks websocket server (only used by clients that support it)
+	FlashblocksBlockTime  string  // Block time for flashblocks in milliseconds (e.g. "250")
+	FlashblocksLeewayTime string  // Leeway time for flashblocks in milliseconds (e.g. "300")
+	BlockTimeMs           uint64  // L2 block time in milliseconds
 }
 
 // ExecutionClient is an abstraction over the different clients that can be used to run the chain like
