@@ -140,6 +140,9 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
           </Link>
         </div>
       </div>
+      {!isLoadTestsRoute && isLoading && (
+        <div className="animate-pulse bg-slate-200 rounded-md h-8 w-48" />
+      )}
       {!isLoadTestsRoute && !isLoading && !!allBenchmarkRuns?.runs.length && (
         <div>
           <Select
