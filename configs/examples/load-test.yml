@@ -1,5 +1,5 @@
 name: Load test throughput test
-description: Test builder throughput using base-load-test binary as transaction generator
+description: Test builder throughput using base-load-tester binary as transaction generator
 payloads:
   - name: Load Test
     type: load-test

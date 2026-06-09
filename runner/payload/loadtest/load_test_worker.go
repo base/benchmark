@@ -52,7 +52,7 @@ type loadTestPayloadWorker struct {
 	outputPath         string
 }
 
-// NewLoadTestPayloadWorker creates a worker that runs the base-load-test binary
+// NewLoadTestPayloadWorker creates a worker that runs the base-load-tester binary
 // as an external transaction generator against the benchmark node's RPC.
 func NewLoadTestPayloadWorker(
 	log log.Logger,

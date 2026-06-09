@@ -113,7 +113,7 @@ export type BenchmarkRunWithStatus = BenchmarkRun & { status: RunStatus };
 // Load tests
 // -----------------------------------------------------------------------------
 //
-// These types mirror the JSON written by the `base-load-test` Rust binary and
+// These types mirror the JSON written by the `base-load-tester` Rust binary and
 // served by report-api at:
 //   GET /api/v1/load-tests/:network                  -> LoadTestEntry[]
 //   GET /api/v1/load-tests/:network/:timestamp       -> LoadTestResult

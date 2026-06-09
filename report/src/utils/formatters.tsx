@@ -189,7 +189,7 @@ const LOAD_TEST_TIMESTAMP_RE =
   /^(\d{4})-(\d{2})-(\d{2})-(\d{2})-(\d{2})-(\d{2})$/;
 
 export const parseLoadTestTimestamp = (raw: string): Date | null => {
-  // Format produced by base-load-test: "YYYY-MM-DD-HH-MM-SS" (UTC, no zone in
+  // Format produced by base-load-tester: "YYYY-MM-DD-HH-MM-SS" (UTC, no zone in
   // the string but the producer writes UTC). Returning null on parse failure
   // lets callers degrade to showing the raw string instead of crashing.
   const m = LOAD_TEST_TIMESTAMP_RE.exec(raw);

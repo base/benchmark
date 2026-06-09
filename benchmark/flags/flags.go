@@ -32,7 +32,7 @@ const (
 // TxFuzz defaults
 const (
 	DefaultTxFuzzBin   = "../tx-fuzz/cmd/livefuzzer/livefuzzer"
-	DefaultLoadTestBin = "./base-load-test"
+	DefaultLoadTestBin = "./base-load-tester"
 )
 
 var (
