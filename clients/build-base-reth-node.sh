@@ -43,9 +43,9 @@ echo "Checking out version: $BASE_RETH_NODE_VERSION"
 git checkout -f "$BASE_RETH_NODE_VERSION"
 
 # Build the binaries using cargo
-echo "Building base-reth-node, base-builder, and base-load-test with cargo..."
+echo "Building base-reth-node, base-builder, and base-load-tester with cargo..."
 cargo build --bin base-reth-node --bin base-builder --profile maxperf
-cargo build -p base-load-tests --bin base-load-test --profile maxperf
+cargo build -p base-load-tester-bin --bin base-load-tester --profile maxperf
 
 # Copy binaries to output directory
 echo "Copying binaries to output directory..."
@@ -74,10 +74,10 @@ else
     exit 1
 fi
 
-if [ -f "target/maxperf/base-load-test" ]; then
-    cp target/maxperf/base-load-test "$FINAL_OUTPUT_DIR/"
+if [ -f "target/maxperf/base-load-tester" ]; then
+    cp target/maxperf/base-load-tester "$FINAL_OUTPUT_DIR/"
 else
-    echo "No base-load-test binary found"
+    echo "No base-load-tester binary found"
     exit 1
 fi
 
