@@ -211,8 +211,6 @@ export interface LoadTestConfig {
   transactions: Array<{ type: string; weight: number }>;
   looper_contract: string | null;
   swap_token_amount: string;
-  // Optional for back-compat: older S3 runs predate this field.
-  b20_mint_amount?: string;
   // Producer omits unless real-token setup is enabled; loosely typed.
   real_token_setup?: Record<string, unknown> | null;
 }

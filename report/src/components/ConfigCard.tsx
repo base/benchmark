@@ -65,12 +65,6 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
       value: formatEthFromWeiString(config.swap_token_amount),
     });
   }
-  if (config.b20_mint_amount && config.b20_mint_amount !== "0") {
-    funding.push({
-      label: "B-20 mint amount",
-      value: formatEthFromWeiString(config.b20_mint_amount),
-    });
-  }
 
   const repro: Row[] = [{ label: "Seed", value: config.seed.toLocaleString() }];
   if (config.chain_id !== null) {
