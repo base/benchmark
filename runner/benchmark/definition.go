@@ -164,7 +164,8 @@ func (s SnapshotDefinition) CreateSnapshot(nodeType string, outputDir string) er
 
 // FlashblocksConfig holds top-level flashblocks configuration.
 type FlashblocksConfig struct {
-	BlockTime string `yaml:"block_time"`
+	BlockTime  string `yaml:"block_time"`
+	LeewayTime string `yaml:"leeway_time"`
 }
 
 const DefaultFlashblocksBlockTime = "250"
@@ -194,6 +195,14 @@ func (bc *BenchmarkConfig) FlashblocksBlockTime() string {
 		return bc.Flashblocks.BlockTime
 	}
 	return DefaultFlashblocksBlockTime
+}
+
+// FlashblocksLeewayTime returns the configured flashblocks leeway time, if set.
+func (bc *BenchmarkConfig) FlashblocksLeewayTime() string {
+	if bc.Flashblocks != nil && bc.Flashblocks.LeewayTime != "" {
+		return bc.Flashblocks.LeewayTime
+	}
+	return ""
 }
 
 type DatadirConfig struct {
