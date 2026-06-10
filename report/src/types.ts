@@ -211,6 +211,10 @@ export interface LoadTestConfig {
   transactions: Array<{ type: string; weight: number }>;
   looper_contract: string | null;
   swap_token_amount: string;
+  // Optional for back-compat: older S3 runs predate this field.
+  b20_mint_amount?: string;
+  // Producer omits unless real-token setup is enabled; loosely typed.
+  real_token_setup?: Record<string, unknown> | null;
 }
 
 /**
@@ -224,8 +228,46 @@ export interface ThroughputSample {
   gps: number;
 }
 
+/**
+ * Clean reporting window for a configured-duration run. Defined as the first
+ * `expected_block_count` blocks starting at `block_range.first_block`. TPS/GPS
+ * denominator is `duration` (= expected_block_count * BLOCK_INTERVAL), not the
+ * full wall-clock run, so headline numbers are not diluted by tail stragglers.
+ * Producer added in base/base#3358.
+ */
+export interface ObservedWindowMetrics {
+  expected_block_count: number;
+  block_range: BlockRange;
+  duration: RustDuration;
+  confirmed_count: number;
+  tps: number;
+  gps: number;
+  block_latency: LatencyStats;
+  block_receipt_delay: LatencyStats;
+  flashblocks_latency: FlashblocksLatencyStats;
+}
+
+/**
+ * Inclusion-delay tail: txs landing in blocks past the observed window
+ * (`block_number > observed_window_end_block`). `null` on continuous runs
+ * (no configured duration). Producer added in base/base#3358.
+ */
+export interface TailMetrics {
+  observed_window_end_block: number | null;
+  count: number;
+  confirmed_pct: number;
+  block_range: BlockRange;
+  time_past_observed_window: LatencyStats;
+  block_latency: LatencyStats;
+  block_receipt_delay: LatencyStats;
+  flashblocks_latency: FlashblocksLatencyStats;
+}
+
 export interface LoadTestResult {
   block_latency: LatencyStats;
+  // Submit-to-receipt-observation delay, full-run baseline. Optional for
+  // back-compat: producer added in base/base#3358.
+  block_receipt_delay?: LatencyStats;
   flashblocks_latency: FlashblocksLatencyStats;
   throughput: ThroughputStats;
   throughput_percentiles: ThroughputPercentiles;
@@ -241,6 +283,12 @@ export interface LoadTestResult {
   // Optional for back-compat: older runs predate this field. The summary
   // section gates the block range stats on its presence.
   block_range?: BlockRange;
+  // Observed reporting window (clean TPS / latency). Optional for back-compat:
+  // older S3 runs predate this; the page falls back to full-run fields.
+  observed_window?: ObservedWindowMetrics;
+  // Inclusion-delay tail. `null` on continuous runs; `undefined` on older
+  // runs that predate the field.
+  tail?: TailMetrics | null;
 }
 
 /**
