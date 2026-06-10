@@ -100,15 +100,52 @@ const SwapsPerSecondHero = ({ tps, label }: { tps: number; label: string }) => (
   </section>
 );
 
+// The full observed-window block range, matching the CLI's display:
+// `first_block ..= first_block + expected_block_count - 1`. The
+// `window.block_range` field is the range of blocks that actually contained
+// confirmed test txs and is typically smaller — surfaced as a hint.
+const formatObservedWindowRange = (
+  window: ObservedWindowMetrics,
+): { value: string; hint: string } | null => {
+  const first = window.block_range.first_block;
+  if (typeof first !== "number" || window.expected_block_count === 0) {
+    return null;
+  }
+  const end = first + window.expected_block_count - 1;
+  const confirmedCount = window.block_range.block_count;
+  return {
+    value: `${first.toLocaleString()} → ${end.toLocaleString()}`,
+    hint: `${window.expected_block_count.toLocaleString()} blocks · txs landed in ${confirmedCount.toLocaleString()}`,
+  };
+};
+
+const OBSERVED_WINDOW_TOOLTIP = (
+  <p className="max-w-xs leading-snug">
+    The clean, first portion of the run, sized to the configured duration. This
+    mirrors what you witness watching the chain live: sustained TPS over a
+    period of time. Use this against OKRs like &ldquo;hit 3k swaps/s on the
+    chain.&rdquo;
+  </p>
+);
+
+const TAIL_INCLUSION_TOOLTIP = (
+  <p className="max-w-xs leading-snug">
+    Txs that landed in blocks past the observed window. Including them in the
+    headline would lower TPS and raise block / FB latency, but the data is
+    critical: it surfaces where inclusion-side optimization is still needed.
+  </p>
+);
+
 const ObservedWindowSummary = ({
   window,
 }: {
   window: ObservedWindowMetrics;
 }) => {
   const blockRange = window.block_range;
+  const windowRange = formatObservedWindowRange(window);
 
   return (
-    <StatCard title="Observed window">
+    <StatCard title="Observed window" titleTooltip={OBSERVED_WINDOW_TOOLTIP}>
       <StatGrid>
         <Stat
           label="Window duration"
@@ -121,12 +158,20 @@ const ObservedWindowSummary = ({
         />
         <Stat label="TPS" value={formatTps(window.tps)} />
         <Stat label="Gas/s" value={formatGpsVerbose(window.gps)} />
-        {blockRange && (
+        {windowRange ? (
           <Stat
             label="Block range"
-            value={formatBlockRange(blockRange)}
-            hint={`${blockRange.block_count.toLocaleString()} blocks`}
+            value={windowRange.value}
+            hint={windowRange.hint}
           />
+        ) : (
+          blockRange && (
+            <Stat
+              label="Block range"
+              value={formatBlockRange(blockRange)}
+              hint={`${blockRange.block_count.toLocaleString()} blocks`}
+            />
+          )
         )}
       </StatGrid>
     </StatCard>
@@ -164,7 +209,10 @@ const TailSection = ({
 
   if (tail.count === 0) {
     return (
-      <StatCard title="Tail inclusion (txs past the observed window)">
+      <StatCard
+        title="Tail inclusion (txs past the observed window)"
+        titleTooltip={TAIL_INCLUSION_TOOLTIP}
+      >
         <div className="text-sm text-slate-500">
           No transactions landed past the observed window
           {typeof tail.observed_window_end_block === "number" && (
@@ -181,7 +229,10 @@ const TailSection = ({
   }
 
   return (
-    <StatCard title="Tail inclusion (txs past the observed window)">
+    <StatCard
+      title="Tail inclusion (txs past the observed window)"
+      titleTooltip={TAIL_INCLUSION_TOOLTIP}
+    >
       <div className="flex flex-col gap-y-6">
         <StatGrid>
           <Stat
