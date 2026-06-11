@@ -1,13 +1,20 @@
 import { ReactNode } from "react";
 import clsx from "clsx";
+import Tooltip from "./Tooltip";
 
 interface StatCardProps {
   title: string;
   children: ReactNode;
   className?: string;
+  titleTooltip?: ReactNode;
 }
 
-const StatCard = ({ title, children, className }: StatCardProps) => {
+const StatCard = ({
+  title,
+  children,
+  className,
+  titleTooltip,
+}: StatCardProps) => {
   return (
     <section
       className={clsx(
@@ -15,8 +22,19 @@ const StatCard = ({ title, children, className }: StatCardProps) => {
         className,
       )}
     >
-      <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4">
-        {title}
+      <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4 flex items-center gap-x-1.5">
+        <span>{title}</span>
+        {titleTooltip && (
+          <Tooltip content={titleTooltip} side="top" align="start">
+            <button
+              type="button"
+              aria-label="More info"
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-slate-300 text-slate-400 text-[10px] font-bold leading-none hover:border-slate-500 hover:text-slate-600 transition-colors cursor-help normal-case"
+            >
+              i
+            </button>
+          </Tooltip>
+        )}
       </h2>
       {children}
     </section>
