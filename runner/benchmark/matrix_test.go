@@ -8,6 +8,7 @@ import (
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestResolveTestRunsFromMatrix(t *testing.T) {
@@ -89,6 +90,61 @@ func TestResolveTestRunsFromMatrix(t *testing.T) {
 						PayloadID:           "complex",
 						BlockTime:           1 * time.Second,
 						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "combined params value",
+			config: benchmark.TestDefinition{
+				Variables: []benchmark.Param{
+					{
+						ParamType: "payload",
+						Value:     "load-test",
+					},
+					{
+						ParamType: "params",
+						Values: []interface{}{
+							map[string]interface{}{
+								"gas_limit": 400_000_000,
+								"load_test_config": map[string]interface{}{
+									"seed": 654_789,
+								},
+							},
+							map[string]interface{}{
+								"gas_limit": 800_000_000,
+								"load_test_config": map[string]interface{}{
+									"seed": 654_790,
+								},
+							},
+						},
+					},
+				},
+			},
+			want: []benchmark.TestRun{
+				{
+					Params: types.RunParams{
+						NodeType:            "geth",
+						GasLimit:            400_000_000,
+						PayloadID:           "load-test",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
+						LoadTestConfigOverrides: map[string]interface{}{
+							"seed": 654_789,
+						},
+					},
+				},
+				{
+					Params: types.RunParams{
+						NodeType:            "geth",
+						GasLimit:            800_000_000,
+						PayloadID:           "load-test",
+						BlockTime:           1 * time.Second,
+						ConsensusTimingMode: types.ConsensusTimingModePreventLateFCU,
+						LoadTestConfigOverrides: map[string]interface{}{
+							"seed": 654_790,
+						},
 					},
 				},
 			},
@@ -365,6 +421,37 @@ func TestResolveTestRunsFromMatrixAllowsSnapshotLoadTestsToOverrideConsensusTimi
 	require.NoError(t, err)
 	require.Len(t, runs, 1)
 	require.Equal(t, types.ConsensusTimingModePreventLateFCU, runs[0].Params.ConsensusTimingMode)
+}
+
+func TestResolveTestRunsFromMatrixSupportsCombinedParamsFromYAML(t *testing.T) {
+	var config benchmark.BenchmarkConfig
+	require.NoError(t, yaml.Unmarshal([]byte(`
+name: snapshot account create
+block_time: 2s
+payloads:
+  - id: account-create
+    type: load-test
+benchmarks:
+  - variables:
+      - type: payload
+        value: account-create
+      - type: params
+        values:
+          - gas_limit: 400000000
+            load_test_config:
+              seed: 654789
+          - gas_limit: 800000000
+            load_test_config:
+              seed: 654790
+`), &config))
+
+	runs, err := benchmark.ResolveTestRunsFromMatrix(config.Benchmarks[0], "benchmark.yml", &config)
+	require.NoError(t, err)
+	require.Len(t, runs, 2)
+	require.Equal(t, uint64(400_000_000), runs[0].Params.GasLimit)
+	require.Equal(t, 654_789, runs[0].Params.LoadTestConfigOverrides["seed"])
+	require.Equal(t, uint64(800_000_000), runs[1].Params.GasLimit)
+	require.Equal(t, 654_790, runs[1].Params.LoadTestConfigOverrides["seed"])
 }
 
 func TestResolveTestRunsFromMatrixRejectsInvalidConsensusTiming(t *testing.T) {

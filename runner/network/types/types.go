@@ -98,6 +98,10 @@ type RunParams struct {
 
 	// ClientBinPath is an optional override for the client binary path.
 	ClientBinPath string
+
+	// LoadTestConfigOverrides are YAML fields overlaid onto native base-load-tester
+	// config files for load-test payloads.
+	LoadTestConfigOverrides map[string]interface{}
 }
 
 const (
@@ -126,6 +130,9 @@ func (p RunParams) ToConfig() map[string]interface{} {
 
 	if p.ConsensusTimingMode != "" {
 		params["ConsensusTimingMode"] = p.ConsensusTimingMode
+	}
+	if len(p.LoadTestConfigOverrides) > 0 {
+		params["LoadTestConfigOverrides"] = p.LoadTestConfigOverrides
 	}
 
 	for k, v := range p.Tags {
