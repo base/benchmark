@@ -143,6 +143,47 @@ transactions:
 	require.Contains(t, output, "duration: \"60s\"")
 }
 
+func TestBuildConfigAppliesLoadTestConfigOverrides(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
+	err := os.WriteFile(configPath, []byte(`
+transaction_submission_rpcs:
+  - "http://standalone-submitter.invalid"
+query_rpc: "http://standalone-query.invalid"
+flashblocks_ws: "ws://standalone-flashblocks.invalid"
+target_gps: 123
+seed: 654789
+duration: "60s"
+transactions:
+  - weight: 100
+    type: transfer
+`), 0644)
+	require.NoError(t, err)
+
+	worker := &loadTestPayloadWorker{
+		flashblocksURL:   "ws://benchmark-flashblocks.example",
+		gasLimit:         150_000_000,
+		blockTime:        2 * time.Second,
+		elRPCURL:         "http://sequencer.example",
+		sourceConfigPath: configPath,
+		configOverrides: map[string]interface{}{
+			"seed":                  654_790,
+			"fresh_recipient_ratio": 1.0,
+		},
+	}
+
+	config, err := worker.buildConfig()
+	require.NoError(t, err)
+
+	encoded, err := yaml.Marshal(config)
+	require.NoError(t, err)
+	output := string(encoded)
+
+	require.Contains(t, output, "target_gps: 75000000")
+	require.Contains(t, output, "seed: 654790")
+	require.Contains(t, output, "fresh_recipient_ratio: 1")
+	require.NotContains(t, output, "seed: 654789")
+}
+
 func TestSetupPreparesConfigWithoutStartingProcess(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
 	err := os.WriteFile(configPath, []byte(`

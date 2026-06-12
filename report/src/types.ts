@@ -209,6 +209,7 @@ export interface LoadTestConfig {
   seed: number;
   chain_id: number | null;
   transactions: Array<{ type: string; weight: number }>;
+  fresh_recipient_ratio?: number;
   looper_contract: string | null;
   swap_token_amount: string;
   // Producer omits unless real-token setup is enabled; loosely typed.

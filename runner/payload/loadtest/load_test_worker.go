@@ -40,6 +40,7 @@ type loadTestPayloadWorker struct {
 	gasLimit           uint64
 	blockTime          time.Duration
 	params             LoadTestPayloadDefinition
+	configOverrides    map[string]interface{}
 	mempool            *mempool.StaticWorkloadMempool
 	cmd                *exec.Cmd
 	done               chan struct{}
@@ -82,6 +83,7 @@ func NewLoadTestPayloadWorker(
 		gasLimit:         params.GasLimit,
 		blockTime:        params.BlockTime,
 		params:           definition,
+		configOverrides:  params.LoadTestConfigOverrides,
 		mempool:          mp,
 		done:             make(chan struct{}),
 		sourceConfigPath: sourceConfigPath,
@@ -260,6 +262,13 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 		targetGPS := w.gasLimit / uint64(w.blockTime.Seconds())
 		setMappingValue(config, "target_gps", uintNode(targetGPS))
 	}
+	for key, value := range w.configOverrides {
+		node, err := nodeFromValue(value)
+		if err != nil {
+			return nil, fmt.Errorf("invalid load-test config override %q: %w", key, err)
+		}
+		setMappingValue(config, key, node)
+	}
 
 	return config, nil
 }
@@ -295,6 +304,22 @@ func stringNode(value string) *yaml.Node {
 
 func uintNode(value uint64) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!int", Value: strconv.FormatUint(value, 10)}
+}
+
+func nodeFromValue(value interface{}) (*yaml.Node, error) {
+	data, err := yaml.Marshal(value)
+	if err != nil {
+		return nil, err
+	}
+
+	var doc yaml.Node
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return nil, err
+	}
+	if len(doc.Content) == 0 {
+		return nil, errors.New("empty YAML value")
+	}
+	return doc.Content[0], nil
 }
 
 func stringSequenceNode(values ...string) *yaml.Node {
