@@ -46,17 +46,11 @@ func NewParamsFromValues(assignments map[string]interface{}) (*types.RunParams, 
 }
 
 func applyParam(params *types.RunParams, k string, v interface{}) error {
+	if k == "params" {
+		return applyParamGroup(params, v)
+	}
+
 	switch k {
-	case "params":
-		expanded, err := stringMap(v)
-		if err != nil {
-			return fmt.Errorf("invalid params %v", v)
-		}
-		for param, value := range expanded {
-			if err := applyParam(params, param, value); err != nil {
-				return err
-			}
-		}
 	case "payload":
 		if vPtrStr, ok := v.(*string); ok {
 			params.PayloadID = string(*vPtrStr)
@@ -90,7 +84,7 @@ func applyParam(params *types.RunParams, k string, v interface{}) error {
 			return fmt.Errorf("invalid gas limit %s", v)
 		}
 	case "load_test_config":
-		overrides, err := stringMap(v)
+		overrides, err := normalizeStringKeyMap(v)
 		if err != nil {
 			return fmt.Errorf("invalid load test config %v", v)
 		}
@@ -146,7 +140,22 @@ func applyParam(params *types.RunParams, k string, v interface{}) error {
 	return nil
 }
 
-func stringMap(value interface{}) (map[string]interface{}, error) {
+func applyParamGroup(params *types.RunParams, value interface{}) error {
+	// A params value groups multiple assignments into one matrix dimension,
+	// preserving relationships between values that should vary together.
+	expanded, err := normalizeStringKeyMap(value)
+	if err != nil {
+		return fmt.Errorf("invalid params %v", value)
+	}
+	for param, value := range expanded {
+		if err := applyParam(params, param, value); err != nil {
+			return fmt.Errorf("invalid params.%s: %w", param, err)
+		}
+	}
+	return nil
+}
+
+func normalizeStringKeyMap(value interface{}) (map[string]interface{}, error) {
 	switch typed := value.(type) {
 	case map[string]interface{}:
 		return typed, nil
