@@ -20,7 +20,6 @@ import {
   FlashblocksLatencyStats,
   LatencyStats,
   LoadTestResult,
-  ObservedWindowMetrics,
 } from "../types";
 
 const formatBlockRange = (range: BlockRange): string => {
@@ -96,25 +95,6 @@ const SwapsPerSecondHero = ({ tps, label }: { tps: number; label: string }) => (
   </section>
 );
 
-// The full observed-window block range, matching the CLI's display:
-// `first_block ..= first_block + expected_block_count - 1`. The
-// `window.block_range` field is the range of blocks that actually contained
-// confirmed test txs and is typically smaller — surfaced as a hint.
-const formatObservedWindowRange = (
-  window: ObservedWindowMetrics,
-): { value: string; hint: string } | null => {
-  const first = window.block_range.first_block;
-  if (typeof first !== "number" || window.expected_block_count === 0) {
-    return null;
-  }
-  const end = first + window.expected_block_count - 1;
-  const confirmedCount = window.block_range.block_count;
-  return {
-    value: `${first.toLocaleString()} → ${end.toLocaleString()}`,
-    hint: `${window.expected_block_count.toLocaleString()} blocks · txs landed in ${confirmedCount.toLocaleString()}`,
-  };
-};
-
 const RESULTS_TOOLTIP = (
   <p className="max-w-xs leading-snug">
     Client-to-client end-to-end latency: from the moment a transaction is
@@ -125,40 +105,28 @@ const RESULTS_TOOLTIP = (
   </p>
 );
 
-const ObservedWindowSummary = ({
-  window,
-  totalSubmitted,
-}: {
-  window: ObservedWindowMetrics;
-  totalSubmitted: number;
-}) => {
-  const blockRange = window.block_range;
-  const windowRange = formatObservedWindowRange(window);
+const ResultsSummary = ({ result }: { result: LoadTestResult }) => {
+  const { throughput, block_range: blockRange } = result;
 
   return (
     <StatCard title="Results" titleTooltip={RESULTS_TOOLTIP}>
       <StatGrid>
-        <Stat label="Submitted" value={totalSubmitted.toLocaleString()} />
+        <Stat
+          label="Submitted"
+          value={throughput.total_submitted.toLocaleString()}
+        />
         <Stat
           label="Confirmed"
-          value={window.confirmed_count.toLocaleString()}
+          value={throughput.total_confirmed.toLocaleString()}
         />
-        <Stat label="TPS" value={formatTps(window.tps)} />
-        <Stat label="Gas/s" value={formatGpsVerbose(window.gps)} />
-        {windowRange ? (
+        <Stat label="TPS" value={formatTps(throughput.tps)} />
+        <Stat label="Gas/s" value={formatGpsVerbose(throughput.gps)} />
+        {blockRange && (
           <Stat
             label="Block range"
-            value={windowRange.value}
-            hint={windowRange.hint}
+            value={formatBlockRange(blockRange)}
+            hint={`${blockRange.block_count.toLocaleString()} blocks`}
           />
-        ) : (
-          blockRange && (
-            <Stat
-              label="Block range"
-              value={formatBlockRange(blockRange)}
-              hint={`${blockRange.block_count.toLocaleString()} blocks`}
-            />
-          )
         )}
       </StatGrid>
     </StatCard>
@@ -181,26 +149,19 @@ export const LoadTestReportContent = ({
   subtitle,
   backLink,
 }: LoadTestReportContentProps) => {
-  const observedWindow = result.observed_window;
-
-  // Headline numbers come from observed_window when available, otherwise fall
-  // back to the legacy full-run fields so older S3 runs still render.
-  const headlineTps = observedWindow?.tps ?? result.throughput.tps;
-  const headlineBlockLatency =
-    observedWindow?.block_latency ?? result.block_latency;
-  const headlineFlashblocksLatency =
-    observedWindow?.flashblocks_latency ?? result.flashblocks_latency;
+  const headlineTps = result.throughput.tps;
+  const headlineFlashblocksLatency = result.flashblocks_latency;
 
   const headlineBlockLatencyRows = useMemo(
-    () => buildLatencyRows(headlineBlockLatency),
-    [headlineBlockLatency],
+    () => buildLatencyRows(result.block_latency),
+    [result.block_latency],
   );
   const headlineFlashblocksRows = useMemo(
     () => buildLatencyRows(headlineFlashblocksLatency),
     [headlineFlashblocksLatency],
   );
 
-  const headlineLabel = observedWindow ? "Observed-window TPS" : "Swaps/s";
+  const headlineLabel = "Swaps/s";
 
   return (
     <>
@@ -236,12 +197,7 @@ export const LoadTestReportContent = ({
 
       {result.config && <ConfigCard config={result.config} />}
 
-      {observedWindow && (
-        <ObservedWindowSummary
-          window={observedWindow}
-          totalSubmitted={result.throughput.total_submitted}
-        />
-      )}
+      <ResultsSummary result={result} />
 
       <StatCard title="Block latency (e2e client observed)">
         <PercentileBarChart
