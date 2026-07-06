@@ -11,11 +11,8 @@ import { useLoadTestResult } from "../utils/useDataSeries";
 import {
   durationToNanos,
   formatDuration,
-  formatEthFromWei,
-  formatGasVerbose,
   formatGpsVerbose,
   formatLoadTestTimestamp,
-  formatPercent,
   formatTps,
 } from "../utils/formatters";
 import {
@@ -24,7 +21,6 @@ import {
   LatencyStats,
   LoadTestResult,
   ObservedWindowMetrics,
-  TailMetrics,
 } from "../types";
 
 const formatBlockRange = (range: BlockRange): string => {
@@ -119,41 +115,32 @@ const formatObservedWindowRange = (
   };
 };
 
-const OBSERVED_WINDOW_TOOLTIP = (
+const RESULTS_TOOLTIP = (
   <p className="max-w-xs leading-snug">
-    The clean, first portion of the run, sized to the configured duration. This
-    mirrors what you witness watching the chain live: sustained TPS over a
-    period of time. Use this against OKRs like &ldquo;hit 3k swaps/s on the
-    chain.&rdquo;
-  </p>
-);
-
-const TAIL_INCLUSION_TOOLTIP = (
-  <p className="max-w-xs leading-snug">
-    Txs that landed in blocks past the observed window. Including them in the
-    headline would lower TPS and raise block / FB latency, but the data is
-    critical: it surfaces where inclusion-side optimization is still needed.
+    Client-to-client end-to-end latency: from the moment a transaction is
+    submitted via <code>eth_sendRawTransaction</code> to when the client
+    receives and processes it (seeing its own txHash in a block). This mirrors
+    what you witness watching the chain live: sustained TPS over a period of
+    time. Use this against OKRs like &ldquo;hit 3k swaps/s on the chain.&rdquo;
   </p>
 );
 
 const ObservedWindowSummary = ({
   window,
+  totalSubmitted,
 }: {
   window: ObservedWindowMetrics;
+  totalSubmitted: number;
 }) => {
   const blockRange = window.block_range;
   const windowRange = formatObservedWindowRange(window);
 
   return (
-    <StatCard title="Observed window" titleTooltip={OBSERVED_WINDOW_TOOLTIP}>
+    <StatCard title="Results" titleTooltip={RESULTS_TOOLTIP}>
       <StatGrid>
+        <Stat label="Submitted" value={totalSubmitted.toLocaleString()} />
         <Stat
-          label="Window duration"
-          value={formatDuration(window.duration)}
-          hint={`${window.expected_block_count.toLocaleString()} expected blocks`}
-        />
-        <Stat
-          label="Confirmed in window"
+          label="Confirmed"
           value={window.confirmed_count.toLocaleString()}
         />
         <Stat label="TPS" value={formatTps(window.tps)} />
@@ -178,247 +165,6 @@ const ObservedWindowSummary = ({
   );
 };
 
-const TailSection = ({
-  tail,
-  totalConfirmed,
-}: {
-  tail: TailMetrics;
-  totalConfirmed: number;
-}) => {
-  const blockRange = tail.block_range;
-  const hasReceiptDelay =
-    tail.block_receipt_delay &&
-    durationToNanos(tail.block_receipt_delay.max) > 0;
-
-  const timePastRows = useMemo(
-    () => buildLatencyRows(tail.time_past_observed_window),
-    [tail.time_past_observed_window],
-  );
-  const blockLatencyRows = useMemo(
-    () => buildLatencyRows(tail.block_latency),
-    [tail.block_latency],
-  );
-  const receiptDelayRows = useMemo(
-    () => (hasReceiptDelay ? buildLatencyRows(tail.block_receipt_delay) : []),
-    [tail.block_receipt_delay, hasReceiptDelay],
-  );
-  const flashblocksRows = useMemo(
-    () => buildLatencyRows(tail.flashblocks_latency),
-    [tail.flashblocks_latency],
-  );
-
-  if (tail.count === 0) {
-    return (
-      <StatCard
-        title="Tail inclusion (txs past the observed window)"
-        titleTooltip={TAIL_INCLUSION_TOOLTIP}
-      >
-        <div className="text-sm text-slate-500">
-          No transactions landed past the observed window
-          {typeof tail.observed_window_end_block === "number" && (
-            <>
-              {" "}
-              (boundary: block {tail.observed_window_end_block.toLocaleString()}
-              )
-            </>
-          )}
-          .
-        </div>
-      </StatCard>
-    );
-  }
-
-  return (
-    <StatCard
-      title="Tail inclusion (txs past the observed window)"
-      titleTooltip={TAIL_INCLUSION_TOOLTIP}
-    >
-      <div className="flex flex-col gap-y-6">
-        <StatGrid>
-          <Stat
-            label="Tail count"
-            value={tail.count.toLocaleString()}
-            hint={`of ${totalConfirmed.toLocaleString()} confirmed`}
-          />
-          <Stat
-            label="% of confirmed"
-            value={`${tail.confirmed_pct.toFixed(2)}%`}
-          />
-          {typeof tail.observed_window_end_block === "number" && (
-            <Stat
-              label="Window end block"
-              value={tail.observed_window_end_block.toLocaleString()}
-              hint="tail = block_number > end"
-            />
-          )}
-          {blockRange && (
-            <Stat
-              label="Tail block range"
-              value={formatBlockRange(blockRange)}
-              hint={`${blockRange.block_count.toLocaleString()} blocks`}
-            />
-          )}
-        </StatGrid>
-
-        <div>
-          <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-            Time past observed window
-          </h3>
-          <PercentileBarChart rows={timePastRows} barColorClass="bg-rose-500" />
-        </div>
-
-        <div>
-          <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-            Block latency (tail)
-          </h3>
-          <PercentileBarChart
-            rows={blockLatencyRows}
-            barColorClass="bg-amber-500"
-          />
-        </div>
-
-        {hasReceiptDelay && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-              Block receipt delay (tail)
-            </h3>
-            <PercentileBarChart
-              rows={receiptDelayRows}
-              barColorClass="bg-sky-500"
-            />
-          </div>
-        )}
-
-        <div>
-          <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-            Flashblocks latency (tail) ·{" "}
-            {tail.flashblocks_latency.count.toLocaleString()} samples
-          </h3>
-          <PercentileBarChart
-            rows={flashblocksRows}
-            barColorClass="bg-fuchsia-500"
-          />
-        </div>
-      </div>
-    </StatCard>
-  );
-};
-
-const FullRunBaselineSection = ({ result }: { result: LoadTestResult }) => {
-  const submitted = result.throughput.total_submitted;
-  const confirmed = result.throughput.total_confirmed;
-  const failed = result.throughput.total_failed;
-  const reverted = result.throughput.total_reverted;
-  const blockRange = result.block_range;
-
-  const blockLatencyRows = useMemo(
-    () => buildLatencyRows(result.block_latency),
-    [result.block_latency],
-  );
-  const flashblocksRows = useMemo(
-    () => buildLatencyRows(result.flashblocks_latency),
-    [result.flashblocks_latency],
-  );
-  const receiptDelayRows = useMemo(
-    () =>
-      result.block_receipt_delay
-        ? buildLatencyRows(result.block_receipt_delay)
-        : [],
-    [result.block_receipt_delay],
-  );
-
-  return (
-    <details className="border border-slate-200 bg-white rounded-lg">
-      <summary className="cursor-pointer select-none px-6 py-4 text-sm font-semibold text-slate-500 uppercase tracking-wide hover:bg-slate-50">
-        Full-run baseline (observed window + tail combined)
-      </summary>
-      <div className="px-6 pb-6 pt-2 flex flex-col gap-y-6">
-        <p className="text-xs text-slate-500 -mt-2">
-          Full-run averages dilute the clean reporting window with tail
-          stragglers. Use the observed-window numbers above for headline
-          comparisons; this section is included for completeness.
-        </p>
-
-        <StatGrid>
-          <Stat
-            label="Wall-clock duration"
-            value={formatDuration(result.throughput.duration)}
-          />
-          <Stat label="Submitted" value={submitted.toLocaleString()} />
-          <Stat
-            label="Confirmed"
-            value={confirmed.toLocaleString()}
-            hint={formatPercent(confirmed, submitted) + " of submitted"}
-          />
-          <Stat label="Failed" value={failed.toLocaleString()} />
-          {reverted > 0 && (
-            <Stat
-              label="Reverted"
-              value={reverted.toLocaleString()}
-              hint={formatPercent(reverted, confirmed) + " of confirmed"}
-            />
-          )}
-          <Stat label="Avg TPS" value={formatTps(result.throughput.tps)} />
-          <Stat
-            label="Avg gas/s"
-            value={formatGpsVerbose(result.throughput.gps)}
-          />
-          <Stat
-            label="Total gas"
-            value={formatGasVerbose(result.gas.total_gas)}
-            hint={`${result.gas.avg_gas.toLocaleString()} avg / tx`}
-          />
-          <Stat
-            label="Total cost"
-            value={formatEthFromWei(result.gas.total_cost_wei)}
-            hint={`${result.gas.avg_gas_price.toLocaleString()} wei avg gas price`}
-          />
-          {blockRange && (
-            <Stat
-              label="Block range"
-              value={formatBlockRange(blockRange)}
-              hint={`${blockRange.block_count.toLocaleString()} blocks`}
-            />
-          )}
-        </StatGrid>
-
-        <div>
-          <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-            Block latency (full run)
-          </h3>
-          <PercentileBarChart
-            rows={blockLatencyRows}
-            barColorClass="bg-amber-500"
-          />
-        </div>
-
-        {result.block_receipt_delay && (
-          <div>
-            <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-              Block receipt delay (full run)
-            </h3>
-            <PercentileBarChart
-              rows={receiptDelayRows}
-              barColorClass="bg-sky-500"
-            />
-          </div>
-        )}
-
-        <div>
-          <h3 className="text-xs uppercase tracking-wide text-slate-500 mb-2">
-            Flashblocks latency (full run) ·{" "}
-            {result.flashblocks_latency.count.toLocaleString()} samples
-          </h3>
-          <PercentileBarChart
-            rows={flashblocksRows}
-            barColorClass="bg-fuchsia-500"
-          />
-        </div>
-      </div>
-    </details>
-  );
-};
-
 interface LoadTestReportContentProps {
   result: LoadTestResult;
   title: string;
@@ -436,7 +182,6 @@ export const LoadTestReportContent = ({
   backLink,
 }: LoadTestReportContentProps) => {
   const observedWindow = result.observed_window;
-  const tail = result.tail ?? undefined;
 
   // Headline numbers come from observed_window when available, otherwise fall
   // back to the legacy full-run fields so older S3 runs still render.
@@ -445,8 +190,6 @@ export const LoadTestReportContent = ({
     observedWindow?.block_latency ?? result.block_latency;
   const headlineFlashblocksLatency =
     observedWindow?.flashblocks_latency ?? result.flashblocks_latency;
-  const headlineReceiptDelay =
-    observedWindow?.block_receipt_delay ?? result.block_receipt_delay;
 
   const headlineBlockLatencyRows = useMemo(
     () => buildLatencyRows(headlineBlockLatency),
@@ -456,13 +199,8 @@ export const LoadTestReportContent = ({
     () => buildLatencyRows(headlineFlashblocksLatency),
     [headlineFlashblocksLatency],
   );
-  const headlineReceiptDelayRows = useMemo(
-    () => (headlineReceiptDelay ? buildLatencyRows(headlineReceiptDelay) : []),
-    [headlineReceiptDelay],
-  );
 
   const headlineLabel = observedWindow ? "Observed-window TPS" : "Swaps/s";
-  const latencyScopeLabel = observedWindow ? "observed window" : "full run";
 
   return (
     <>
@@ -498,41 +236,28 @@ export const LoadTestReportContent = ({
 
       {result.config && <ConfigCard config={result.config} />}
 
-      {observedWindow && <ObservedWindowSummary window={observedWindow} />}
+      {observedWindow && (
+        <ObservedWindowSummary
+          window={observedWindow}
+          totalSubmitted={result.throughput.total_submitted}
+        />
+      )}
 
-      <StatCard title={`Block latency (submit → block, ${latencyScopeLabel})`}>
+      <StatCard title="Block latency (e2e client observed)">
         <PercentileBarChart
           rows={headlineBlockLatencyRows}
           barColorClass="bg-amber-500"
         />
       </StatCard>
 
-      {headlineReceiptDelay && (
-        <StatCard
-          title={`Block receipt delay (block → receipt, ${latencyScopeLabel})`}
-        >
-          <PercentileBarChart
-            rows={headlineReceiptDelayRows}
-            barColorClass="bg-sky-500"
-          />
-        </StatCard>
-      )}
-
       <StatCard
-        title={`Flashblocks latency (submit → flashblock, ${latencyScopeLabel}) · ${headlineFlashblocksLatency.count.toLocaleString()} samples`}
+        title={`Flashblocks latency (e2e client observed) · ${headlineFlashblocksLatency.count.toLocaleString()} samples`}
       >
         <PercentileBarChart
           rows={headlineFlashblocksRows}
           barColorClass="bg-fuchsia-500"
         />
       </StatCard>
-
-      {tail && (
-        <TailSection
-          tail={tail}
-          totalConfirmed={result.throughput.total_confirmed}
-        />
-      )}
 
       <StatCard title="Top failure reasons">
         {(() => {
@@ -562,8 +287,6 @@ export const LoadTestReportContent = ({
           );
         })()}
       </StatCard>
-
-      {observedWindow && <FullRunBaselineSection result={result} />}
     </>
   );
 };
