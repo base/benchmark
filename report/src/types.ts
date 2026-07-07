@@ -130,10 +130,9 @@ export interface RustDuration {
   nanos: number;
 }
 
+// Mirrors Rust `LatencyMetrics`. No `count` field — only
+// `FlashblocksLatencyStats` carries a sample count.
 export interface LatencyStats {
-  // NOTE: `count` is currently only present on flashblocks_latency, not
-  // block_latency. See upgrades.md P0 #2. Treat as optional until backend fixes.
-  count?: number;
   min: RustDuration;
   max: RustDuration;
   mean: RustDuration;
@@ -227,67 +226,25 @@ export interface ThroughputSample {
   gps: number;
 }
 
-/**
- * Clean reporting window for a configured-duration run. Defined as the first
- * `expected_block_count` blocks starting at `block_range.first_block`. TPS/GPS
- * denominator is `duration` (= expected_block_count * BLOCK_INTERVAL), not the
- * full wall-clock run, so headline numbers are not diluted by tail stragglers.
- * Producer added in base/base#3358.
- */
-export interface ObservedWindowMetrics {
-  expected_block_count: number;
-  block_range: BlockRange;
-  duration: RustDuration;
-  confirmed_count: number;
-  tps: number;
-  gps: number;
-  block_latency: LatencyStats;
-  block_receipt_delay: LatencyStats;
-  flashblocks_latency: FlashblocksLatencyStats;
-}
-
-/**
- * Inclusion-delay tail: txs landing in blocks past the observed window
- * (`block_number > observed_window_end_block`). `null` on continuous runs
- * (no configured duration). Producer added in base/base#3358.
- */
-export interface TailMetrics {
-  observed_window_end_block: number | null;
-  count: number;
-  confirmed_pct: number;
-  block_range: BlockRange;
-  time_past_observed_window: LatencyStats;
-  block_latency: LatencyStats;
-  block_receipt_delay: LatencyStats;
-  flashblocks_latency: FlashblocksLatencyStats;
-}
-
+// Mirrors Rust `MetricsSummary` (base/base#3695). Reports client-to-client
+// end-to-end latency over the full run; the earlier observed-window/tail split
+// and per-tx block_receipt_delay were removed.
 export interface LoadTestResult {
+  // Present only on runs where a fatal error stopped the test.
+  error?: string;
   block_latency: LatencyStats;
-  // Submit-to-receipt-observation delay, full-run baseline. Optional for
-  // back-compat: producer added in base/base#3358.
-  block_receipt_delay?: LatencyStats;
   flashblocks_latency: FlashblocksLatencyStats;
   throughput: ThroughputStats;
   throughput_percentiles: ThroughputPercentiles;
+  throughput_timeseries: ThroughputSample[];
   gas: GasStats;
+  block_range: BlockRange;
   // Element type is best-effort until upgrades.md P3 #7 lands. Empty arrays
   // dominate today, so we have no live samples to verify against.
   top_failure_reasons: FailureReason[];
-  // Both optional for back-compat: older S3 runs predate these fields and the
-  // page must render without them. Sections that depend on each field are
-  // gated on its presence rather than rendering empty placeholders.
+  // Optional for back-compat: older S3 runs predate this field, and the page
+  // omits the config card when absent.
   config?: LoadTestConfig;
-  throughput_timeseries?: ThroughputSample[];
-  // Optional for back-compat: older runs predate this field. The summary
-  // section gates the block range stats on its presence.
-  block_range?: BlockRange;
-  // Observed reporting window (clean TPS / latency). Optional for back-compat:
-  // older S3 runs predate this; the page falls back to full-run fields.
-  observed_window?: ObservedWindowMetrics;
-  // Inclusion-delay tail. `null` on continuous runs; `undefined` on older
-  // runs that predate the field.
-  tail?: TailMetrics | null;
 }
 
 /**
