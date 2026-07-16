@@ -207,7 +207,14 @@ export interface LoadTestConfig {
   target_gps: number;
   seed: number;
   chain_id: number | null;
-  transactions: Array<{ type: string; weight: number }>;
+  // Storage-type entries also carry `contract` and `slots_per_tx` (flattened
+  // from the Rust `TxTypeConfig::Storage` variant via `#[serde(tag = "type")]`).
+  transactions: Array<{
+    type: string;
+    weight: number;
+    contract?: string;
+    slots_per_tx?: number;
+  }>;
   fresh_recipient_ratio?: number;
   looper_contract: string | null;
   swap_token_amount: string;
