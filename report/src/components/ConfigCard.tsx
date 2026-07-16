@@ -63,6 +63,17 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
     { label: "Duration", value: config.duration },
     { label: "Target gas/s", value: formatTargetGps(config.target_gps) },
   ];
+  // Surface the storage workload's cold-slot count (from the `storage` tx's
+  // `slots_per_tx`) so proofs/storage runs show their per-tx write budget.
+  const storageTx = config.transactions.find(
+    (t) => t.type === "storage" && t.slots_per_tx != null,
+  );
+  if (storageTx?.slots_per_tx != null) {
+    target.push({
+      label: "Cold storage slots / tx",
+      value: storageTx.slots_per_tx.toLocaleString(),
+    });
+  }
 
   const funding: Row[] = [
     {

@@ -141,6 +141,7 @@ interface LoadTestReportContentProps {
     to: string;
     label: string;
   };
+  network?: string;
 }
 
 export const LoadTestReportContent = ({
@@ -148,6 +149,7 @@ export const LoadTestReportContent = ({
   title,
   subtitle,
   backLink,
+  network,
 }: LoadTestReportContentProps) => {
   const headlineTps = result.throughput.tps;
   const headlineFlashblocksLatency = result.flashblocks_latency;
@@ -161,7 +163,8 @@ export const LoadTestReportContent = ({
     [headlineFlashblocksLatency],
   );
 
-  const headlineLabel = "Swaps/s";
+  // Proofs runs are not swap-based, so the hero reads as raw TPS instead of Swaps/s.
+  const headlineLabel = network === "proofs" ? "TPS" : "Swaps/s";
 
   return (
     <>
@@ -290,6 +293,7 @@ const LoadTestDetail = () => {
               to: `/load-tests/${network ?? "sepolia"}/all`,
               label: "View all runs →",
             }}
+            network={network}
           />
         )}
       </main>
