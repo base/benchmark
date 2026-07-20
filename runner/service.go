@@ -93,9 +93,12 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 		return nil, errors.Wrap(err, "failed to open chain config file")
 	}
 
-	// write chain cfg
-	err = json.NewEncoder(chainCfgFile).Encode(genesis)
-	if err != nil {
+	// write chain cfg, preserving Base-specific config fields (config.base,
+	// config.activationAdminAddress) that go-ethereum's core.Genesis drops on
+	// decode. Without this, the reth node never schedules the Beryl upgrade and
+	// the B20 precompile suite (incl. PolicyRegistry) is never installed.
+	if err = writeChainConfig(chainCfgFile, genesis, snapshot); err != nil {
+		_ = chainCfgFile.Close()
 		return nil, errors.Wrap(err, "failed to write chain config")
 	}
 
@@ -155,6 +158,80 @@ func (s *service) setupInternalDirectories(testDir string, params types.RunParam
 	}
 
 	return internalOptions, nil
+}
+
+// baseConfigExtraKeys are Base-specific keys under genesis.config that
+// go-ethereum's params.ChainConfig has no struct fields for and therefore
+// discards during JSON decode. They must be carried over verbatim from the
+// source genesis file so the reth node schedules the Base upgrades.
+var baseConfigExtraKeys = []string{"base", "activationAdminAddress"}
+
+func writeChainConfig(w io.Writer, genesis *core.Genesis, snapshot *benchmark.SnapshotDefinition) error {
+	if snapshot == nil || snapshot.GenesisFile == nil {
+		return json.NewEncoder(w).Encode(genesis)
+	}
+
+	encoded, err := json.Marshal(genesis)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal genesis")
+	}
+
+	var chainCfg map[string]json.RawMessage
+	if err = json.Unmarshal(encoded, &chainCfg); err != nil {
+		return errors.Wrap(err, "failed to unmarshal encoded genesis")
+	}
+
+	extra, err := extractBaseConfigExtras(*snapshot.GenesisFile)
+	if err != nil {
+		return err
+	}
+	if len(extra) == 0 {
+		_, err = w.Write(encoded)
+		return err
+	}
+
+	var cfg map[string]json.RawMessage
+	if raw, ok := chainCfg["config"]; ok {
+		if err = json.Unmarshal(raw, &cfg); err != nil {
+			return errors.Wrap(err, "failed to unmarshal genesis config")
+		}
+	} else {
+		cfg = make(map[string]json.RawMessage)
+	}
+
+	for key, value := range extra {
+		cfg[key] = value
+	}
+
+	mergedCfg, err := json.Marshal(cfg)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal merged config")
+	}
+	chainCfg["config"] = mergedCfg
+
+	return json.NewEncoder(w).Encode(chainCfg)
+}
+
+func extractBaseConfigExtras(genesisPath string) (map[string]json.RawMessage, error) {
+	raw, err := os.ReadFile(genesisPath)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read source genesis file")
+	}
+
+	var source struct {
+		Config map[string]json.RawMessage `json:"config"`
+	}
+	if err = json.Unmarshal(raw, &source); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal source genesis file")
+	}
+
+	extra := make(map[string]json.RawMessage)
+	for _, key := range baseConfigExtraKeys {
+		if value, ok := source.Config[key]; ok {
+			extra[key] = value
+		}
+	}
+	return extra, nil
 }
 
 type TestRunMetadata struct {
@@ -510,6 +587,22 @@ func (s *service) runTest(ctx context.Context, params types.RunParams, workingDi
 		if validatorOptions != nil {
 			s.dumpLogFile(validatorOptions, "validator")
 		}
+
+		// Salvage any metrics collected before the failure so the run still
+		// reports its measured throughput instead of being dropped entirely.
+		// The post-run block-driving phase reliably times out on very large
+		// state ("context deadline exceeded" on newPayload), yet the sequencer
+		// phase has already produced a full metric series; discarding it would
+		// leave the report empty for an otherwise-valid measurement.
+		if salvaged, resErr := benchmark.GetResult(); resErr == nil {
+			salvaged.Success = false
+			if salvaged.FailureReason == "" {
+				salvaged.FailureReason = runErr.Error()
+			}
+			s.log.Warn("benchmark run errored; reporting salvaged metrics", "err", runErr)
+			return salvaged, nil
+		}
+
 		return nil, errors.Wrap(runErr, "failed to run benchmark")
 	}
 

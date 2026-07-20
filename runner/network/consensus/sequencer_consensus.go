@@ -137,17 +137,17 @@ func (f *SequencerConsensusClient) generatePayloadAttributes(sequencerTxs [][]by
 	}
 
 	l1BlockInfo := &derive.L1BlockInfo{
-		Number:               number,
-		Time:                 time,
-		BaseFee:              baseFee,
-		BlockHash:            blockHash,
-		SequenceNumber:       f.headBlockNumber,
-		BatcherAddr:          f.batcherAddr,
-		BlobBaseFee:          big.NewInt(1),
-		BaseFeeScalar:        1,
-		BlobBaseFeeScalar:    1,
-		OperatorFeeScalar:    0,
-		OperatorFeeConstant:  0,
+		Number:              number,
+		Time:                time,
+		BaseFee:             baseFee,
+		BlockHash:           blockHash,
+		SequenceNumber:      f.headBlockNumber,
+		BatcherAddr:         f.batcherAddr,
+		BlobBaseFee:         big.NewInt(1),
+		BaseFeeScalar:       1,
+		BlobBaseFeeScalar:   1,
+		OperatorFeeScalar:   0,
+		OperatorFeeConstant: 0,
 		// Intentionally 0: disables the post-Jovian DA footprint cap so
 		// the benchmark measures raw EL gas throughput rather than L1 DA
 		// budget. With a non-zero scalar, cheap-tx workloads plateau at
@@ -355,6 +355,10 @@ func (f *SequencerConsensusClient) Propose(ctx context.Context, blockMetrics *me
 	gasPerSecond := float64(gasPerBlock) / blockBuildingDuration.Seconds()
 	blockMetrics.AddExecutionMetric(networktypes.GasPerBlockMetric, float64(gasPerBlock))
 	blockMetrics.AddExecutionMetric(networktypes.GasPerSecondMetric, gasPerSecond)
+	// Record the build-cycle wall clock explicitly so the summary can compute a
+	// duration-weighted throughput (Σgas/Σduration) instead of reconstructing the
+	// denominator from gas/gasPerSecond, which is undefined for zero-gas blocks.
+	blockMetrics.AddExecutionMetric(networktypes.BlockBuildingDurationMetric, blockBuildingDuration)
 
 	// get transactions per block
 	transactionsPerBlock := len(payload.Transactions)
