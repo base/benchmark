@@ -9,6 +9,7 @@ import (
 type RunResult struct {
 	Success          bool                       `json:"success"`
 	Complete         bool                       `json:"complete"`
+	FailureReason    string                     `json:"failureReason,omitempty"`
 	SequencerMetrics *types.SequencerKeyMetrics `json:"sequencerMetrics,omitempty"`
 	ValidatorMetrics *types.ValidatorKeyMetrics `json:"validatorMetrics,omitempty"`
 	ClientVersion    string                     `json:"clientVersion,omitempty"`

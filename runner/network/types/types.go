@@ -3,6 +3,7 @@ package types
 import (
 	"crypto/ecdsa"
 	"math/big"
+	"sort"
 	"strings"
 	"time"
 
@@ -168,6 +169,91 @@ func getAverage(metrics []metrics.BlockMetrics, metricName string) float64 {
 	return total / float64(count)
 }
 
+// saturationGasFraction is the fraction of the MEDIAN observed gas/block a block must
+// reach to count as a full (saturated) block. Saturation is measured relative to the
+// median of the observed distribution rather than the configured gas limit because a
+// builder under real mempool and timing constraints rarely fills a block to its nominal
+// cap (observed peaks are commonly ~70% of the limit), so a limit-relative threshold
+// would reject every block. Median-relative (not peak-relative) is used so a single
+// exceptionally large block cannot shrink the qualifying window; blocks below this
+// fraction of the median are warmup, drain, or demand-starved and would dilute the rate.
+const saturationGasFraction = 0.5
+
+const (
+	RegimeCadenceLimited = "cadence-limited"
+	RegimeOverloaded     = "overloaded"
+	RegimeUnsaturated    = "unsaturated"
+)
+
+// median returns the median of values. It sorts a copy so the caller's slice is
+// untouched. Returns 0 for an empty input.
+func median(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+	sorted := append([]float64(nil), values...)
+	sort.Float64s(sorted)
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+	return (sorted[mid-1] + sorted[mid]) / 2
+}
+
+// saturatedThroughput computes a duration-weighted gas/second over the saturated-block
+// window and classifies the load regime.
+//
+// The headline rate is Σgas / Σblock_building_duration over blocks that reached
+// saturationGasFraction of the median observed gas/block. This aggregate rate is invariant
+// to how work is partitioned across blocks, unlike a mean of per-block rates which would
+// weight a 2s block and an 11s block equally.
+//
+// The regime keys off get_payload latency (the actual build compute), NOT
+// block_building_duration: the latter includes an intentional sleep to the block
+// deadline when the builder finishes early, so it is ~blockTime even when the builder is
+// idle most of the slot. A builder whose mean get_payload over the saturated window
+// exceeds the whole block time cannot sustain the cadence and is overloaded; otherwise it
+// finishes within the slot and is cadence-limited.
+func saturatedThroughput(blockMetrics []metrics.BlockMetrics, blockTime time.Duration) (gasPerSecond float64, saturatedBlocks int, regime string) {
+	var gasValues []float64
+	for _, m := range blockMetrics {
+		if gas, ok := m.GetMetricFloat(GasPerBlockMetric); ok {
+			gasValues = append(gasValues, gas)
+		}
+	}
+	gasThreshold := median(gasValues) * saturationGasFraction
+
+	var sumGas, sumDuration, sumGetPayload float64
+	for _, m := range blockMetrics {
+		gas, hasGas := m.GetMetricFloat(GasPerBlockMetric)
+		dur, hasDur := m.GetMetricFloat(BlockBuildingDurationMetric)
+		if !hasGas || !hasDur || dur <= 0 {
+			continue
+		}
+		if gasThreshold > 0 && gas < gasThreshold {
+			continue
+		}
+		sumGas += gas
+		sumDuration += dur
+		if getPayload, ok := m.GetMetricFloat(GetPayloadLatencyMetric); ok {
+			sumGetPayload += getPayload
+		}
+		saturatedBlocks++
+	}
+
+	if saturatedBlocks == 0 || sumDuration <= 0 {
+		return 0, 0, RegimeUnsaturated
+	}
+
+	gasPerSecond = sumGas / sumDuration
+	avgGetPayload := sumGetPayload / float64(saturatedBlocks)
+	regime = RegimeCadenceLimited
+	if blockTime > 0 && avgGetPayload > blockTime.Seconds() {
+		regime = RegimeOverloaded
+	}
+	return gasPerSecond, saturatedBlocks, regime
+}
+
 const (
 	UpdateForkChoiceLatencyMetric      = "latency/update_fork_choice"
 	NewPayloadLatencyMetric            = "latency/new_payload"
@@ -175,6 +261,7 @@ const (
 	SendTxsLatencyMetric               = "latency/send_txs"
 	GasPerBlockMetric                  = "gas/per_block"
 	GasPerSecondMetric                 = "gas/per_second"
+	BlockBuildingDurationMetric        = "duration/block_building"
 	TransactionsPerBlockMetric         = "transactions/per_block"
 	FlashblockProcessingDurationMetric = "reth_flashblocks_block_processing_duration"
 	FlashblockSenderRecoveryMetric     = "reth_flashblocks_sender_recovery_duration"
@@ -188,6 +275,8 @@ type SequencerKeyMetrics struct {
 	AverageFCULatency        float64 `json:"forkChoiceUpdated"`
 	AverageGetPayloadLatency float64 `json:"getPayload"`
 	AverageSendTxsLatency    float64 `json:"sendTxs"`
+	SaturatedBlockCount      int     `json:"saturatedBlockCount"`
+	Regime                   string  `json:"regime"`
 }
 
 type ValidatorKeyMetrics struct {
@@ -219,18 +308,24 @@ func BlockMetricsToValidatorSummary(metrics []metrics.BlockMetrics) *ValidatorKe
 }
 
 // BlockMetricsToSequencerSummary converts block metrics to a sequencer summary.
-func BlockMetricsToSequencerSummary(metrics []metrics.BlockMetrics) *SequencerKeyMetrics {
+//
+// AverageGasPerSecond is the duration-weighted throughput over the saturated
+// (full-block) window rather than a naive mean over every block. blockTime comes from
+// the run params and drives the cadence-limited/overloaded regime classification.
+func BlockMetricsToSequencerSummary(metrics []metrics.BlockMetrics, blockTime time.Duration) *SequencerKeyMetrics {
 	averageUpdateForkChoiceLatency := getAverage(metrics, UpdateForkChoiceLatencyMetric)
 	averageSendTxsLatency := getAverage(metrics, SendTxsLatencyMetric)
 	averageGetPayloadLatency := getAverage(metrics, GetPayloadLatencyMetric)
-	averageGasPerSecond := getAverage(metrics, GasPerSecondMetric)
+	saturatedGasPerSecond, saturatedBlocks, regime := saturatedThroughput(metrics, blockTime)
 
 	return &SequencerKeyMetrics{
 		AverageFCULatency:        averageUpdateForkChoiceLatency,
 		AverageSendTxsLatency:    averageSendTxsLatency,
 		AverageGetPayloadLatency: averageGetPayloadLatency,
+		SaturatedBlockCount:      saturatedBlocks,
+		Regime:                   regime,
 		CommonKeyMetrics: CommonKeyMetrics{
-			AverageGasPerSecond: averageGasPerSecond,
+			AverageGasPerSecond: saturatedGasPerSecond,
 		},
 	}
 }
