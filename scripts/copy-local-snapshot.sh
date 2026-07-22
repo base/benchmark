@@ -30,8 +30,10 @@ fi
 NODE_TYPE=$1
 DESTINATION=$2
 
-# TODO: inject with env var
-RETH_SNAPSHOT_LOCATION="/data/snapshots"
+# Overridable via env var so this script can point at any pre-staged datadir
+# (e.g. a Storage-V2 snapshot copied onto a non-ZFS/ext4 machine) without
+# editing the script itself.
+RETH_SNAPSHOT_LOCATION="${RETH_SNAPSHOT_LOCATION:-/data/snapshots}"
 
 case $NODE_TYPE in
 reth)

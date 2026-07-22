@@ -77,7 +77,10 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 	ctx, cancel := context.WithTimeout(ctx, 240*time.Second)
 	defer cancel()
 	var payloadResp engine.ExecutionPayloadEnvelope
-	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV4", payloadID)
+	// getPayloadV5 is required once Osaka (Base Azul) is active: reth rejects
+	// getPayloadV4 with -38005 "Unsupported fork" for Osaka-timestamped payloads.
+	// newPayload stays V4 and forkchoiceUpdated stays V3 at Osaka (only getPayload bumps).
+	err := b.authClient.CallContext(ctx, &payloadResp, "engine_getPayloadV5", payloadID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get payload")
 	}
@@ -90,7 +93,7 @@ func (b *BaseConsensusClient) getBuiltPayload(ctx context.Context, payloadID eng
 // newPayload calls engine_newPayloadV4 with the given executable data.
 func (b *BaseConsensusClient) newPayload(ctx context.Context, params *engine.ExecutableData, beaconRoot common.Hash) error {
 
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 300*time.Second)
 	defer cancel()
 	var resp engine.ForkChoiceResponse
 	err := b.authClient.CallContext(ctx, &resp, "engine_newPayloadV4", params, []common.Hash{}, beaconRoot, []common.Hash{})

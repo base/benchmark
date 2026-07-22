@@ -40,16 +40,31 @@ func newBenchmarkRunController(transactionWorker payloadworker.Worker, params be
 	return benchmarkRunController{maxBlocks: params.NumBlocks}
 }
 
-func (c benchmarkRunController) shouldStop(nextBlockIndex uint64) (bool, error) {
+// shouldStop reports whether block production should end. Worker completion is
+// always a clean stop: a load-test worker that finished its run has produced a
+// full metric series even if it exited non-zero (e.g. from expired/abandoned
+// submissions under overload). That exit status is a workload outcome, not a
+// harness failure, so it is surfaced separately via workerCompletionErr rather
+// than aborting here and discarding the collected metrics.
+func (c benchmarkRunController) shouldStop(nextBlockIndex uint64) bool {
 	if c.completion != nil {
 		select {
 		case <-c.completion.Done():
-			return true, c.completion.Err()
+			return true
 		default:
-			return false, nil
+			return false
 		}
 	}
-	return int(nextBlockIndex) > c.maxBlocks, nil
+	return int(nextBlockIndex) > c.maxBlocks
+}
+
+// workerCompletionErr returns the completion worker's exit error, if any. It is
+// only meaningful after shouldStop has reported a stop due to completion.
+func (c benchmarkRunController) workerCompletionErr() error {
+	if c.completion != nil {
+		return c.completion.Err()
+	}
+	return nil
 }
 
 func (c benchmarkRunController) usesWorkerCompletion() bool {
@@ -62,6 +77,12 @@ type sequencerBenchmark struct {
 	config             benchtypes.TestConfig
 	l1Chain            *l1Chain
 	transactionPayload payload.Definition
+
+	// workloadErr records a non-fatal load-test worker exit error observed when
+	// the worker completed its run. It is written by the block-production
+	// goroutine before it publishes payloads and read by benchmarkSequencer
+	// after Run returns; the payloadResult channel provides the happens-before.
+	workloadErr error
 }
 
 func newSequencerBenchmark(log log.Logger, config benchtypes.TestConfig, sequencerClient types.ExecutionClient, l1Chain *l1Chain, transactionPayload payload.Definition) *sequencerBenchmark {
@@ -277,14 +298,10 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		blockIndex := uint64(1)
 		for {
-			stop, err := runController.shouldStop(blockIndex)
-			if err != nil {
-				errChan <- errors.Wrap(err, "payload worker failed")
-				return
-			}
-			if stop {
+			if runController.shouldStop(blockIndex) {
 				if runController.usesWorkerCompletion() {
-					nb.log.Info("Payload worker completed", "blocks", blockIndex-1)
+					nb.workloadErr = runController.workerCompletionErr()
+					nb.log.Info("Payload worker completed", "blocks", blockIndex-1, "workloadErr", nb.workloadErr)
 				}
 				break
 			}
@@ -310,8 +327,7 @@ func (nb *sequencerBenchmark) Run(ctx context.Context, metricsCollector metrics.
 
 		if !runController.usesWorkerCompletion() {
 			if err := nb.settleGracefulWorkerShutdown(benchmarkCtx, transactionWorker, consensusClient, pendingTxs); err != nil {
-				errChan <- err
-				return
+				nb.log.Warn("settlement blocks failed (non-fatal, metrics already collected)", "err", err)
 			}
 		}
 

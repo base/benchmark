@@ -41,6 +41,12 @@ type NetworkBenchmark struct {
 	collectedSequencerMetrics *benchtypes.SequencerKeyMetrics
 	collectedValidatorMetrics *benchtypes.ValidatorKeyMetrics
 
+	// sequencerWorkloadErr holds a non-fatal load-test worker exit error. When
+	// set, the run produced a full metric series but the workload did not
+	// complete cleanly, so GetResult reports Success=false with this reason
+	// instead of discarding the metrics.
+	sequencerWorkloadErr error
+
 	testConfig  *benchtypes.TestConfig
 	proofConfig *benchmark.ProofProgramOptions
 
@@ -121,8 +127,8 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 	// Collect metrics in a deferred function to ensure they're always collected
 	defer func() {
 		sequencerMetrics := metricsCollector.GetMetrics()
-		if sequencerMetrics != nil {
-			nb.collectedSequencerMetrics = benchtypes.BlockMetricsToSequencerSummary(sequencerMetrics)
+		if len(sequencerMetrics) > 0 {
+			nb.collectedSequencerMetrics = benchtypes.BlockMetricsToSequencerSummary(sequencerMetrics, nb.testConfig.Params.BlockTime)
 			if err := metricsWriter.Write(sequencerMetrics); err != nil {
 				nb.log.Error("Failed to write sequencer metrics", "error", err)
 			}
@@ -136,6 +142,8 @@ func (nb *NetworkBenchmark) benchmarkSequencer(ctx context.Context, l1Chain *l1C
 		sequencerClient.Stop()
 		return nil, 0, nil, fmt.Errorf("failed to run sequencer benchmark: %w", err)
 	}
+
+	nb.sequencerWorkloadErr = benchmark.workloadErr
 
 	return payloadResult, lastBlock, sequencerClient, nil
 }
@@ -268,8 +276,11 @@ func (nb *NetworkBenchmark) GetResult() (*benchmark.RunResult, error) {
 
 	result := &benchmark.RunResult{
 		SequencerMetrics: nb.collectedSequencerMetrics,
-		Success:          true,
+		Success:          nb.sequencerWorkloadErr == nil,
 		Complete:         true,
+	}
+	if nb.sequencerWorkloadErr != nil {
+		result.FailureReason = nb.sequencerWorkloadErr.Error()
 	}
 
 	if nb.runsValidator() {

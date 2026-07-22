@@ -96,12 +96,21 @@ func (r *RethClient) Run(ctx context.Context, cfg *types.RuntimeConfig) error {
 	args = append(args, "--port", fmt.Sprintf("%d", r.p2pPort))
 	args = append(args, "-vv")
 
-	// increase mempool size
+	// increase mempool size. byte-size caps bind before count caps: reth accounts
+	// each pooled tx at its ~3.6KB in-memory footprint, so the prior 100MB cap
+	// evicted pending at ~29k txs and starved the builder. 8192MB holds >1M txs.
 	args = append(args, "--txpool.pending-max-count", "100000000")
 	args = append(args, "--txpool.queued-max-count", "100000000")
 	args = append(args, "--txpool.max-account-slots", "100000000")
-	args = append(args, "--txpool.pending-max-size", "100")
-	args = append(args, "--txpool.queued-max-size", "100")
+	args = append(args, "--txpool.pending-max-size", "8192")
+	args = append(args, "--txpool.queued-max-size", "8192")
+	args = append(args, "--txpool.basefee-max-size", "8192")
+
+	// reth defaults max-batch-size to 1, serializing pool insertions one tx at a
+	// time under the pool write lock; batching them lifts the admission ceiling.
+	args = append(args, "--txpool.max-batch-size", "1024")
+	args = append(args, "--txpool.additional-validation-tasks", "8")
+	args = append(args, "--txpool.max-new-pending-txs-notifications", "8192")
 
 	args = append(args, "--db.read-transaction-timeout", "0")
 	args = append(args, cfg.Args...)
