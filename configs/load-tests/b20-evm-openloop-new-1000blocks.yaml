@@ -9,7 +9,7 @@ seed: 12345
 funding_amount: "2000000000000000000"
 fresh_recipient_ratio: 1.0
 open_loop: true
-prefill_per_sender: 100000
+prefill_per_sender: 0  # 0 = unbounded streaming pre-sign (no prefill budget cap)
 skip_drain: true
 
 transactions:
