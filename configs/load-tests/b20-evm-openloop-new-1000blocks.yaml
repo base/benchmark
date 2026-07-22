@@ -3,6 +3,10 @@ sender_count: 100
 target_gps: 4000000000
 in_flight_per_sender: 4096
 batch_size: 200
+# Funding-phase batch size (separate from batch_size above). Kept at the reth
+# txpool default per-sender slot limit (16) to avoid "txpool is full" errors
+# during account setup; raise only if the target node's txpool limit is raised too.
+funding_batch_size: 16
 batch_timeout: "10ms"
 duration: "3600s"
 seed: 12345
