@@ -1,5 +1,9 @@
 name: B20 Precompile - new recipients (ext4 / Storage V2, 1000 blocks, caching study)
 block_time: "2s"
+flashblocks:
+  # 200ms per flashblock * 10 flashblocks = 2000ms (matches block_time above).
+  # Default (unset) is 250ms -> 8 flashblocks/block; we explicitly target 10.
+  block_time: "200"
 
 payloads:
   - name: B20 native precompile / new recipients (ext4 / Storage V2)
