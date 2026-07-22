@@ -1,0 +1,18 @@
+chain_id: 8453
+sender_count: 100
+target_gps: 4000000000
+in_flight_per_sender: 4096
+batch_size: 200
+batch_timeout: "10ms"
+duration: "3600s"
+seed: 12345
+funding_amount: "2000000000000000000"
+fresh_recipient_ratio: 1.0
+open_loop: true
+prefill_per_sender: 100000
+skip_drain: true
+
+transactions:
+  - weight: 100
+    type: b20_evm
+    contract: "0xb200000000000000000000000000000000000ee2"

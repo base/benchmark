@@ -1,0 +1,26 @@
+name: B20 Precompile - existing recipients (10M state, 100 blocks)
+block_time: "2s"
+
+payloads:
+  - name: B20 native precompile / existing recipients (10M state)
+    id: precompile-existing
+    type: load-test
+    config_file: ./load-tests/b20-evm-openloop.yaml
+
+benchmarks:
+  - snapshot:
+      command: ./scripts/zfs-clone-b20-10m.sh
+      superchain_chain_id: 8453
+      genesis_file: ./configs/genesis/base-mainnet-beryl.json
+      force_clean: false
+    roles:
+      - sequencer
+    variables:
+      - type: payload
+        value: precompile-existing
+      - type: node_type
+        value: builder
+      - type: num_blocks
+        value: 100
+      - type: gas_limit
+        value: 4000000000

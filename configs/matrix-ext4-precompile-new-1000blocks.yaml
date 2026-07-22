@@ -1,0 +1,33 @@
+name: B20 Precompile - new recipients (ext4 / Storage V2, 1000 blocks, caching study)
+block_time: "2s"
+
+payloads:
+  - name: B20 native precompile / new recipients (ext4 / Storage V2)
+    id: precompile-new-1000blocks-ext4
+    type: load-test
+    config_file: ./load-tests/b20-evm-openloop-new-1000blocks.yaml
+
+benchmarks:
+  - snapshot:
+      # copy-local-snapshot.sh is filesystem-agnostic (plain rsync) and
+      # idempotent (skips the copy if $DESTINATION/db/mdbx.dat already
+      # exists), unlike the zfs-clone-*.sh scripts used elsewhere in this
+      # repo. force_clean MUST be false here — base-bench defaults it to
+      # true and wipes the destination dir before invoking the snapshot
+      # command otherwise, which would force a full re-copy of the (large,
+      # tip-synced) datadir on every run instead of reusing it in place.
+      command: ./scripts/copy-local-snapshot.sh
+      superchain_chain_id: 8453
+      genesis_file: ./configs/genesis/base-mainnet-beryl.json
+      force_clean: false
+    roles:
+      - sequencer
+    variables:
+      - type: payload
+        value: precompile-new-1000blocks-ext4
+      - type: node_type
+        value: builder
+      - type: num_blocks
+        value: 1000
+      - type: gas_limit
+        value: 4000000000

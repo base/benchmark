@@ -1,0 +1,13 @@
+chain_id: 8453
+sender_count: 100
+in_flight_per_sender: 512
+batch_size: 100
+batch_timeout: "10ms"
+duration: "60s"
+seed: 12345
+funding_amount: "2000000000000000000"
+fresh_recipient_ratio: 0.0
+
+transactions:
+  - weight: 100
+    type: b20
