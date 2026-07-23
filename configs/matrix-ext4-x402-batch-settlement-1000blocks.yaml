@@ -1,0 +1,31 @@
+name: x402 Batch Settlement (ext4, 1000 blocks)
+block_time: "2s"
+flashblocks:
+  block_time: "200"
+
+payloads:
+  - name: x402 batch settlement / open-loop (ext4)
+    id: x402-batch-settlement-1000blocks-ext4
+    type: load-test
+    config_file: ./load-tests/x402-batch-settlement-openloop.yaml
+
+benchmarks:
+  - snapshot:
+      command: echo not running
+      superchain_chain_id: 8453
+      genesis_file: ./configs/genesis/base-mainnet-beryl.json
+      force_clean: false
+    datadirs:
+      sequencer: /mnt/mainnet-snapshot-archive
+      validator: /mnt/none
+    roles:
+      - sequencer
+    variables:
+      - type: payload
+        value: x402-batch-settlement-1000blocks-ext4
+      - type: node_type
+        value: builder
+      - type: num_blocks
+        value: 1000
+      - type: gas_limit
+        value: 4000000000

@@ -1,0 +1,35 @@
+chain_id: 8453
+sender_count: 100
+target_gps: 4000000000
+in_flight_per_sender: 4096
+batch_size: 200
+funding_batch_size: 16
+batch_timeout: "10ms"
+duration: "3600s"
+seed: 987321
+funding_amount: "500000000000000000"
+open_loop: true
+prefill_per_sender: 0
+skip_drain: true
+
+batch_settlement:
+  settlement_contract: "0x0000000000000000000000000000000000000000"
+  token: "0xD5409af0AA7Ee0cB7fF1375FCecECDdbf75febA3"
+  collector: "0x0000000000000000000000000000000000000000"
+  channels_per_sender: 16
+  channels_per_claim: 8
+  fresh_channel_ratio: 0.25
+  deposit_amount: "1000000000"
+  claim_ladder_rungs: 128
+  topups_per_channel: 8
+  withdraw_delay_secs: 3600
+
+transactions:
+  - weight: 90
+    type: batch_settlement_claim_with_signature
+  - weight: 5
+    type: batch_settlement_deposit
+  - weight: 4
+    type: batch_settlement_settle
+  - weight: 1
+    type: batch_settlement_refund
