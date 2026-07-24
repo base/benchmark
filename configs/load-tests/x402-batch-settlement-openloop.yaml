@@ -5,7 +5,7 @@ in_flight_per_sender: 4096
 batch_size: 200
 funding_batch_size: 16
 batch_timeout: "10ms"
-duration: "3600s"
+duration: "60s"
 seed: 987321
 funding_amount: "500000000000000000"
 open_loop: true
@@ -20,8 +20,8 @@ batch_settlement:
   channels_per_claim: 8
   fresh_channel_ratio: 0.25
   deposit_amount: "1000000000"
-  claim_ladder_rungs: 128
-  topups_per_channel: 8
+  claim_ladder_rungs: 2816
+  topups_per_channel: 200
   withdraw_delay_secs: 3600
 
 transactions:
