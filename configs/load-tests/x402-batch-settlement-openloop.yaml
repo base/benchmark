@@ -13,9 +13,9 @@ prefill_per_sender: 0
 skip_drain: true
 
 batch_settlement:
-  settlement_contract: "0x0000000000000000000000000000000000000000"
-  token: "0xD5409af0AA7Ee0cB7fF1375FCecECDdbf75febA3"
-  collector: "0x0000000000000000000000000000000000000000"
+  settlement_contract: "0xd4FE634e56794A2Fd4bB7d4395d8F8db794dFfE9"
+  token: "0x87EB8c2fa1B531899f0E4389002cBbF64f1a5EEb"
+  collector: "0x686Cf3BE5427E68181d1AB9C88550647caF3B882"
   channels_per_sender: 16
   channels_per_claim: 8
   fresh_channel_ratio: 0.25
