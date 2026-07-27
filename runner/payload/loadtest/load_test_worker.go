@@ -24,8 +24,7 @@ import (
 
 // LoadTestPayloadDefinition is the YAML payload params for the load-test type.
 // The load-test workload itself lives in a native base-load-tester config file;
-// benchmark mode overlays the RPC fields it must control and overlays target_gps
-// only when the benchmark matrix specifies one.
+// benchmark mode overlays the RPC and block fields it must control.
 type LoadTestPayloadDefinition struct {
 	ConfigFile string `yaml:"config_file"`
 	Network    string `yaml:"network"`
@@ -44,12 +43,17 @@ type loadTestPayloadWorker struct {
 	mempool            *mempool.StaticWorkloadMempool
 	cmd                *exec.Cmd
 	done               chan struct{}
-	startOnce          sync.Once
+	measurementDone    chan struct{}
+	processOnce        sync.Once
+	armOnce            sync.Once
+	finishOnce         sync.Once
 	shutdownOnce       sync.Once
 	waitErrMu          sync.Mutex
 	waitErr            error
+	armErr             error
 	sourceConfigPath   string
 	renderedConfigPath string
+	controlDir         string
 	outputPath         string
 }
 
@@ -86,6 +90,7 @@ func NewLoadTestPayloadWorker(
 		configOverrides:  params.LoadTestConfigOverrides,
 		mempool:          mp,
 		done:             make(chan struct{}),
+		measurementDone:  make(chan struct{}),
 		sourceConfigPath: sourceConfigPath,
 		outputPath:       outputPath,
 	}
@@ -104,12 +109,16 @@ func (w *loadTestPayloadWorker) Setup(ctx context.Context) error {
 	}
 	w.renderedConfigPath = configPath
 
-	w.log.Info("Prepared load test", "binary", w.loadTestBin, "config", configPath)
-	return nil
+	if err := w.start(ctx); err != nil {
+		return err
+	}
+	readyFile := filepath.Join(w.controlDir, "ready")
+	w.log.Info("Waiting for load test readiness", "ready_file", readyFile)
+	return w.waitForFile(ctx, readyFile, "load test exited before becoming ready")
 }
 
 func (w *loadTestPayloadWorker) start(ctx context.Context) error {
-	w.startOnce.Do(func() {
+	w.processOnce.Do(func() {
 		if w.renderedConfigPath == "" {
 			w.finish(errors.New("load-test config has not been prepared"))
 			return
@@ -117,7 +126,13 @@ func (w *loadTestPayloadWorker) start(ctx context.Context) error {
 
 		w.log.Info("Starting load test", "binary", w.loadTestBin, "config", w.renderedConfigPath)
 
-		cmd := exec.CommandContext(ctx, w.loadTestBin, w.renderedConfigPath)
+		cmd := exec.CommandContext(
+			ctx,
+			w.loadTestBin,
+			"--separate-setup", w.controlDir,
+			"--block-gas-limit", strconv.FormatUint(w.gasLimit, 10),
+			w.renderedConfigPath,
+		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stdout
 		cmd.Env = append(os.Environ(), fmt.Sprintf("FUNDER_KEY=%s", w.prefundSK))
@@ -134,8 +149,28 @@ func (w *loadTestPayloadWorker) start(ctx context.Context) error {
 			return
 		}
 		w.cmd = cmd
+		if w.measurementDone == nil {
+			w.measurementDone = make(chan struct{})
+		}
 		go func() {
 			w.finish(cmd.Wait())
+		}()
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 24*time.Hour)
+			defer cancel()
+			err := w.waitForFile(
+				ctx,
+				filepath.Join(w.controlDir, "finished"),
+				"load test exited before measurement completed",
+			)
+			if err != nil {
+				w.waitErrMu.Lock()
+				if w.waitErr == nil {
+					w.waitErr = err
+				}
+				w.waitErrMu.Unlock()
+			}
+			close(w.measurementDone)
 		}()
 	})
 
@@ -174,6 +209,10 @@ func (w *loadTestPayloadWorker) Done() <-chan struct{} {
 	return w.done
 }
 
+func (w *loadTestPayloadWorker) MeasurementDone() <-chan struct{} {
+	return w.measurementDone
+}
+
 func (w *loadTestPayloadWorker) Err() error {
 	w.waitErrMu.Lock()
 	defer w.waitErrMu.Unlock()
@@ -181,10 +220,14 @@ func (w *loadTestPayloadWorker) Err() error {
 }
 
 func (w *loadTestPayloadWorker) finish(err error) {
-	w.waitErrMu.Lock()
-	w.waitErr = err
-	w.waitErrMu.Unlock()
-	close(w.done)
+	w.finishOnce.Do(func() {
+		w.waitErrMu.Lock()
+		if w.waitErr == nil {
+			w.waitErr = err
+		}
+		w.waitErrMu.Unlock()
+		close(w.done)
+	})
 }
 
 func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
@@ -213,15 +256,71 @@ func (w *loadTestPayloadWorker) Stop(ctx context.Context) error {
 			w.log.Warn("failed to remove load-test config", "path", w.renderedConfigPath, "err", err)
 		}
 	}
+	if w.controlDir != "" {
+		if err := os.RemoveAll(w.controlDir); err != nil {
+			w.log.Warn("failed to remove load-test control directory", "path", w.controlDir, "err", err)
+		}
+	}
 
 	return nil
 }
 
 func (w *loadTestPayloadWorker) SendTxs(ctx context.Context, _ int) (int, error) {
-	if err := w.start(ctx); err != nil {
-		return 0, err
+	w.armOnce.Do(func() {
+		startFile := filepath.Join(w.controlDir, "start")
+		if err := publishFile(startFile); err != nil {
+			w.armErr = errors.Wrap(err, "failed to arm load test")
+			return
+		}
+		startedFile := filepath.Join(w.controlDir, "started")
+		w.log.Info("Armed load test; waiting for start acknowledgement", "started_file", startedFile)
+		w.armErr = w.waitForFile(ctx, startedFile, "load test exited before acknowledging start")
+	})
+	return 0, w.armErr
+}
+
+func (w *loadTestPayloadWorker) waitForFile(ctx context.Context, path, exitMessage string) error {
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
 	}
-	return 0, nil
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if _, err := os.Stat(path); err == nil {
+			return nil
+		} else if !os.IsNotExist(err) {
+			return errors.Wrap(err, "failed to inspect load-test handshake file")
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-w.Done():
+			if err := w.Err(); err != nil {
+				return errors.Wrap(err, exitMessage)
+			}
+			return errors.New(exitMessage)
+		case <-ticker.C:
+		}
+	}
+}
+
+func publishFile(path string) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".load-test-handshake-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func resolveConfigFilePath(benchmarkConfigPath string, loadTestConfigPath string) (string, error) {
@@ -258,9 +357,8 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 		flashblocksURL = "ws://localhost:7111"
 	}
 	setMappingValue(config, "flashblocks_ws", stringNode(flashblocksURL))
-	if w.blockTime > 0 && w.gasLimit > 0 {
-		targetGPS := w.gasLimit / uint64(w.blockTime.Seconds())
-		setMappingValue(config, "target_gps", uintNode(targetGPS))
+	if mappingUintValue(config, "mempool_target_blocks") == 0 {
+		setMappingValue(config, "mempool_target_blocks", uintNode(3))
 	}
 	for key, value := range w.configOverrides {
 		node, err := nodeFromValue(value)
@@ -269,6 +367,7 @@ func (w *loadTestPayloadWorker) buildConfig() (*yaml.Node, error) {
 		}
 		setMappingValue(config, key, node)
 	}
+	setMappingValue(config, "target_gps", nullNode())
 
 	return config, nil
 }
@@ -298,6 +397,16 @@ func setMappingValue(mapping *yaml.Node, key string, value *yaml.Node) {
 	mapping.Content = append(mapping.Content, stringNode(key), value)
 }
 
+func mappingUintValue(mapping *yaml.Node, key string) uint64 {
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == key {
+			value, _ := strconv.ParseUint(mapping.Content[i+1].Value, 10, 64)
+			return value
+		}
+	}
+	return 0
+}
+
 func stringNode(value string) *yaml.Node {
 	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value}
 }
@@ -322,6 +431,10 @@ func nodeFromValue(value interface{}) (*yaml.Node, error) {
 	return doc.Content[0], nil
 }
 
+func nullNode() *yaml.Node {
+	return &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!null", Value: "null"}
+}
+
 func stringSequenceNode(values ...string) *yaml.Node {
 	node := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 	for _, value := range values {
@@ -331,10 +444,25 @@ func stringSequenceNode(values ...string) *yaml.Node {
 }
 
 // writeConfig generates a temporary YAML config file for the load-test binary
-// with benchmark-controlled RPC, timing, and report fields.
+// with benchmark-controlled RPC, block, handshake, and report fields.
 func (w *loadTestPayloadWorker) writeConfig() (string, error) {
+	tmpFile, err := os.CreateTemp("", "load-test-config-*.yaml")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to create temp config file")
+	}
+	configPath := tmpFile.Name()
+	if err := tmpFile.Close(); err != nil {
+		return "", errors.Wrap(err, "failed to close temp config file")
+	}
+	w.controlDir, err = os.MkdirTemp("", "load-test-control-*")
+	if err != nil {
+		_ = os.Remove(configPath)
+		return "", errors.Wrap(err, "failed to create load-test control directory")
+	}
+
 	config, err := w.buildConfig()
 	if err != nil {
+		_ = os.Remove(configPath)
 		return "", err
 	}
 	data, err := yaml.Marshal(config)
@@ -342,18 +470,9 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 		return "", errors.Wrap(err, "failed to marshal load-test config")
 	}
 
-	tmpFile, err := os.CreateTemp("", "load-test-config-*.yaml")
-	if err != nil {
-		return "", errors.Wrap(err, "failed to create temp config file")
-	}
-
-	if _, err := tmpFile.Write(data); err != nil {
-		_ = tmpFile.Close()
+	if err := os.WriteFile(configPath, data, 0600); err != nil {
+		_ = os.Remove(configPath)
 		return "", errors.Wrap(err, "failed to write temp config file")
-	}
-
-	if err := tmpFile.Close(); err != nil {
-		return "", errors.Wrap(err, "failed to close temp config file")
 	}
 
 	w.log.Info("Generated load-test config",
@@ -362,5 +481,5 @@ func (w *loadTestPayloadWorker) writeConfig() (string, error) {
 		"block_time", w.blockTime,
 	)
 
-	return tmpFile.Name(), nil
+	return configPath, nil
 }
