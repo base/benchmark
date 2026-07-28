@@ -61,7 +61,7 @@ def workload_name(result: dict) -> str:
 
 def import_result(
     source: Path, output_root: Path, benchmark_run: str, client_version: str
-) -> dict:
+) -> None:
     result = json.loads(source.read_text())
     interval_ms = result["block_interval_ms"]
     workload = workload_name(result)
@@ -88,67 +88,57 @@ def import_result(
         json.dumps(load_test, indent=2) + "\n"
     )
 
-    load_throughput = load_test["throughput"]
     created_at = datetime.fromtimestamp(source.stat().st_mtime, timezone.utc).isoformat()
-    return {
-        "id": run_name,
-        "sourceFile": source.name,
-        "testName": "Base mainnet snapshot throughput",
-        "testDescription": "Saturated block production from an existing Base mainnet datadir",
-        "outputDir": run_name,
-        "createdAt": created_at,
-        "testConfig": {
-            "BenchmarkRun": benchmark_run,
-            "BlockTimeMilliseconds": interval_ms,
-            "GasLimit": blocks[0]["gas_limit"],
-            "Workload": workload,
-            "ClientVersion": client_version,
-        },
-        "result": {
-            "success": load_test.get("error") is None,
-            "complete": True,
-            "clientVersion": client_version,
-            "sequencerMetrics": {
-                "gasPerSecond": canonical_rate(blocks, interval_ms, "gas_used"),
-                "transactionsPerSecond": canonical_rate(
-                    blocks, interval_ms, "transaction_count"
-                ),
-            },
-            "validatorMetrics": {
-                "gasPerSecond": canonical_rate(
-                    validator_blocks, interval_ms, "gas_used"
-                ),
-                "transactionsPerSecond": canonical_rate(
-                    validator_blocks, interval_ms, "transaction_count"
-                ),
-            },
-            "loadTestMetrics": {
-                "gasPerSecond": load_throughput["gps"],
-                "transactionsPerSecond": load_throughput["tps"],
-                "submitted": load_throughput["total_submitted"],
-                "confirmed": load_throughput["total_confirmed"],
-                "failed": load_throughput["total_failed"],
-                "reverted": load_throughput.get("total_reverted", 0),
-            },
-            "artifacts": {"loadTestResult": "load-test-result.json"},
-        },
+    metadata = {
+        "runs": [
+            {
+                "id": run_name,
+                "sourceFile": "base-mainnet-snapshot",
+                "testName": "Base mainnet snapshot throughput",
+                "testDescription": "Saturated block production from an existing Base mainnet datadir",
+                "outputDir": run_name,
+                "createdAt": created_at,
+                "testConfig": {
+                    "BenchmarkRun": benchmark_run,
+                    "BlockTimeMilliseconds": interval_ms,
+                    "GasLimit": blocks[0]["gas_limit"],
+                    "NodeType": "base-reth-node",
+                    "TransactionPayload": workload,
+                    "ClientVersion": client_version,
+                },
+                "result": {
+                    "success": load_test.get("error") is None,
+                    "complete": True,
+                    "clientVersion": client_version,
+                    "sequencerMetrics": {
+                        "gasPerSecond": canonical_rate(
+                            blocks, interval_ms, "gas_used"
+                        ),
+                    },
+                    "validatorMetrics": {
+                        "gasPerSecond": canonical_rate(
+                            validator_blocks, interval_ms, "gas_used"
+                        ),
+                    },
+                    "artifacts": {"loadTestResult": "load-test-result.json"},
+                },
+            }
+        ]
     }
+    # metadata.json is the report server's commit signal. Write it only after
+    # every artifact in this run directory is complete.
+    (run_dir / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
 
 
 def main() -> None:
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    runs = [
+    for source in args.results:
         import_result(
             source, args.output_dir, args.benchmark_run, args.client_version
         )
-        for source in args.results
-    ]
-    (args.output_dir / "metadata.json").write_text(
-        json.dumps({"runs": runs}, indent=2) + "\n"
-    )
     print(
-        f"Imported {len(runs)} run(s). Open /run-comparison/{args.benchmark_run} in the report."
+        f"Imported {len(args.results)} run(s). Open /run-comparison/{args.benchmark_run} in the report."
     )
 
 

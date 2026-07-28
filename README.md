@@ -144,16 +144,29 @@ cadence, and copies the load-generator summary alongside each run.
   /path/to/fresh-account-2s.json \
   /path/to/fresh-account-200ms.json
 
+make build-server
+./bin/report-server --local-dir ./output
+
+# In another shell:
 cd report
 yarn install
-yarn dev
+VITE_DATA_SOURCE=api \
+  VITE_API_BASE_URL=http://localhost:8080/ \
+  VITE_ALLOWED_HOSTS=eagle,localhost \
+  yarn dev --host 0.0.0.0
 ```
 
 Open
-[`http://localhost:3000/run-comparison/snapshot-throughput`](http://localhost:3000/run-comparison/snapshot-throughput).
+[`http://localhost:3000/#/run-comparison/snapshot-throughput`](http://localhost:3000/#/run-comparison/snapshot-throughput).
 Use **Show Line Per → Block Time Milliseconds**, then select the workload and
-node role to compare 2s and 200ms blocks. Generated data lives in the ignored
+node role to compare 2s and 200ms blocks. The workload is exposed through the
+standard **Transaction Payload** filter. Generated data lives in the ignored
 `output/` directory, so benchmark artifacts do not need to be committed.
+
+Each imported result owns one directory containing its role metrics,
+load-test artifact, and a one-run `metadata.json`. The importer writes metadata
+last as the commit signal. The report server discovers these per-run files and
+assembles `/output/metadata.json`; producers never update a shared metadata file.
 
 The imported report covers canonical gas/block, gas/s, transactions/block,
 transactions/s, and load-test totals. It does not yet collect host CPU, memory,
