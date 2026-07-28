@@ -33,18 +33,19 @@ def parse_args() -> argparse.Namespace:
 
 def metric_samples(blocks: list[dict], interval_ms: int) -> list[dict]:
     block_seconds = interval_ms / 1_000
-    return [
-        {
-            "BlockNumber": block["number"],
-            "ExecutionMetrics": {
+    samples = []
+    for index, block in enumerate(blocks, start=1):
+        metrics = dict(block.get("prometheus_metrics", {}))
+        metrics.update(
+            {
                 "gas/per_block": block["gas_used"],
                 "gas/per_second": block["gas_used"] / block_seconds,
                 "transactions/per_block": block["transaction_count"],
                 "transactions/per_second": block["transaction_count"] / block_seconds,
-            },
-        }
-        for block in blocks
-    ]
+            }
+        )
+        samples.append({"BlockNumber": index, "ExecutionMetrics": metrics})
+    return samples
 
 
 def canonical_rate(blocks: list[dict], interval_ms: int, key: str) -> float:
