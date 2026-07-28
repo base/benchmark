@@ -44,7 +44,10 @@ def metric_samples(blocks: list[dict], interval_ms: int) -> list[dict]:
                 "transactions/per_second": block["transaction_count"] / block_seconds,
             }
         )
-        samples.append({"BlockNumber": index, "ExecutionMetrics": metrics})
+        sample = {"BlockNumber": index, "ExecutionMetrics": metrics}
+        if "timestamp_ms" in block:
+            sample["Timestamp"] = block["timestamp_ms"]
+        samples.append(sample)
     return samples
 
 
