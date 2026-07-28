@@ -136,6 +136,18 @@ export const CHART_CONFIG = {
     description: "Shows the median gas per block",
     unit: "gas",
   },
+  "gas/per_second": {
+    type: "line",
+    title: "Canonical Gas Per Second",
+    description: "Shows actual canonical gas produced per second",
+    unit: "gas/s",
+  },
+  "transactions/per_second": {
+    type: "line",
+    title: "Canonical Transactions Per Second",
+    description: "Shows actual canonical transactions produced per second",
+    unit: "count",
+  },
   reth_sync_execution_execution_duration_avg: {
     type: "line",
     title: "Reth Sync Execution Duration",
@@ -404,6 +416,8 @@ const CHART_CONFIG_ORDER: (keyof typeof CHART_CONFIG)[] = [
   "latency/new_payload",
   "latency/update_fork_choice",
   "latency/send_txs",
+  "gas/per_second",
+  "transactions/per_second",
   "gas/per_block",
   "transactions/per_block",
   "chain/inserts.50-percentile",
