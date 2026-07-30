@@ -23,7 +23,9 @@ const baseConfig = (
 });
 
 const flatLabels = (config: LoadTestConfig): string[] =>
-  buildRows(config).flat().map((r) => r.label);
+  buildRows(config)
+    .flat()
+    .map((r) => r.label);
 
 describe("formatTransactions", () => {
   it("formats a weighted transaction mix", () => {
