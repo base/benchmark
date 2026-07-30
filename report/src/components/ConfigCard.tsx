@@ -35,37 +35,65 @@ export const formatTransactions = (
     .join(" · ");
 };
 
-const formatTargetGps = (gps: number): string => {
+export const formatTargetGps = (gps: number): string => {
   if (gps >= 1e9) return `${(gps / 1e9).toFixed(1)}B gas/s`;
   if (gps >= 1e6) return `${(gps / 1e6).toFixed(0)}M gas/s`;
   if (gps >= 1e3) return `${(gps / 1e3).toFixed(0)}k gas/s`;
   return `${gps.toLocaleString()} gas/s`;
 };
 
-const buildRows = (config: LoadTestConfig): Row[][] => {
-  const loadShape: Row[] = [
-    { label: "Senders", value: config.sender_count.toLocaleString() },
-    {
+/** Build labeled config rows, omitting null/undefined / schema-drift fields. */
+export const buildRows = (config: LoadTestConfig): Row[][] => {
+  const loadShape: Row[] = [];
+  if (typeof config.sender_count === "number") {
+    loadShape.push({
+      label: "Senders",
+      value: config.sender_count.toLocaleString(),
+    });
+  }
+  if (typeof config.in_flight_per_sender === "number") {
+    loadShape.push({
       label: "In-flight / sender",
       value: config.in_flight_per_sender.toLocaleString(),
-    },
-    { label: "Batch size", value: config.batch_size.toLocaleString() },
-    { label: "Batch timeout", value: config.batch_timeout },
-  ];
-  if (config.sender_offset !== 0) {
+    });
+  }
+  // Closed-loop: batch_size + batch_timeout. Open-loop dropped both.
+  if (typeof config.batch_size === "number") {
+    loadShape.push({
+      label: "Batch size",
+      value: config.batch_size.toLocaleString(),
+    });
+  }
+  if (config.batch_timeout != null) {
+    loadShape.push({ label: "Batch timeout", value: config.batch_timeout });
+  }
+  if (typeof config.sender_offset === "number" && config.sender_offset !== 0) {
     loadShape.push({
       label: "Sender offset",
       value: config.sender_offset.toLocaleString(),
     });
   }
 
-  const target: Row[] = [
-    { label: "Duration", value: config.duration },
-    { label: "Target gas/s", value: formatTargetGps(config.target_gps) },
-  ];
+  const target: Row[] = [];
+  if (config.duration != null) {
+    target.push({ label: "Duration", value: config.duration });
+  }
+  // Prefer target_gps; fall back to open-loop max_target_gps.
+  const targetGps =
+    typeof config.target_gps === "number"
+      ? config.target_gps
+      : typeof config.max_target_gps === "number"
+        ? config.max_target_gps
+        : null;
+  if (targetGps !== null) {
+    target.push({
+      label: "Target gas/s",
+      value: formatTargetGps(targetGps),
+    });
+  }
   // Surface the storage workload's cold-slot count (from the `storage` tx's
   // `slots_per_tx`) so proofs/storage runs show their per-tx write budget.
-  const storageTx = config.transactions.find(
+  const storageTx = config.transactions?.find(
     (t) => t.type === "storage" && t.slots_per_tx != null,
   );
   if (storageTx?.slots_per_tx != null) {
@@ -81,8 +109,14 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
       value: formatEthFromWeiString(config.funding_amount),
     },
   ];
+  if (typeof config.funding_batch_size === "number") {
+    funding.push({
+      label: "Funding batch size",
+      value: config.funding_batch_size.toLocaleString(),
+    });
+  }
   const hasSwapToken =
-    config.transactions.some((t) => t.type === "swap") &&
+    config.transactions?.some((t) => t.type === "swap") &&
     config.swap_token_amount &&
     config.swap_token_amount !== "0";
   if (hasSwapToken) {
@@ -92,15 +126,19 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
     });
   }
 
-  const repro: Row[] = [{ label: "Seed", value: config.seed.toLocaleString() }];
-  if (config.chain_id !== null) {
+  const repro: Row[] = [];
+  if (typeof config.seed === "number") {
+    repro.push({ label: "Seed", value: config.seed.toLocaleString() });
+  }
+  if (typeof config.chain_id === "number") {
     repro.push({ label: "Chain ID", value: config.chain_id.toLocaleString() });
   }
   if (config.looper_contract) {
     repro.push({ label: "Looper contract", value: config.looper_contract });
   }
 
-  return [loadShape, target, funding, repro];
+  // Drop empty groups so continuous / open-loop runs don't leave blank sections.
+  return [loadShape, target, funding, repro].filter((g) => g.length > 0);
 };
 
 const RowGroup = ({ rows }: { rows: Row[] }) => (

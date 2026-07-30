@@ -201,10 +201,17 @@ export interface LoadTestConfig {
   sender_count: number;
   sender_offset: number;
   in_flight_per_sender: number;
-  batch_size: number;
-  batch_timeout: string;
-  duration: string;
-  target_gps: number;
+  // Closed-loop producer fields. Open-loop (base#30092f0) dropped these in
+  // favor of funding_batch_size — treat as optional so both schemas render.
+  batch_size?: number | null;
+  batch_timeout?: string | null;
+  // Open-loop / funding-phase RPC batch size. Absent on older closed-loop runs.
+  funding_batch_size?: number | null;
+  // Option in Rust ConfigSummary — null when unset; may be absent on older runs.
+  duration: string | null;
+  target_gps?: number | null;
+  // Open-loop adaptive pacing ceiling; prefer when target_gps is absent.
+  max_target_gps?: number | null;
   seed: number;
   chain_id: number | null;
   // Storage-type entries also carry `contract` and `slots_per_tx` (flattened
@@ -218,6 +225,8 @@ export interface LoadTestConfig {
   fresh_recipient_ratio?: number;
   looper_contract: string | null;
   swap_token_amount: string;
+  // Present on newer producers; unused in the UI today.
+  b20_mint_amount?: string;
   // Producer omits unless real-token setup is enabled; loosely typed.
   real_token_setup?: Record<string, unknown> | null;
 }
