@@ -85,7 +85,7 @@ transactions:
 		"transaction_submission_rpcs:\n    - http://sequencer.example",
 		"query_rpc: http://sequencer.example",
 		"flashblocks_ws: ws://benchmark-flashblocks.example",
-		"target_gps: 75000000",
+		"mempool_target_blocks: 3",
 		"duration: \"60s\"",
 		"chain_id: 8453",
 		"sender_count: 250",
@@ -105,13 +105,16 @@ transactions:
 		"standalone-submitter.invalid",
 		"standalone-query.invalid",
 		"standalone-flashblocks.invalid",
-		"target_gps: 123",
+		"block_gas_limit:",
+		"ready_file:",
+		"start_file:",
+		"started_file:",
 	} {
 		require.NotContains(t, output, oldValue)
 	}
 }
 
-func TestBuildConfigPreservesNativeTargetGPSWhenGasLimitOrBlockTimeIsZero(t *testing.T) {
+func TestBuildConfigRemovesTargetGPSAndPreservesExplicitMempoolMultiplier(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
 	err := os.WriteFile(configPath, []byte(`
 transaction_submission_rpcs:
@@ -119,6 +122,7 @@ transaction_submission_rpcs:
 query_rpc: "http://standalone-query.invalid"
 flashblocks_ws: "ws://standalone-flashblocks.invalid"
 target_gps: 123
+mempool_target_blocks: 5
 duration: "60s"
 transactions:
   - weight: 100
@@ -139,7 +143,8 @@ transactions:
 	require.NoError(t, err)
 	output := string(encoded)
 
-	require.Contains(t, output, "target_gps: 123")
+	require.Contains(t, output, "target_gps: null")
+	require.Contains(t, output, "mempool_target_blocks: 5")
 	require.Contains(t, output, "duration: \"60s\"")
 }
 
@@ -178,13 +183,13 @@ transactions:
 	require.NoError(t, err)
 	output := string(encoded)
 
-	require.Contains(t, output, "target_gps: 75000000")
+	require.Contains(t, output, "target_gps: null")
 	require.Contains(t, output, "seed: 654790")
 	require.Contains(t, output, "fresh_recipient_ratio: 1")
 	require.NotContains(t, output, "seed: 654789")
 }
 
-func TestSetupPreparesConfigWithoutStartingProcess(t *testing.T) {
+func TestSetupStartsProcessAndFirstSendTxsCompletesHandshake(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
 	err := os.WriteFile(configPath, []byte(`
 transaction_submission_rpcs:
@@ -197,27 +202,122 @@ transactions:
 `), 0644)
 	require.NoError(t, err)
 
+	helper := writeHelper(t, `
+control=$2
+ready="$control/ready"
+start="$control/start"
+started="$control/started"
+finished="$control/finished"
+touch "$ready"
+while [ ! -e "$start" ]; do sleep 0.01; done
+touch "$started"
+touch "$finished"
+trap 'exit 0' INT TERM
+while :; do sleep 1; done
+`)
 	worker := &loadTestPayloadWorker{
 		log:              log.New(),
+		loadTestBin:      helper,
 		elRPCURL:         "http://sequencer.example",
 		sourceConfigPath: configPath,
 		done:             make(chan struct{}),
 	}
-	t.Cleanup(func() {
-		if worker.renderedConfigPath != "" {
-			require.NoError(t, os.Remove(worker.renderedConfigPath))
-		}
-	})
+	t.Cleanup(func() { require.NoError(t, worker.Stop(context.Background())) })
 
 	require.NoError(t, worker.Setup(context.Background()))
 	require.NotEmpty(t, worker.renderedConfigPath)
-	require.Nil(t, worker.cmd)
+	require.NotNil(t, worker.cmd)
+	require.FileExists(t, filepath.Join(worker.controlDir, "ready"))
+	require.NoFileExists(t, filepath.Join(worker.controlDir, "start"))
+
+	count, err := worker.SendTxs(context.Background(), 0)
+	require.NoError(t, err)
+	require.Zero(t, count)
+	require.FileExists(t, filepath.Join(worker.controlDir, "start"))
+	require.FileExists(t, filepath.Join(worker.controlDir, "started"))
+	select {
+	case <-worker.MeasurementDone():
+	case <-time.After(time.Second):
+		t.Fatal("measurement completion was not signaled")
+	}
+
+	// The barrier is one-shot; subsequent calls return immediately.
+	_, err = worker.SendTxs(context.Background(), 0)
+	require.NoError(t, err)
+}
+
+func TestSetupFailsWhenProcessExitsBeforeReady(t *testing.T) {
+	worker := testWorker(t, writeHelper(t, `exit 7`))
+	err := worker.Setup(context.Background())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "before becoming ready")
+	require.NoError(t, worker.Stop(context.Background()))
+}
+
+func TestSetupHonorsContextCancellation(t *testing.T) {
+	worker := testWorker(t, writeHelper(t, `while :; do sleep 1; done`))
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	err := worker.Setup(ctx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NoError(t, worker.Stop(context.Background()))
+}
+
+func TestSendTxsHonorsContextWhileWaitingForStarted(t *testing.T) {
+	worker := testWorker(t, writeHelper(t, `
+control=$2
+ready="$control/ready"
+touch "$ready"
+trap 'exit 0' INT TERM
+while :; do sleep 1; done
+`))
+	require.NoError(t, worker.Setup(context.Background()))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	_, err := worker.SendTxs(ctx, 0)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.FileExists(t, filepath.Join(worker.controlDir, "start"))
+	require.NoError(t, worker.Stop(context.Background()))
+}
+
+func TestCleanExitBeforeFinishedFailsMeasurement(t *testing.T) {
+	worker := testWorker(t, writeHelper(t, `
+control=$2
+touch "$control/ready"
+while [ ! -e "$control/start" ]; do sleep 0.01; done
+touch "$control/started"
+sleep 0.1
+exit 0
+`))
+	require.NoError(t, worker.Setup(context.Background()))
+	_, err := worker.SendTxs(context.Background(), 0)
+	require.NoError(t, err)
 
 	select {
-	case <-worker.Done():
-		t.Fatal("load-test worker should not be done before it starts")
-	default:
+	case <-worker.MeasurementDone():
+	case <-time.After(time.Second):
+		t.Fatal("measurement failure was not signaled")
 	}
+	require.ErrorContains(t, worker.Err(), "exited before measurement completed")
+	require.NoError(t, worker.Stop(context.Background()))
+}
+
+func testWorker(t *testing.T, binary string) *loadTestPayloadWorker {
+	t.Helper()
+	configPath := filepath.Join(t.TempDir(), "load-test.yaml")
+	require.NoError(t, os.WriteFile(configPath, []byte("transactions: []\n"), 0644))
+	return &loadTestPayloadWorker{
+		log: log.New(), loadTestBin: binary, elRPCURL: "http://sequencer.example",
+		sourceConfigPath: configPath, done: make(chan struct{}),
+	}
+}
+
+func writeHelper(t *testing.T, body string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "helper.sh")
+	require.NoError(t, os.WriteFile(path, []byte("#!/bin/sh\nset -eu\n"+body), 0755))
+	return path
 }
 
 func TestResolveConfigFilePath(t *testing.T) {
