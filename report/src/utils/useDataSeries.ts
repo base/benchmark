@@ -77,13 +77,23 @@ export const useMultipleDataSeries = (
   const multiFetcher = async (
     urlsToFetch: [runId: string, outputDir: string, role: string][],
   ) => {
-    // Fetch all metrics in parallel
-    const promises = urlsToFetch.map((url) => {
-      const [runId, outputDir, role] = url;
-      return fetcher([runId, outputDir, role]);
-    });
+    // Fetch all metrics in parallel, but tolerate individual failures: a run
+    // that is missing metrics for the requested role (e.g. a sequencer-only run
+    // grouped by role, which has no metrics-validator.json) 404s here. Degrade
+    // that one series to empty instead of rejecting the batch, so the remaining
+    // series still render. ChartGrid already skips series with no data points.
+    const results = await Promise.all(
+      urlsToFetch.map(async (url) => {
+        const [runId, outputDir, role] = url;
+        try {
+          return await fetcher([runId, outputDir, role]);
+        } catch {
+          return [] as MetricData[];
+        }
+      }),
+    );
 
-    return Promise.all(promises);
+    return results;
   };
 
   return useSWR(urlsToFetch, multiFetcher, {

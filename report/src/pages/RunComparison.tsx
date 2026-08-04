@@ -38,8 +38,7 @@ function RunComparison() {
         allBenchmarkRuns?.runs.filter(
           (run) =>
             run.testConfig.BenchmarkRun === benchmarkRunId &&
-            run.result?.complete &&
-            run.result.success,
+            run.result?.complete,
         ) ?? [],
     };
   }, [allBenchmarkRuns, benchmarkRunId]);
