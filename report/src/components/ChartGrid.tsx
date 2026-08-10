@@ -39,37 +39,61 @@ function resolveMetricKey(
   return primaryKey;
 }
 
+const GROUP_ORDER = ["Latency", "Chain", "Throughput"];
+
 const ChartGrid: React.FC<ProvidedProps> = ({ data, role }: ProvidedProps) => {
+  const chartData = data.flatMap((s) => s.data);
+  const thresholds = data[0]?.thresholds;
+
+  const visibleCharts = SORTED_CHART_CONFIG.flatMap(([metricKey, config]) => {
+    const resolvedKey = resolveMetricKey(data, metricKey, config.aliases);
+    const executionMetrics = chartData
+      .map((d) => d.ExecutionMetrics[resolvedKey])
+      .filter((v) => v !== undefined);
+    if (executionMetrics.length === 0) return [];
+    return [{ metricKey, resolvedKey, config }];
+  });
+
+  const grouped = visibleCharts.reduce<Record<string, typeof visibleCharts>>(
+    (acc, item) => {
+      const group = item.config.group ?? "Other";
+      if (!acc[group]) acc[group] = [];
+      acc[group].push(item);
+      return acc;
+    },
+    {},
+  );
+
+  const groupKeys = [
+    ...GROUP_ORDER.filter((g) => grouped[g]),
+    ...Object.keys(grouped).filter((g) => !GROUP_ORDER.includes(g)),
+  ];
+
   return (
     <div className="charts-container">
-      {SORTED_CHART_CONFIG.map(([metricKey, config]) => {
-        const resolvedKey = resolveMetricKey(data, metricKey, config.aliases);
-        const thresholdKey = role ? `${role}/${metricKey}` : null;
-        const chartData = data.flatMap((s) => s.data);
-        const thresholds = data[0]?.thresholds;
-        const executionMetrics = chartData
-          .map((d) => d.ExecutionMetrics[resolvedKey])
-          .filter((v) => v !== undefined);
-
-        if (executionMetrics.length === 0) {
-          return null;
-        }
-
-        const chartProps = {
-          series: data,
-          metricKey: resolvedKey,
-          title: config.title,
-          description: config.description,
-          unit: config.unit,
-          thresholds,
-        };
-
-        return (
-          <div key={metricKey} className="chart-container">
-            <LineChart thresholdKey={thresholdKey} {...chartProps} />
+      {groupKeys.map((group) => (
+        <div key={group} className="metric-group">
+          <h2 className="metric-group-title">{group}</h2>
+          <div className="metric-group-charts">
+            {grouped[group].map(({ metricKey, resolvedKey, config }) => {
+              const thresholdKey = role ? `${role}/${metricKey}` : null;
+              return (
+                <div key={metricKey} className="chart-container">
+                  <LineChart
+                    thresholdKey={thresholdKey}
+                    series={data}
+                    metricKey={resolvedKey}
+                    title={config.title}
+                    description={config.description}
+                    unit={config.unit}
+                    thresholds={thresholds}
+                  />
+                </div>
+              );
+            })}
           </div>
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
 };
