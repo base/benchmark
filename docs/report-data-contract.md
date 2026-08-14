@@ -1,10 +1,10 @@
 # Report data contract
 
-This document describes what the `report/` web UI in this repo expects
-from whatever produces benchmark data. The intent is to let `base/benchmark`
-become a **pure visualization tool** — any runner (Go, Rust, future
-monorepo) can produce data the report consumes, as long as it follows
-this contract.
+This document describes what the benchmark report UI expects from whatever
+produces benchmark data. The UI itself lives in [`base/ui`](https://github.com/base/ui)
+under `app/benchmark/`; this repo is one of the producers. Any runner (Go,
+Rust, future monorepo) can produce data the report consumes, as long as it
+follows this contract.
 
 The current Go runner in `runner/` is one producer; the future Rust
 runner in the Coinbase monorepo will be another. Both write the same
@@ -191,7 +191,7 @@ on-the-wire shape.
 
 The set of metric keys inside `ExecutionMetrics` is open. The
 frontend has a registry of "known" metrics with units and labels at
-`report/src/metricDefinitions.ts`; anything not listed there still
+`base/ui/app/benchmark/metricDefinitions.ts`; anything not listed there still
 renders, just with raw key names.
 
 ## Comparison groups (automatic)
@@ -294,7 +294,7 @@ A natural follow-on is to drop the merged `metadata.json` response
 entirely and serve per-run JSON via an index endpoint
 (`GET /api/v1/runs?since=<ts>` paginated). The frontend already has a
 data-source abstraction in
-`report/src/services/dataService.ts` — swapping out the metadata
+`base/ui/app/benchmark/services/dataService.ts` — swapping out the metadata
 fetch would be a single function change. But this requires a
 frontend change, so it's a bigger lift than the producer-side
 upgrades above.
@@ -336,11 +336,11 @@ UI silently breaks.
 - Comparison synthesizer:
   `protocols/base-benchmarking/report-api/internal/services/comparison.go`
 - Frontend types (what the UI expects):
-  `report/src/types.ts::BenchmarkRun`
+  `base/ui/app/benchmark/types.ts::BenchmarkRun`
 - Frontend metric definitions (keys/units/labels):
-  `report/src/metricDefinitions.ts`
+  `base/ui/app/benchmark/metricDefinitions.ts`
 - Frontend filter logic (how dropdowns are auto-discovered):
-  `report/src/hooks/useBenchmarkFilters.ts` and `report/src/filter.ts`
+  `base/ui/app/benchmark/hooks/useBenchmarkFilters.ts` and `base/ui/app/benchmark/filter.ts`
 - Current Go runner that produces this shape:
   `runner/benchmark/result_metadata.go::Run` and
   `runner/service.go::applyClientVersion`

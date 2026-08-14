@@ -11,22 +11,8 @@ alwaysApply: false
 - **benchmark/**: Go-based benchmark runner and core logic
 - **contracts/**: Solidity smart contracts for testing
 - **configs/**: YAML configuration files for different benchmark scenarios
-- **report/**: React-based web UI for viewing benchmark results
 - **runner/**: Go-based execution engine
 - **scripts/**: Utility scripts for setup and automation
-
-### Report UI Structure ([report/](mdc:report))
-```
-report/
-├── src/
-│   ├── components/     # Reusable UI components
-│   ├── pages/         # Page-level components
-│   ├── hooks/         # Custom React hooks
-│   ├── utils/         # Utility functions and formatters
-│   └── types.ts       # TypeScript type definitions
-├── public/            # Static assets
-└── package.json       # Frontend dependencies
-```
 
 ## Configuration Management
 
@@ -44,12 +30,6 @@ report/
 
 ## Development Workflow
 
-### Frontend Development
-1. Work in the `report/` directory for UI changes
-2. Use TypeScript for type safety
-3. Follow React functional component patterns
-4. Use Tailwind CSS for styling
-
 ### Backend Development
 1. Work in `benchmark/` and `runner/` directories
 2. Use Go for performance-critical code
@@ -64,12 +44,6 @@ report/
 
 ## Build and Deployment
 
-### Frontend Build
-- Vite-based build system
-- Static asset generation
-- Optimized bundle output
-- Development server with hot reload
-
 ### Backend Build
 - Go module-based dependencies
 - Cross-platform compilation
@@ -82,5 +56,6 @@ report/
 1. Configuration files define test parameters
 2. Go runner executes benchmarks
 3. Results stored in structured format
-4. React UI displays and analyzes results
+   (see [docs/report-data-contract.md](mdc:docs/report-data-contract.md))
+4. The benchmark UI in `base/ui` reads that data and displays it
 

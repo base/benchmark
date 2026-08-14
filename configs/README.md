@@ -101,4 +101,6 @@ All configurations track key metrics:
 - **Resource Usage**: CPU, memory, disk I/O
 - **Throughput**: Transactions per second, gas per second
 
-For detailed metric analysis, view the interactive dashboard after running benchmarks.
+Every metric is written to the output directory as JSON. See
+[../docs/report-data-contract.md](../docs/report-data-contract.md) for the
+layout and field definitions.
