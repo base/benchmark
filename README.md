@@ -27,13 +27,13 @@ Base Benchmark is a performance testing framework for Ethereum execution clients
 
 ## Results
 
-Public results are available at the following links:
+Benchmark runs write JSON to an output directory (see
+[docs/report-data-contract.md](docs/report-data-contract.md) for the schema).
+The `run-publish-benchmarks` workflow runs the public benchmark suite on every
+push to `main` and uploads its output as a workflow artifact.
 
-| Network      | Link                                                                   |
-| ------------ | ---------------------------------------------------------------------- |
-| Devnet       | [https://base.github.io/benchmark/](https://base.github.io/benchmark/) |
-| Base Sepolia | Coming soon                                                            |
-| Base Mainnet | Coming soon                                                            |
+This repo no longer ships a dashboard for viewing that output; it is a
+benchmark runner and a data contract.
 
 ## Features
 
@@ -41,7 +41,6 @@ Public results are available at the following links:
 - **Comparative Analysis:** Measure client behavior across various inputs and workloads
 - **Metric Collection:** Track critical metrics including submission times, latency, and throughput
 - **Flexible Workloads:** Configure transaction patterns to match your specific needs
-- **Interactive Dashboard:** Generate beautiful HTML reports with charts and run comparisons
 - **Import & Merge:** Combine benchmark results from multiple machines with flexible tagging
 
 ## Repository Structure
@@ -65,8 +64,6 @@ Public results are available at the following links:
 │   └── public/           # Production-ready benchmarks
 ├── contracts/            # Smart contracts for testing
 │   └── src/              # Solidity source files
-├── report/               # Interactive dashboard
-│   └── src/              # React TypeScript application
 └── clients/              # Client build scripts
 ```
 
@@ -74,7 +71,6 @@ Public results are available at the following links:
 
 - **Go:** Version 1.21 or later. Install from [go.dev](https://go.dev/dl/)
 - **Foundry:** For smart contract compilation. See [installation guide](https://book.getfoundry.sh/getting-started/installation)
-- **Node.js:** Version 18+ for the interactive dashboard. Install from [nodejs.org](https://nodejs.org/)
 
 ## Getting Started
 
@@ -119,15 +115,12 @@ To see available options:
 ./bin/base-bench run --help
 ```
 
-### 5. View Results in the Interactive Dashboard
+### 5. Read the Results
 
-```bash
-cd report/
-npm install
-npm run dev
-```
-
-Open your browser to the URL shown (typically `http://localhost:5173`).
+The run writes one directory per benchmark under `--output-dir`, each holding a
+`metadata.json` and per-role `metrics-<role>.json` timeseries.
+[docs/report-data-contract.md](docs/report-data-contract.md) documents the
+layout and every field, so you can consume it from your own tooling.
 
 ## Available Benchmarks
 
@@ -241,11 +234,9 @@ OPTIONS:
 
 ### Understanding Runs and Suites
 
-When you view benchmark results in the interactive dashboard, you can switch between different test runs using the run switcher:
-
-<div align="center">
-  <img src=".github/assets/run-switcher.png" alt="Run Switcher" width="600">
-</div>
+A suite is one execution of `base-bench run`. Each suite writes its own set of
+runs to the output directory, keyed by the `BenchmarkRun` ID they share, so
+results from separate executions stay distinguishable.
 
 ### Creating Test Runs
 

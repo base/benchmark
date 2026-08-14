@@ -53,11 +53,3 @@ build-base-reth-node:
 
 .PHONY: build-binaries
 build-binaries: build-reth build-geth build-base-reth-node
-
-.PHONY: build-frontend
-build-frontend:
-	cd report && yarn build
-
-.PHONY: run-frontend
-run-frontend:
-	cd report && set -a && [ -f ../.env ] && . ../.env && set +a && yarn dev
