@@ -40,7 +40,10 @@ function sortFilterValues<
     const versionKey = String(version);
     latestByVersion.set(
       versionKey,
-      Math.max(latestByVersion.get(versionKey) ?? Number.NEGATIVE_INFINITY, timestamp),
+      Math.max(
+        latestByVersion.get(versionKey) ?? Number.NEGATIVE_INFINITY,
+        timestamp,
+      ),
     );
   }
 
