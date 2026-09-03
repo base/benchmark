@@ -70,6 +70,58 @@ describe("BenchmarkVariables", () => {
     });
   });
 
+  it("ranks ClientVersion values by their most recent run", () => {
+    const versionedRuns: BenchmarkRun[] = [
+      {
+        sourceFile: "v1-old.json",
+        testName: "old v1",
+        testDescription: "",
+        outputDir: "/tmp/v1-old",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        testConfig: { ClientVersion: "base/v1", NodeType: "reth" },
+        result: { success: true },
+      },
+      {
+        sourceFile: "v2.json",
+        testName: "v2",
+        testDescription: "",
+        outputDir: "/tmp/v2",
+        createdAt: "2026-09-02T00:00:00.000Z",
+        testConfig: { ClientVersion: "base/v2", NodeType: "reth" },
+        result: { success: true },
+      },
+      {
+        sourceFile: "v1-latest.json",
+        testName: "latest v1",
+        testDescription: "",
+        outputDir: "/tmp/v1-latest",
+        createdAt: "2026-09-03T00:00:00.000Z",
+        testConfig: { ClientVersion: "base/v1", NodeType: "reth" },
+        result: { success: true },
+      },
+      {
+        sourceFile: "unknown.json",
+        testName: "unknown",
+        testDescription: "",
+        outputDir: "/tmp/unknown",
+        createdAt: "not-a-timestamp",
+        testConfig: { ClientVersion: "base/unknown", NodeType: "reth" },
+        result: { success: true },
+      },
+    ];
+
+    const result = getBenchmarkVariables(versionedRuns, {
+      params: {},
+      byMetric: "NodeType",
+    });
+
+    expect(result.variables.ClientVersion).toEqual([
+      "base/v1",
+      "base/v2",
+      "base/unknown",
+    ]);
+  });
+
   it("should provide options even if the current selection has no matches", () => {
     const result = getBenchmarkVariables(sampleRuns, {
       params: { GasLimit: 100, ExtraParam: false }, // This specific combo has no runs

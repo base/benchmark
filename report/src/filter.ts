@@ -17,6 +17,53 @@ function matchRuns<T extends { testConfig: Record<string, string | number> }>(
 }
 
 /**
+ * Client versions identify builds, not a naturally lexical configuration
+ * dimension. Show the version whose latest result is newest first.
+ */
+function sortFilterValues<
+  T extends {
+    testConfig: Record<string, string | number>;
+    createdAt?: string;
+  },
+>(key: string, values: Set<FilterValue>, runs: T[]): FilterValue[] {
+  const sorted = [...values];
+  if (key !== "ClientVersion") {
+    return sorted.sort();
+  }
+
+  const latestByVersion = new Map<string, number>();
+  for (const run of runs) {
+    const version = run.testConfig.ClientVersion;
+    if (version === undefined) continue;
+    const timestamp = Date.parse(run.createdAt ?? "");
+    if (Number.isNaN(timestamp)) continue;
+    const versionKey = String(version);
+    latestByVersion.set(
+      versionKey,
+      Math.max(
+        latestByVersion.get(versionKey) ?? Number.NEGATIVE_INFINITY,
+        timestamp,
+      ),
+    );
+  }
+
+  return sorted.sort((left, right) => {
+    const leftTimestamp = latestByVersion.get(String(left));
+    const rightTimestamp = latestByVersion.get(String(right));
+    if (
+      leftTimestamp !== undefined &&
+      rightTimestamp !== undefined &&
+      leftTimestamp !== rightTimestamp
+    ) {
+      return rightTimestamp - leftTimestamp;
+    }
+    if (leftTimestamp !== undefined) return -1;
+    if (rightTimestamp !== undefined) return 1;
+    return String(left).localeCompare(String(right));
+  });
+}
+
+/**
  * Extracts variables, calculates available filter options, and filters runs based on selections.
  * Ensures that filter options remain available even if the current selection yields no results.
  */
@@ -47,7 +94,7 @@ export function getBenchmarkVariables<
       return Object.fromEntries(
         Object.entries(allPossibleValues)
           .filter(([, values]) => values.size > 1)
-          .map(([key, values]) => [key, [...values].sort()]),
+          .map(([key, values]) => [key, sortFilterValues(key, values, runs)]),
       );
     })(); // Immediately invoke the IIFE if needed
 
