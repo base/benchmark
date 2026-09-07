@@ -27,9 +27,12 @@ func (o OpcodeStats) Round() OpcodeStats {
 }
 
 func (o OpcodeStats) Add(other OpcodeStats) OpcodeStats {
-	result := make(OpcodeStats)
+	result := make(OpcodeStats, len(o)+len(other))
+	for opcode, count := range o {
+		result[opcode] = count
+	}
 	for opcode, count := range other {
-		result[opcode] = o[opcode] + count
+		result[opcode] += count
 	}
 	return result
 }
@@ -43,9 +46,12 @@ func (o OpcodeStats) Pow(n float64) OpcodeStats {
 }
 
 func (o OpcodeStats) Sub(other OpcodeStats) OpcodeStats {
-	result := make(OpcodeStats)
+	result := make(OpcodeStats, len(o)+len(other))
+	for opcode, count := range o {
+		result[opcode] = count
+	}
 	for opcode, count := range other {
-		result[opcode] = o[opcode] - count
+		result[opcode] -= count
 	}
 	return result
 }
