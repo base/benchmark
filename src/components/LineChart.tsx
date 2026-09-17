@@ -63,10 +63,7 @@ const CHART_RATE_PREFIXES = [
 const sampleX = (data: MetricData): number =>
   data.PercentComplete ?? data.ElapsedMilliseconds ?? data.BlockNumber;
 
-const formatElapsedTime = (
-  milliseconds: number,
-  unit: "ms" | "s",
-): string => {
+const formatElapsedTime = (milliseconds: number, unit: "ms" | "s"): string => {
   if (unit === "s") {
     const seconds = milliseconds / 1_000;
     return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
@@ -122,14 +119,24 @@ const averageSamples = (
     const end = Math.floor(((bucketIndex + 1) * validSamples.length) / buckets);
     const samples = validSamples.slice(start, Math.max(start + 1, end));
     const averageX = d3.mean(samples, sampleX) ?? 0;
+    const averageElapsedMilliseconds =
+      d3.mean(
+        samples,
+        (sample) => sample.ElapsedMilliseconds ?? sample.BlockNumber,
+      ) ?? 0;
+    const hasPercentComplete = samples.some(
+      (sample) =>
+        typeof sample.PercentComplete === "number" &&
+        Number.isFinite(sample.PercentComplete),
+    );
     const averageValue =
       d3.mean(samples, (sample) => sample.ExecutionMetrics[metricKey]) ?? 0;
 
     return {
       ...samples[0],
-      BlockNumber: averageX,
-      ElapsedMilliseconds: averageX,
-      PercentComplete: averageX,
+      BlockNumber: averageElapsedMilliseconds,
+      ElapsedMilliseconds: averageElapsedMilliseconds,
+      PercentComplete: hasPercentComplete ? averageX : undefined,
       ExecutionMetrics: {
         [metricKey]: averageValue,
       },
