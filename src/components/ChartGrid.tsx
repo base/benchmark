@@ -359,14 +359,14 @@ const ChartGrid: React.FC<ProvidedProps> = ({
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
           {isTransactionPayloadComparison ? (
-            <section className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm sm:col-span-2 xl:col-span-5">
-              <div className="bg-blue-600 px-5 py-3 text-white">
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-100">
+            <section className="overflow-hidden rounded-xl border border-slate-200 bg-white xl:col-span-12">
+              <div className="border-b border-slate-100 px-5 py-3">
+                <p className="text-sm font-medium text-slate-900">
                   Performance by transaction payload
                 </p>
               </div>
               <table className="w-full text-sm">
-                <thead className="border-b border-slate-100 bg-blue-50/50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-5 py-2 font-medium">
                       Transaction payload
@@ -386,19 +386,19 @@ const ChartGrid: React.FC<ProvidedProps> = ({
                   {payloadThroughputRows.map((row) => (
                     <tr key={row.name}>
                       <td className="px-5 py-2.5 text-slate-700">{row.name}</td>
-                      <td className="px-5 py-2.5 text-right font-mono text-lg font-semibold tabular-nums text-slate-900">
+                      <td className="px-5 py-2.5 text-right font-mono font-medium tabular-nums text-slate-900">
                         {row.tps === undefined
                           ? "—"
                           : `${row.tps.toLocaleString(undefined, {
                               maximumFractionDigits: 1,
                             })} TPS`}
                       </td>
-                      <td className="px-5 py-2.5 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
+                      <td className="px-5 py-2.5 text-right font-mono text-sm font-medium tabular-nums text-slate-900">
                         {row.gasPerSecond === undefined
                           ? "—"
                           : formatValue(row.gasPerSecond, "gas/s")}
                       </td>
-                      <td className="px-5 py-2.5 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
+                      <td className="px-5 py-2.5 text-right font-mono text-sm font-medium tabular-nums text-slate-900">
                         {row.roleProcessingTime === undefined
                           ? "—"
                           : formatValue(row.roleProcessingTime, "s")}
@@ -429,26 +429,27 @@ const ChartGrid: React.FC<ProvidedProps> = ({
               </p>
             </div>
           )}
-          {overviewStats.slice(1).map((stat) => (
-            <div
-              key={stat.label}
-              className={`rounded-xl border px-5 py-4 shadow-sm ${stat.className}`}
-            >
-              <p
-                className={`text-xs font-semibold uppercase tracking-[0.12em] ${stat.labelClassName}`}
+          {!isTransactionPayloadComparison &&
+            overviewStats.slice(1).map((stat) => (
+              <div
+                key={stat.label}
+                className={`rounded-xl border px-5 py-4 shadow-sm ${stat.className}`}
               >
-                {stat.label}
-              </p>
-              <p
-                className={`mt-1 font-semibold tracking-tight tabular-nums ${stat.valueClassName}`}
-              >
-                {stat.value}
-              </p>
-              <p className={`mt-1 text-xs ${stat.descriptionClassName}`}>
-                {stat.description}
-              </p>
-            </div>
-          ))}
+                <p
+                  className={`text-xs font-semibold uppercase tracking-[0.12em] ${stat.labelClassName}`}
+                >
+                  {stat.label}
+                </p>
+                <p
+                  className={`mt-1 font-semibold tracking-tight tabular-nums ${stat.valueClassName}`}
+                >
+                  {stat.value}
+                </p>
+                <p className={`mt-1 text-xs ${stat.descriptionClassName}`}>
+                  {stat.description}
+                </p>
+              </div>
+            ))}
         </div>
         <div className="mt-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
           <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
