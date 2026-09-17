@@ -7,6 +7,7 @@ import LineChart from "./LineChart";
 interface ProvidedProps {
   data: DataSeries[];
   role: "sequencer" | "validator" | null;
+  comparisonMetric: string;
 }
 
 interface ChartSection {
@@ -211,7 +212,11 @@ const averageMetric = (
   );
 };
 
-const ChartGrid: React.FC<ProvidedProps> = ({ data, role }) => {
+const ChartGrid: React.FC<ProvidedProps> = ({
+  data,
+  role,
+  comparisonMetric,
+}) => {
   const availableCharts = useMemo(() => {
     const chartData = data.flatMap((series) => series.data);
     return new Map(
@@ -267,6 +272,8 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data, role }) => {
     "transactions/per_second",
   );
   const averageRoleProcessingTime = averageMetric(data, focusMetric.key);
+  const isTransactionPayloadComparison =
+    comparisonMetric === "TransactionPayload";
   const overviewStats = [
     {
       label: "Average TPS",
@@ -320,6 +327,11 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data, role }) => {
     },
   ];
 
+  const payloadThroughputRows = data.map((series) => ({
+    name: series.name,
+    tps: averageMetric([series], "transactions/per_second"),
+  }));
+
   return (
     <div className="space-y-12 pb-12">
       <section aria-labelledby="overview-heading">
@@ -344,7 +356,62 @@ const ChartGrid: React.FC<ProvidedProps> = ({ data, role }) => {
           </span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
-          {overviewStats.map((stat) => (
+          {isTransactionPayloadComparison ? (
+            <section className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm sm:col-span-2 xl:col-span-5">
+              <div className="bg-blue-600 px-5 py-3 text-white">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-100">
+                  Average TPS by transaction payload
+                </p>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-100 bg-blue-50/50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-5 py-2 font-medium">
+                      Transaction payload
+                    </th>
+                    <th className="px-5 py-2 text-right font-medium">
+                      Average TPS
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {payloadThroughputRows.map((row) => (
+                    <tr key={row.name}>
+                      <td className="px-5 py-2.5 text-slate-700">{row.name}</td>
+                      <td className="px-5 py-2.5 text-right font-mono text-lg font-semibold tabular-nums text-slate-900">
+                        {row.tps === undefined
+                          ? "—"
+                          : `${row.tps.toLocaleString(undefined, {
+                              maximumFractionDigits: 1,
+                            })} TPS`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          ) : (
+            <div
+              className={`rounded-xl border px-5 py-4 shadow-sm ${overviewStats[0].className}`}
+            >
+              <p
+                className={`text-xs font-semibold uppercase tracking-[0.12em] ${overviewStats[0].labelClassName}`}
+              >
+                {overviewStats[0].label}
+              </p>
+              <p
+                className={`mt-1 font-semibold tracking-tight tabular-nums ${overviewStats[0].valueClassName}`}
+              >
+                {overviewStats[0].value}
+              </p>
+              <p
+                className={`mt-1 text-xs ${overviewStats[0].descriptionClassName}`}
+              >
+                {overviewStats[0].description}
+              </p>
+            </div>
+          )}
+          {overviewStats.slice(1).map((stat) => (
             <div
               key={stat.label}
               className={`rounded-xl border px-5 py-4 shadow-sm ${stat.className}`}

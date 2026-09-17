@@ -31,11 +31,13 @@ interface ChartSelectorProps {
 export interface DataSelection {
   data: SelectedData[];
   role: "sequencer" | "validator" | null;
+  comparisonMetric: string;
 }
 
 export const EmptyDataSelection: DataSelection = {
   data: [],
   role: null,
+  comparisonMetric: "",
 };
 
 // Snapshot comparisons are generally investigated from the sequencer
@@ -129,7 +131,11 @@ const ChartSelector = ({
 
     if (!isEqual(dataToSend, lastSentDataRef.current)) {
       lastSentDataRef.current = dataToSend;
-      onChangeDataQuery({ data: dataToSend, role });
+      onChangeDataQuery({
+        data: dataToSend,
+        role,
+        comparisonMetric: filterSelections.byMetric,
+      });
     }
   }, [matchedRuns, filterSelections.byMetric, role, onChangeDataQuery]);
 
