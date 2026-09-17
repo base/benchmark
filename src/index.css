@@ -3,7 +3,9 @@
 
 body {
   margin: 0;
-  color: #333;
+  color: #334155;
+  font-family: "Coinbase Text", ui-sans-serif, system-ui, sans-serif;
+  font-weight: 400;
 
   @apply bg-slate-50;
 }
@@ -15,10 +17,10 @@ body {
 }
 
 .chart-container {
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  border: 1px solid #dbe2ea;
+  border-radius: 10px;
   padding: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   background: white;
 }
 

@@ -338,12 +338,12 @@ const ChartGrid: React.FC<ProvidedProps> = ({
       <section aria-labelledby="overview-heading">
         <div className="mb-5 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-blue-600">
               Snapshot benchmark
             </p>
             <h2
               id="overview-heading"
-              className="mt-1 text-2xl font-semibold text-slate-900"
+              className="font-coinbase-display mt-1 text-2xl font-medium tracking-tight text-slate-900"
             >
               Performance overview
             </h2>
@@ -404,12 +404,12 @@ const ChartGrid: React.FC<ProvidedProps> = ({
               className={`rounded-xl border px-5 py-4 shadow-sm ${overviewStats[0].className}`}
             >
               <p
-                className={`text-xs font-semibold uppercase tracking-[0.12em] ${overviewStats[0].labelClassName}`}
+                className={`text-xs font-medium uppercase tracking-[0.12em] ${overviewStats[0].labelClassName}`}
               >
                 {overviewStats[0].label}
               </p>
               <p
-                className={`mt-1 font-semibold tracking-tight tabular-nums ${overviewStats[0].valueClassName}`}
+                className={`mt-1 font-medium tracking-tight tabular-nums ${overviewStats[0].valueClassName}`}
               >
                 {overviewStats[0].value}
               </p>
@@ -427,12 +427,12 @@ const ChartGrid: React.FC<ProvidedProps> = ({
                 className={`rounded-xl border px-5 py-4 shadow-sm ${stat.className}`}
               >
                 <p
-                  className={`text-xs font-semibold uppercase tracking-[0.12em] ${stat.labelClassName}`}
+                  className={`text-xs font-medium uppercase tracking-[0.12em] ${stat.labelClassName}`}
                 >
                   {stat.label}
                 </p>
                 <p
-                  className={`mt-1 font-semibold tracking-tight tabular-nums ${stat.valueClassName}`}
+                  className={`mt-1 font-medium tracking-tight tabular-nums ${stat.valueClassName}`}
                 >
                   {stat.value}
                 </p>
@@ -443,7 +443,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({
             ))}
         </div>
         <div className="mt-4 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center">
-          <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+          <span className="shrink-0 text-xs font-medium uppercase tracking-[0.12em] text-slate-500">
             Compared runs
           </span>
           <div className="flex flex-wrap gap-x-4 gap-y-2">
@@ -484,7 +484,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({
             <div className="mb-4 border-b border-slate-200 pb-3">
               <h2
                 id={`${section.title}-heading`}
-                className="text-lg font-semibold text-slate-900"
+                className="font-coinbase-display text-lg font-medium text-slate-900"
               >
                 {section.title}
               </h2>

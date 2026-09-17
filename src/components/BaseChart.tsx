@@ -114,8 +114,10 @@ const BaseChart: React.FC<BaseChartProps> = ({
         .attr("x", dimensions.width / 2)
         .attr("y", -TOP_MARGIN - 20)
         .attr("text-anchor", "middle")
-        .style("font-size", "16px")
-        .style("font-weight", "bold")
+        .style("font-family", "Coinbase Display, sans-serif")
+        .style("font-size", "15px")
+        .style("font-weight", "500")
+        .style("fill", "#334155")
         .text(title);
     }
 
@@ -125,8 +127,9 @@ const BaseChart: React.FC<BaseChartProps> = ({
         .attr("x", dimensions.width / 2)
         .attr("y", -TOP_MARGIN)
         .attr("text-anchor", "middle")
-        .style("font-size", "12px")
-        .style("fill", "#666")
+        .style("font-family", "Coinbase Text, sans-serif")
+        .style("font-size", "11px")
+        .style("fill", "#64748b")
         .text(description);
     }
 

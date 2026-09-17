@@ -139,7 +139,7 @@ function RunComparison() {
       <div className="flex flex-col w-full flex-grow">
         <div className="p-8">
           <div className="mb-6">
-            <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            <h1 className="font-coinbase-display text-3xl font-medium tracking-tight text-slate-900">
               Compare benchmark runs
             </h1>
             <p className="mt-2 max-w-3xl text-sm text-slate-600">
