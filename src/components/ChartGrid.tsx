@@ -331,7 +331,6 @@ const ChartGrid: React.FC<ProvidedProps> = ({
     name: series.name,
     tps: averageMetric([series], "transactions/per_second"),
     gasPerSecond: averageMetric([series], "gas/per_second"),
-    roleProcessingTime: averageMetric([series], focusMetric.key),
   }));
 
   return (
@@ -377,9 +376,6 @@ const ChartGrid: React.FC<ProvidedProps> = ({
                     <th className="px-5 py-2 text-right font-medium">
                       Average Gas/s
                     </th>
-                    <th className="px-5 py-2 text-right font-medium">
-                      {focusMetric.label}
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -397,11 +393,6 @@ const ChartGrid: React.FC<ProvidedProps> = ({
                         {row.gasPerSecond === undefined
                           ? "—"
                           : formatValue(row.gasPerSecond, "gas/s")}
-                      </td>
-                      <td className="px-5 py-2.5 text-right font-mono text-sm font-medium tabular-nums text-slate-900">
-                        {row.roleProcessingTime === undefined
-                          ? "—"
-                          : formatValue(row.roleProcessingTime, "s")}
                       </td>
                     </tr>
                   ))}
