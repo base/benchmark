@@ -107,8 +107,11 @@ const ChartSelector = ({
         }
 
         const role = run.testConfig.role ?? "unknown";
-        const scenario = run.testConfig.Scenario ?? "Unknown scenario";
-        seriesName = `${formatLabel(String(scenario))} - ${seriesName}`;
+        const transactionPayload =
+          run.testConfig.TransactionPayload ?? "Unknown transaction payload";
+        if (filterSelections.byMetric !== "TransactionPayload") {
+          seriesName = `${formatLabel(String(transactionPayload))} - ${seriesName}`;
+        }
 
         const request: SelectedData = {
           outputDir: run.outputDir,
