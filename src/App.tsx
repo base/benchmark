@@ -14,7 +14,7 @@ function App() {
         <Route path="/" element={<RedirectToLatestRun />} />
         <Route
           path="/load-tests"
-          element={<Navigate to="/load-tests/sepolia" replace />}
+          element={<Navigate to="/load-tests/sepolia/all" replace />}
         />
         <Route path="/load-tests/:network" element={<LoadTestLanding />} />
         <Route path="/load-tests/:network/all" element={<LoadTestAllRuns />} />

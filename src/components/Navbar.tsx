@@ -134,7 +134,10 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
           <Link to="/" className={tabClass(!isLoadTestsRoute)}>
             Benchmarks
           </Link>
-          <Link to="/load-tests/sepolia" className={tabClass(isLoadTestsRoute)}>
+          <Link
+            to="/load-tests/sepolia/all"
+            className={tabClass(isLoadTestsRoute)}
+          >
             Load Tests
           </Link>
         </div>
