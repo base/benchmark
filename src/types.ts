@@ -2,6 +2,7 @@ export interface MetricData {
   BlockNumber: number;
   Timestamp?: string | number;
   ElapsedMilliseconds?: number;
+  PercentComplete?: number;
   ExecutionMetrics: {
     [key: string]: number;
   };

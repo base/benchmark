@@ -61,7 +61,7 @@ const CHART_RATE_PREFIXES = [
 ] as const;
 
 const sampleX = (data: MetricData): number =>
-  data.ElapsedMilliseconds ?? data.BlockNumber;
+  data.PercentComplete ?? data.ElapsedMilliseconds ?? data.BlockNumber;
 
 const formatElapsedTime = (
   milliseconds: number,
@@ -129,6 +129,7 @@ const averageSamples = (
       ...samples[0],
       BlockNumber: averageX,
       ElapsedMilliseconds: averageX,
+      PercentComplete: averageX,
       ExecutionMetrics: {
         [metricKey]: averageValue,
       },
@@ -144,7 +145,7 @@ const LineChart: React.FC<LineChartProps> = ({
   description,
   unit,
   xAxisDomain,
-  xAxisLabel = "Elapsed Time",
+  xAxisLabel,
   thresholds,
 }) => {
   // Generate a unique ID for this chart
@@ -439,27 +440,37 @@ const LineChart: React.FC<LineChartProps> = ({
         }));
         renderedSeriesRef.current = renderedSeries;
         const renderedData = renderedSeries.flatMap((item) => item.data);
+        const usePercentComplete = renderedData.some(
+          (sample) =>
+            typeof sample.PercentComplete === "number" &&
+            Number.isFinite(sample.PercentComplete),
+        );
         const blockNumbers = renderedData.map(sampleX);
         const minBlock = xAxisDomain
           ? xAxisDomain[0]
-          : blockNumbers.length
-            ? Math.min(...blockNumbers)
-            : 0;
+          : usePercentComplete
+            ? 0
+            : blockNumbers.length
+              ? Math.min(...blockNumbers)
+              : 0;
         const maxBlock = xAxisDomain
           ? xAxisDomain[1]
-          : blockNumbers.length
-            ? Math.max(...blockNumbers)
-            : 100;
+          : usePercentComplete
+            ? 100
+            : blockNumbers.length
+              ? Math.max(...blockNumbers)
+              : 100;
         const maxValue =
           (d3.max(
             renderedData,
             (d) => d.ExecutionMetrics[metricKey],
           ) as number) || 0;
-        const useSecondsForXAxis = maxBlock >= 1_000;
+        const useSecondsForXAxis = !usePercentComplete && maxBlock >= 1_000;
         const resolvedXAxisLabel =
-          xAxisLabel === "Elapsed Time"
-            ? `Elapsed Time (${useSecondsForXAxis ? "s" : "ms"})`
-            : xAxisLabel;
+          xAxisLabel ??
+          (usePercentComplete
+            ? "Benchmark completion"
+            : `Elapsed Time (${useSecondsForXAxis ? "s" : "ms"})`);
 
         // Store refs for use in effects and callbacks
         svgRef.current = svg.node();
@@ -557,7 +568,9 @@ const LineChart: React.FC<LineChartProps> = ({
               .axisBottom(x)
               .ticks(Math.min(maxBlock - minBlock, MAX_TICKS))
               .tickFormat((d) =>
-                formatElapsedTime(d as number, useSecondsForXAxis),
+                usePercentComplete
+                  ? `${Math.round(d as number)}%`
+                  : formatElapsedTime(d as number, useSecondsForXAxis),
               ),
           )
           .selectAll("text")

@@ -61,6 +61,12 @@ function RunComparison() {
       return dataPerFile;
     }
 
+    // Keep a time axis when all selected runs have the same block count. When
+    // their lengths differ, align every run by completion so corresponding
+    // points represent the same relative point in the benchmark.
+    const normalizeProgress =
+      new Set(dataPerFile.map((samples) => samples.length)).size > 1;
+
     return dataPerFile.map((data, index): DataSeries => {
       const { name, color, blockTimeMilliseconds } = selection.data[index];
       const timestamps = data.map((sample) => {
@@ -74,8 +80,11 @@ function RunComparison() {
         return undefined;
       });
       const firstTimestamp = timestamps[0];
+      const lastTimestamp = timestamps[timestamps.length - 1];
       const useTimestamps =
         firstTimestamp !== undefined &&
+        lastTimestamp !== undefined &&
+        lastTimestamp > firstTimestamp &&
         timestamps.every((timestamp) => timestamp !== undefined);
       const firstBlockNumber = data[0]?.BlockNumber ?? 0;
       const blockInterval =
@@ -89,6 +98,15 @@ function RunComparison() {
           ElapsedMilliseconds: useTimestamps
             ? (timestamps[sampleIndex] as number) - firstTimestamp
             : (sample.BlockNumber - firstBlockNumber) * blockInterval,
+          PercentComplete: normalizeProgress
+            ? data.length <= 1
+              ? 100
+              : useTimestamps
+                ? (((timestamps[sampleIndex] as number) - firstTimestamp) /
+                    (lastTimestamp - firstTimestamp)) *
+                  100
+                : (sampleIndex / (data.length - 1)) * 100
+            : undefined,
         })),
         color,
         thresholds: selection.data[index].thresholds,
