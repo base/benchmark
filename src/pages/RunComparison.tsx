@@ -61,12 +61,20 @@ function RunComparison() {
       return dataPerFile;
     }
 
-    // Keep a time axis for runs whose block counts are within 2% of each other.
-    // Only normalize to completion when their lengths materially differ, so a
-    // near-identical set of runs remains readable in real elapsed time.
-    const blockCounts = dataPerFile.map((samples) => samples.length);
-    const shortestRun = Math.min(...blockCounts);
-    const longestRun = Math.max(...blockCounts);
+    // Keep a time axis when the configured benchmark durations are within 2%.
+    // Completion alignment is needed only when `block count × block time`
+    // materially differs across runs; block count alone is not enough when
+    // comparing different block cadences.
+    const estimatedDurations = dataPerFile.map((samples, index) => {
+      const blockTimeMilliseconds = Number(
+        selection.data[index]?.blockTimeMilliseconds,
+      );
+      return Number.isFinite(blockTimeMilliseconds) && blockTimeMilliseconds > 0
+        ? samples.length * blockTimeMilliseconds
+        : samples.length;
+    });
+    const shortestRun = Math.min(...estimatedDurations);
+    const longestRun = Math.max(...estimatedDurations);
     const normalizeProgress =
       longestRun > 0 && (longestRun - shortestRun) / longestRun > 0.02;
 
@@ -104,11 +112,7 @@ function RunComparison() {
           PercentComplete: normalizeProgress
             ? data.length <= 1
               ? 100
-              : useTimestamps
-                ? (((timestamps[sampleIndex] as number) - firstTimestamp) /
-                    (lastTimestamp - firstTimestamp)) *
-                  100
-                : (sampleIndex / (data.length - 1)) * 100
+              : (sampleIndex / (data.length - 1)) * 100
             : undefined,
         })),
         color,
