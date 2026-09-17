@@ -7,7 +7,6 @@ import LineChart from "./LineChart";
 interface ProvidedProps {
   data: DataSeries[];
   role: "sequencer" | "validator" | null;
-  comparisonMetric: string;
 }
 
 interface ChartSection {
@@ -212,11 +211,7 @@ const averageMetric = (
   );
 };
 
-const ChartGrid: React.FC<ProvidedProps> = ({
-  data,
-  role,
-  comparisonMetric,
-}) => {
+const ChartGrid: React.FC<ProvidedProps> = ({ data, role }) => {
   const availableCharts = useMemo(() => {
     const chartData = data.flatMap((series) => series.data);
     return new Map(
@@ -272,8 +267,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({
     "transactions/per_second",
   );
   const averageRoleProcessingTime = averageMetric(data, focusMetric.key);
-  const isTransactionPayloadComparison =
-    comparisonMetric === "TransactionPayload";
+  const hasMultipleRuns = data.length > 1;
   const overviewStats = [
     {
       label: "Average TPS",
@@ -357,19 +351,17 @@ const ChartGrid: React.FC<ProvidedProps> = ({
           </span>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-12">
-          {isTransactionPayloadComparison ? (
+          {hasMultipleRuns ? (
             <section className="overflow-hidden rounded-xl border border-slate-200 bg-white xl:col-span-12">
               <div className="border-b border-slate-100 px-5 py-3">
                 <p className="text-sm font-medium text-slate-900">
-                  Performance by transaction payload
+                  Performance by compared run
                 </p>
               </div>
               <table className="w-full text-sm">
                 <thead className="border-b border-slate-100 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                   <tr>
-                    <th className="px-5 py-2 font-medium">
-                      Transaction payload
-                    </th>
+                    <th className="px-5 py-2 font-medium">Run</th>
                     <th className="px-5 py-2 text-right font-medium">
                       Average TPS
                     </th>
@@ -420,7 +412,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({
               </p>
             </div>
           )}
-          {!isTransactionPayloadComparison &&
+          {!hasMultipleRuns &&
             overviewStats.slice(1).map((stat) => (
               <div
                 key={stat.label}

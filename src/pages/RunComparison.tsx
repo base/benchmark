@@ -154,11 +154,7 @@ function RunComparison() {
           {isLoading ? (
             "Loading..."
           ) : (
-            <ChartGrid
-              role={selection.role}
-              comparisonMetric={selection.comparisonMetric}
-              data={data ?? []}
-            />
+            <ChartGrid role={selection.role} data={data ?? []} />
           )}
         </div>
       </div>
