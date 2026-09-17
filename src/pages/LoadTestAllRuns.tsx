@@ -1,7 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import { useLoadTestList } from "../utils/useDataSeries";
-import { formatLoadTestTimestamp } from "../utils/formatters";
 
 const DEFAULT_NETWORK = "sepolia";
 
@@ -51,33 +50,35 @@ const LoadTestAllRuns = () => {
               <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wide">
                 <tr>
                   <th className="text-left font-medium px-6 py-3">Run</th>
-                  <th className="text-left font-medium px-6 py-3">Network</th>
+                  <th className="text-left font-medium px-6 py-3">Benchmark</th>
                   <th className="text-right font-medium px-6 py-3">Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {entries.map((entry) => (
                   <tr
-                    key={`${entry.network}-${entry.timestamp}`}
+                    key={`${entry.network}-${entry.outputDir}`}
                     className="hover:bg-slate-50"
                   >
                     <td className="px-6 py-3 font-mono text-slate-900">
                       <Link
-                        to={`/load-tests/${entry.network}/${entry.timestamp}`}
+                        to={`/load-tests/${entry.network}/${entry.outputDir}`}
                         className="hover:underline"
                       >
-                        {formatLoadTestTimestamp(entry.timestamp)}
+                        {entry.transactionPayload ?? entry.testName}
                       </Link>
                       <div className="text-xs text-slate-400 font-mono mt-0.5">
-                        {entry.timestamp}
+                        {new Date(entry.createdAt).toLocaleString()}
                       </div>
                     </td>
                     <td className="px-6 py-3 text-slate-600">
-                      {entry.network}
+                      {entry.blockTimeMilliseconds
+                        ? `${entry.network} · ${entry.blockTimeMilliseconds} ms blocks`
+                        : entry.network}
                     </td>
                     <td className="px-6 py-3 text-right">
                       <Link
-                        to={`/load-tests/${entry.network}/${entry.timestamp}`}
+                        to={`/load-tests/${entry.network}/${entry.outputDir}`}
                         className="text-blue-600 hover:underline"
                       >
                         View →

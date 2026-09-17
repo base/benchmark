@@ -65,9 +65,9 @@ const sampleX = (data: MetricData): number =>
 
 const formatElapsedTime = (
   milliseconds: number,
-  useSeconds: boolean,
+  unit: "ms" | "s",
 ): string => {
-  if (useSeconds) {
+  if (unit === "s") {
     const seconds = milliseconds / 1_000;
     return `${Number.isInteger(seconds) ? seconds : seconds.toFixed(1)}s`;
   }
@@ -465,12 +465,13 @@ const LineChart: React.FC<LineChartProps> = ({
             renderedData,
             (d) => d.ExecutionMetrics[metricKey],
           ) as number) || 0;
-        const useSecondsForXAxis = !usePercentComplete && maxBlock >= 1_000;
+        const elapsedTimeUnit =
+          !usePercentComplete && maxBlock >= 1_000 ? "s" : "ms";
         const resolvedXAxisLabel =
           xAxisLabel ??
           (usePercentComplete
             ? "Benchmark completion"
-            : `Elapsed Time (${useSecondsForXAxis ? "s" : "ms"})`);
+            : `Elapsed Time (${elapsedTimeUnit})`);
 
         // Store refs for use in effects and callbacks
         svgRef.current = svg.node();
@@ -570,7 +571,7 @@ const LineChart: React.FC<LineChartProps> = ({
               .tickFormat((d) =>
                 usePercentComplete
                   ? `${Math.round(d as number)}%`
-                  : formatElapsedTime(d as number, useSecondsForXAxis),
+                  : formatElapsedTime(d as number, elapsedTimeUnit),
               ),
           )
           .selectAll("text")

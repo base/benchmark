@@ -90,6 +90,10 @@ export interface BenchmarkRun {
       gasPerSecond: number;
       newPayload: number;
     };
+    artifacts?: {
+      loadTestResult?: string;
+      validation?: string;
+    };
   } | null;
 }
 
@@ -116,10 +120,9 @@ export type BenchmarkRunWithStatus = BenchmarkRun & { status: RunStatus };
 // Load tests
 // -----------------------------------------------------------------------------
 //
-// These types mirror the JSON written by the `base-load-tester` Rust binary and
-// served by report-api at:
-//   GET /api/v1/load-tests/:network                  -> LoadTestEntry[]
-//   GET /api/v1/load-tests/:network/:timestamp       -> LoadTestResult
+// These types mirror the JSON written by the `base-load-tester` Rust binary.
+// Snapshot benchmark bundles carry one `load-test-result.json` sidecar per run;
+// the static visualizer discovers it from `output/metadata.json`.
 //
 // IMPORTANT: types are hand-maintained. If the Rust schema changes, update here.
 // See `upgrades.md` for planned producer-side changes (schema_version, metadata
@@ -204,10 +207,13 @@ export interface LoadTestConfig {
   sender_count: number;
   sender_offset: number;
   in_flight_per_sender: number;
+  max_total_in_flight?: number;
   batch_size: number;
-  batch_timeout: string;
-  duration: string;
-  target_gps: number;
+  batch_timeout?: string | null;
+  duration?: string | null;
+  measurement_blocks?: number;
+  block_time?: string;
+  target_gps?: number | null;
   seed: number;
   chain_id: number | null;
   // Storage-type entries also carry `contract` and `slots_per_tx` (flattened
@@ -258,13 +264,15 @@ export interface LoadTestResult {
 }
 
 /**
- * One entry in the list returned by `GET /api/v1/load-tests/:network`.
- * Backend sorts newest-first by timestamp string (lexicographic over the
- * "YYYY-MM-DD-HH-MM-SS" format works because all components are zero-padded).
+ * One load-test sidecar discovered in a snapshot benchmark output bundle.
  */
 export interface LoadTestEntry {
   network: string;
-  timestamp: string;
+  outputDir: string;
+  createdAt: string;
+  testName: string;
+  transactionPayload?: string;
+  blockTimeMilliseconds?: number;
 }
 
 export const getTestRunsWithStatus = (

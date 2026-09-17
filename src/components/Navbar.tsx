@@ -12,7 +12,6 @@ import { useCallback, useMemo } from "react";
 import { uniqBy } from "lodash";
 import {} from "react-router-dom";
 import Select from "./Select";
-import { formatLoadTestTimestamp } from "../utils/formatters";
 
 interface ProvidedProps {
   urlPrefix?: string;
@@ -42,7 +41,7 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
   const {
     benchmarkRunId,
     network: loadTestNetwork,
-    timestamp: loadTestTimestamp,
+    outputDir: loadTestOutputDir,
   } = useParams();
 
   const activeLoadTestNetwork = loadTestNetwork ?? DEFAULT_LOAD_TEST_NETWORK;
@@ -51,9 +50,9 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
     useLoadTestList(isLoadTestsRoute ? activeLoadTestNetwork : null);
 
   const navigateToLoadTestRun = useCallback(
-    (timestamp: string) => {
+    (outputDir: string) => {
       navigate({
-        pathname: `/load-tests/${activeLoadTestNetwork}/${timestamp}`,
+        pathname: `/load-tests/${activeLoadTestNetwork}/${outputDir}`,
       });
     },
     [activeLoadTestNetwork, navigate],
@@ -62,8 +61,8 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
   const loadTestOptions = useMemo(() => {
     if (!loadTestEntries) return [];
     return loadTestEntries.map((entry) => ({
-      label: formatLoadTestTimestamp(entry.timestamp),
-      value: entry.timestamp,
+      label: `${entry.transactionPayload ?? entry.testName} · ${new Date(entry.createdAt).toLocaleString()}`,
+      value: entry.outputDir,
     }));
   }, [loadTestEntries]);
 
@@ -158,12 +157,12 @@ const Navbar = ({ urlPrefix }: ProvidedProps) => {
         </div>
       )}
       {isLoadTestsRoute &&
-        !!loadTestTimestamp &&
+        !!loadTestOutputDir &&
         !isLoadingLoadTests &&
         loadTestOptions.length > 0 && (
           <div>
             <Select
-              value={loadTestTimestamp}
+              value={loadTestOutputDir}
               onChange={(e) => navigateToLoadTestRun(e.target.value)}
             >
               {loadTestOptions.map((option) => (

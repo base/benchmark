@@ -1,16 +1,18 @@
 // Unified data service that works with both static files and API servers
 // Since the API now emulates the static file structure, we only need one service
 import {
+  BenchmarkRun,
   BenchmarkRuns,
   LoadTestEntry,
   LoadTestResult,
   MetricData,
 } from "../types";
 
-// Load-test endpoints live under the versioned API prefix, unlike benchmark
-// data which uses the legacy unversioned `output/` paths. Centralized here so
-// the call sites stay clean and a future migration is one constant change.
-const LOAD_TEST_API_PREFIX = "api/v1/load-tests";
+const networkForRun = (run: BenchmarkRun): string =>
+  run.outputDir.split("-")[0] || `chain-${run.testConfig.ChainId ?? "unknown"}`;
+
+const hasLoadTestArtifact = (run: BenchmarkRun): boolean =>
+  Boolean(run.result?.artifacts?.loadTestResult);
 
 export interface DataServiceConfig {
   baseUrl: string; // Base URL for both static and API modes
@@ -50,25 +52,49 @@ export class DataService {
   }
 
   async getLoadTestList(network: string): Promise<LoadTestEntry[]> {
-    const response = await fetch(
-      `${this.baseUrl}${LOAD_TEST_API_PREFIX}/${encodeURIComponent(network)}`,
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch load test list: ${response.status} ${response.statusText}`,
+    const metadata = await this.getMetadata();
+    return metadata.runs
+      .filter(
+        (run) => hasLoadTestArtifact(run) && networkForRun(run) === network,
+      )
+      .map((run) => ({
+        network: networkForRun(run),
+        outputDir: run.outputDir,
+        createdAt: run.createdAt,
+        testName: run.testName,
+        transactionPayload:
+          typeof run.testConfig.TransactionPayload === "string"
+            ? run.testConfig.TransactionPayload
+            : undefined,
+        blockTimeMilliseconds: Number(run.testConfig.BlockTimeMilliseconds),
+      }))
+      .sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime(),
       );
-    }
-
-    return await response.json();
   }
 
   async getLoadTestResult(
     network: string,
-    timestamp: string,
+    outputDir: string,
   ): Promise<LoadTestResult> {
+    const metadata = await this.getMetadata();
+    const run = metadata.runs.find(
+      (candidate) =>
+        candidate.outputDir === outputDir &&
+        networkForRun(candidate) === network &&
+        hasLoadTestArtifact(candidate),
+    );
+    if (!run) {
+      throw new Error(
+        `No load-test artifact found for ${network}/${outputDir}`,
+      );
+    }
+
+    const filename = run.result?.artifacts?.loadTestResult;
     const response = await fetch(
-      `${this.baseUrl}${LOAD_TEST_API_PREFIX}/${encodeURIComponent(network)}/${encodeURIComponent(timestamp)}`,
+      `${this.baseUrl}output/${encodeURIComponent(outputDir)}/${encodeURIComponent(filename ?? "load-test-result.json")}`,
     );
 
     if (!response.ok) {

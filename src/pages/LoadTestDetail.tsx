@@ -12,7 +12,6 @@ import {
   durationToNanos,
   formatDuration,
   formatGpsVerbose,
-  formatLoadTestTimestamp,
   formatTps,
 } from "../utils/formatters";
 import {
@@ -251,12 +250,12 @@ export const LoadTestReportContent = ({
 };
 
 const LoadTestDetail = () => {
-  const { network, timestamp } = useParams();
+  const { network, outputDir } = useParams();
   const {
     data: result,
     isLoading,
     error,
-  } = useLoadTestResult(network, timestamp);
+  } = useLoadTestResult(network, outputDir);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -275,15 +274,15 @@ const LoadTestDetail = () => {
         {result && (
           <LoadTestReportContent
             result={result}
-            title={timestamp ? formatLoadTestTimestamp(timestamp) : "Load test"}
+            title="Snapshot load test"
             subtitle={
               <>
                 Network: <span className="font-mono">{network}</span>
-                {timestamp && (
+                {outputDir && (
                   <>
                     {" · "}
                     <span className="font-mono text-slate-400">
-                      {timestamp}
+                      {outputDir}
                     </span>
                   </>
                 )}

@@ -116,22 +116,21 @@ export const useLoadTestList = (network: string | null | undefined) => {
 
 export const useLoadTestResult = (
   network: string | undefined,
-  timestamp: string | undefined,
+  outputDir: string | undefined,
 ) => {
   const fetcher = useCallback(async (): Promise<LoadTestResult> => {
-    if (!network || !timestamp) {
-      throw new Error("network and timestamp required");
+    if (!network || !outputDir) {
+      throw new Error("network and output directory required");
     }
     const dataService = getDataService();
-    return await dataService.getLoadTestResult(network, timestamp);
-  }, [network, timestamp]);
+    return await dataService.getLoadTestResult(network, outputDir);
+  }, [network, outputDir]);
 
   return useSWR(
-    network && timestamp ? `load-test-${network}-${timestamp}` : null,
+    network && outputDir ? `load-test-${network}-${outputDir}` : null,
     fetcher,
     {
-      // Individual results are immutable (the file at <timestamp>.json never
-      // changes), so cache aggressively to match the backend's 12h Cache-Control.
+      // A run's sidecar is immutable after the snapshot benchmark finishes.
       dedupingInterval: 12 * 60 * 60 * 1000,
       revalidateOnFocus: false,
       errorRetryCount: 3,

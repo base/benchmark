@@ -61,11 +61,14 @@ function RunComparison() {
       return dataPerFile;
     }
 
-    // Keep a time axis when all selected runs have the same block count. When
-    // their lengths differ, align every run by completion so corresponding
-    // points represent the same relative point in the benchmark.
+    // Keep a time axis for runs whose block counts are within 2% of each other.
+    // Only normalize to completion when their lengths materially differ, so a
+    // near-identical set of runs remains readable in real elapsed time.
+    const blockCounts = dataPerFile.map((samples) => samples.length);
+    const shortestRun = Math.min(...blockCounts);
+    const longestRun = Math.max(...blockCounts);
     const normalizeProgress =
-      new Set(dataPerFile.map((samples) => samples.length)).size > 1;
+      longestRun > 0 && (longestRun - shortestRun) / longestRun > 0.02;
 
     return dataPerFile.map((data, index): DataSeries => {
       const { name, color, blockTimeMilliseconds } = selection.data[index];

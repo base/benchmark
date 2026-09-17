@@ -35,7 +35,8 @@ export const formatTransactions = (
     .join(" · ");
 };
 
-const formatTargetGps = (gps: number): string => {
+const formatTargetGps = (gps: number | null | undefined): string => {
+  if (gps == null) return "Unbounded";
   if (gps >= 1e9) return `${(gps / 1e9).toFixed(1)}B gas/s`;
   if (gps >= 1e6) return `${(gps / 1e6).toFixed(0)}M gas/s`;
   if (gps >= 1e3) return `${(gps / 1e3).toFixed(0)}k gas/s`;
@@ -50,8 +51,14 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
       value: config.in_flight_per_sender.toLocaleString(),
     },
     { label: "Batch size", value: config.batch_size.toLocaleString() },
-    { label: "Batch timeout", value: config.batch_timeout },
+    { label: "Batch timeout", value: config.batch_timeout ?? "—" },
   ];
+  if (config.max_total_in_flight != null) {
+    loadShape.push({
+      label: "Maximum in-flight",
+      value: config.max_total_in_flight.toLocaleString(),
+    });
+  }
   if (config.sender_offset !== 0) {
     loadShape.push({
       label: "Sender offset",
@@ -60,7 +67,14 @@ const buildRows = (config: LoadTestConfig): Row[][] => {
   }
 
   const target: Row[] = [
-    { label: "Duration", value: config.duration },
+    {
+      label: "Duration",
+      value:
+        config.duration ??
+        (config.measurement_blocks != null && config.block_time
+          ? `${config.measurement_blocks.toLocaleString()} blocks × ${config.block_time}`
+          : "—"),
+    },
     { label: "Target gas/s", value: formatTargetGps(config.target_gps) },
   ];
   // Surface the storage workload's cold-slot count (from the `storage` tx's

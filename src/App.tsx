@@ -19,7 +19,7 @@ function App() {
         <Route path="/load-tests/:network" element={<LoadTestLanding />} />
         <Route path="/load-tests/:network/all" element={<LoadTestAllRuns />} />
         <Route
-          path="/load-tests/:network/:timestamp"
+          path="/load-tests/:network/:outputDir"
           element={<LoadTestDetail />}
         />
         <Route path="/:benchmarkRunId" element={<RunIndex />} />

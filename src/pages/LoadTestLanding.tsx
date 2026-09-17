@@ -9,11 +9,11 @@ const LoadTestLanding = () => {
   const { data: entries, isLoading, error } = useLoadTestList(network);
 
   if (!isLoading && !error && entries && entries.length > 0) {
-    // List endpoint returns runs sorted newest-first; take entry 0 as latest.
+    // Entries are sorted newest-first; take entry 0 as latest.
     const latest = entries[0];
     return (
       <Navigate
-        to={`/load-tests/${latest.network}/${latest.timestamp}`}
+        to={`/load-tests/${latest.network}/${latest.outputDir}`}
         replace
       />
     );
