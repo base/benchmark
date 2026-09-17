@@ -1,17 +1,9 @@
-.DS_Store
-/.idea/
-**/bin/
-data-dir/
-output/
+
+node_modules
+dist
+.vite
 .vercel
-clients/build/
-
-contracts/cache/
-contracts/out/
-contracts/abi/
-benchmark/benchmark
-
-.env
+output
 
 # Node
 coverage/
@@ -19,4 +11,13 @@ coverage/
 node_modules
 yarn-debug.log*
 yarn-error.log*
-.env*.local
+
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/releases
+!.yarn/plugins
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
