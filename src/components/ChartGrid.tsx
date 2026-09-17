@@ -330,6 +330,8 @@ const ChartGrid: React.FC<ProvidedProps> = ({
   const payloadThroughputRows = data.map((series) => ({
     name: series.name,
     tps: averageMetric([series], "transactions/per_second"),
+    gasPerSecond: averageMetric([series], "gas/per_second"),
+    roleProcessingTime: averageMetric([series], focusMetric.key),
   }));
 
   return (
@@ -360,7 +362,7 @@ const ChartGrid: React.FC<ProvidedProps> = ({
             <section className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-sm sm:col-span-2 xl:col-span-5">
               <div className="bg-blue-600 px-5 py-3 text-white">
                 <p className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-100">
-                  Average TPS by transaction payload
+                  Performance by transaction payload
                 </p>
               </div>
               <table className="w-full text-sm">
@@ -371,6 +373,12 @@ const ChartGrid: React.FC<ProvidedProps> = ({
                     </th>
                     <th className="px-5 py-2 text-right font-medium">
                       Average TPS
+                    </th>
+                    <th className="px-5 py-2 text-right font-medium">
+                      Average Gas/s
+                    </th>
+                    <th className="px-5 py-2 text-right font-medium">
+                      {focusMetric.label}
                     </th>
                   </tr>
                 </thead>
@@ -384,6 +392,16 @@ const ChartGrid: React.FC<ProvidedProps> = ({
                           : `${row.tps.toLocaleString(undefined, {
                               maximumFractionDigits: 1,
                             })} TPS`}
+                      </td>
+                      <td className="px-5 py-2.5 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
+                        {row.gasPerSecond === undefined
+                          ? "—"
+                          : formatValue(row.gasPerSecond, "gas/s")}
+                      </td>
+                      <td className="px-5 py-2.5 text-right font-mono text-sm font-semibold tabular-nums text-slate-900">
+                        {row.roleProcessingTime === undefined
+                          ? "—"
+                          : formatValue(row.roleProcessingTime, "s")}
                       </td>
                     </tr>
                   ))}
