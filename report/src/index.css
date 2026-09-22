@@ -82,3 +82,23 @@ body {
 .filter-select {
   @apply p-2 rounded border border-gray-300 mt-1 bg-white;
 }
+
+/* Metric grouping */
+.metric-group {
+  margin-bottom: 2rem;
+}
+
+.metric-group-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #374151;
+  padding: 0.5rem 0;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.metric-group-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+  gap: 1rem;
+}

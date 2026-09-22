@@ -2,30 +2,35 @@ import { ChartConfig } from "./types"; // Import from types.ts
 export const CHART_CONFIG = {
   "latency/send_txs": {
     type: "line",
+    group: "Latency",
     title: "Send Txs",
     description: "Shows the median time taken for send txs",
     unit: "ns",
   },
   "latency/update_fork_choice": {
     type: "line",
+    group: "Latency",
     title: "Update Fork Choice",
     description: "Shows the median time taken for update fork choice",
     unit: "ns",
   },
   "latency/get_payload": {
     type: "line",
+    group: "Latency",
     title: "Get Payload",
     description: "Shows the median time taken for get payload",
     unit: "ns",
   },
   "latency/new_payload": {
     type: "line",
+    group: "Latency",
     title: "New Payload",
     description: "Shows the median time taken for new payload",
     unit: "ns",
   },
   "chain/inserts.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Inserts",
     description:
       "Shows the median time taken for block processing and insertion (end-to-end)",
@@ -41,6 +46,7 @@ export const CHART_CONFIG = {
   },
   "chain/storage/reads.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Storage Reads",
     description:
       "Shows the median time taken for storage reads during block processing",
@@ -56,6 +62,7 @@ export const CHART_CONFIG = {
   },
   "chain/account/updates.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Account Updates",
     description:
       "Shows the median time taken for updating accounts during state validation",
@@ -63,6 +70,7 @@ export const CHART_CONFIG = {
   },
   "chain/account/hashes.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Account Hashes",
     description:
       "Shows the median time taken for hashing accounts during state validation",
@@ -70,6 +78,7 @@ export const CHART_CONFIG = {
   },
   "chain/storage/updates.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Storage Updates", // Renamed from 'Storage Writes' for consistency
     description:
       "Shows the median time taken for updating storage during state validation",
@@ -77,6 +86,7 @@ export const CHART_CONFIG = {
   },
   "chain/validation.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Validation (Misc)",
     description:
       "Shows the median time taken for miscellaneous block validation steps",
@@ -92,6 +102,7 @@ export const CHART_CONFIG = {
   },
   "chain/write.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Write (Misc)",
     description:
       "Shows the median time taken for miscellaneous block write operations (excluding commits)",
@@ -99,6 +110,7 @@ export const CHART_CONFIG = {
   },
   "chain/account/commits.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Account Commits",
     description:
       "Shows the median time taken for committing account changes to the DB",
@@ -106,6 +118,7 @@ export const CHART_CONFIG = {
   },
   "chain/storage/commits.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Storage Commits",
     description:
       "Shows the median time taken for committing storage changes to the DB",
@@ -113,6 +126,7 @@ export const CHART_CONFIG = {
   },
   "chain/snapshot/commits.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "Snapshot Commits",
     description:
       "Shows the median time taken for committing snapshot changes to the DB",
@@ -120,18 +134,21 @@ export const CHART_CONFIG = {
   },
   "chain/triedb/commits.50-percentile": {
     type: "line",
+    group: "Chain",
     title: "TrieDB Commits",
     description: "Shows the median time taken for committing TrieDB changes",
     unit: "ns",
   },
   "transactions/per_block": {
     type: "line",
+    group: "Throughput",
     title: "Transactions per Block",
     description: "Shows the number of transactions per block",
     unit: "count",
   },
   "gas/per_block": {
     type: "line",
+    group: "Throughput",
     title: "Gas Per Block",
     description: "Shows the median gas per block",
     unit: "gas",

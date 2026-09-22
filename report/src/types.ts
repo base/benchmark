@@ -40,6 +40,7 @@ export interface ChartConfig {
   title: string;
   description: string;
   type: "line";
+  group?: "Latency" | "Chain" | "Throughput";
   unit?:
     | "ns"
     | "us"
