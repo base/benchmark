@@ -17,6 +17,7 @@ import (
 	"github.com/base/base-bench/runner/network/mempool"
 	"github.com/base/base-bench/runner/network/types"
 	"github.com/base/base-bench/runner/payload/worker"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
@@ -76,7 +77,7 @@ func NewLoadTestPayloadWorker(
 
 	w := &loadTestPayloadWorker{
 		log:              log,
-		prefundSK:        hex.EncodeToString(prefundedPrivateKey.D.Bytes()),
+		prefundSK:        hex.EncodeToString(crypto.FromECDSA(&prefundedPrivateKey)),
 		loadTestBin:      cfg.LoadTestBinary(),
 		elRPCURL:         elRPCURL,
 		flashblocksURL:   flashblocksURL,
