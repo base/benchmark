@@ -3,6 +3,7 @@ package simulator
 import (
 	"context"
 	"crypto/ecdsa"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"math/big"
@@ -217,7 +218,8 @@ func generateCallerAccounts(prefundedKey *ecdsa.PrivateKey, numCallers int) ([]*
 	}
 
 	// Use deterministic random source seeded from prefunded key
-	seed := int64(prefundedKey.D.Uint64())
+	keyBytes := crypto.FromECDSA(prefundedKey)
+	seed := int64(binary.BigEndian.Uint64(keyBytes[len(keyBytes)-8:]))
 	src := rand.New(rand.NewSource(seed))
 
 	keys := make([]*ecdsa.PrivateKey, numCallers)

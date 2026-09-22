@@ -69,7 +69,7 @@ func (o OpcodeStats) String() string {
 	})
 	opcodes = opcodes[:min(10, len(opcodes))]
 	for _, opcode := range opcodes {
-		result.WriteString(fmt.Sprintf("\n   - %20s: %.2f", opcode, o[opcode]))
+		fmt.Fprintf(&result, "\n   - %20s: %.2f", opcode, o[opcode])
 	}
 	return result.String()
 }
