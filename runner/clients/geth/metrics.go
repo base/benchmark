@@ -55,7 +55,11 @@ func (g *metricsCollector) GetMetrics() []metrics.BlockMetrics {
 }
 
 func (g *metricsCollector) Collect(ctx context.Context, metrics *metrics.BlockMetrics) error {
-	resp, err := http.Get(g.GetMetricsEndpoint())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, g.GetMetricsEndpoint(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create metrics request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
 	}

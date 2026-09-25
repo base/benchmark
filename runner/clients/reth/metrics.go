@@ -52,7 +52,11 @@ func (r *metricsCollector) GetMetricTypes() map[string]bool {
 }
 
 func (r *metricsCollector) Collect(ctx context.Context, m *metrics.BlockMetrics) error {
-	resp, err := http.Get(r.GetMetricsEndpoint())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.GetMetricsEndpoint(), nil)
+	if err != nil {
+		return fmt.Errorf("failed to create metrics request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to get metrics: %w", err)
 	}
