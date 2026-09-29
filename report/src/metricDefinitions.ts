@@ -136,6 +136,25 @@ export const CHART_CONFIG = {
     description: "Shows the median gas per block",
     unit: "gas",
   },
+  "gas/per_second": {
+    type: "line",
+    title: "Canonical Gas Per Second",
+    description: "Shows actual canonical gas produced per second",
+    unit: "gas/s",
+  },
+  "transactions/per_second": {
+    type: "line",
+    title: "Canonical Transactions Per Second",
+    description: "Shows actual canonical transactions produced per second",
+    unit: "count",
+  },
+  "benchmark/prometheus_blocks_per_scrape": {
+    type: "line",
+    title: "Blocks per Metrics Scrape",
+    description:
+      "One means an exact per-block scrape; values above one identify interval-averaged counter and histogram samples",
+    unit: "blocks",
+  },
   reth_sync_execution_execution_duration_avg: {
     type: "line",
     title: "Reth Sync Execution Duration",
@@ -145,11 +164,45 @@ export const CHART_CONFIG = {
   },
   reth_sync_block_validation_state_root_duration_avg: {
     type: "line",
-    title: "Reth Sync Block Validation State Root Duration",
+    title: "State Root Validation Duration",
     description:
-      "Shows the average time taken for state root validation during reth sync",
+      "Process-wide average time taken for state root validation during canonical block processing",
     unit: "s",
     aliases: ["reth_sync_block_validation_state_root_duration"],
+  },
+  reth_consensus_engine_beacon_block_insert_total_duration_avg: {
+    type: "line",
+    title: "Block Insert Duration",
+    description:
+      "Process-wide average end-to-end canonical block insertion time",
+    unit: "s",
+  },
+  reth_consensus_engine_beacon_new_payload_latency_avg: {
+    type: "line",
+    title: "New Payload Latency",
+    description:
+      "Process-wide average Engine API new-payload processing latency",
+    unit: "s",
+  },
+  reth_consensus_engine_persistence_save_blocks_duration_seconds_avg: {
+    type: "line",
+    title: "Persistence Save Blocks Duration",
+    description:
+      "Process-wide average duration of a canonical block persistence operation",
+    unit: "s",
+  },
+  reth_transaction_pool_pending_pool_transactions: {
+    type: "line",
+    title: "Pending Pool Transactions",
+    description: "Point-in-time number of transactions ready for inclusion",
+    unit: "count",
+  },
+  reth_transaction_pool_total_transactions: {
+    type: "line",
+    title: "Total Pool Transactions",
+    description:
+      "Point-in-time number of transactions in all transaction-pool subpools",
+    unit: "count",
   },
   reth_base_builder_block_built_success: {
     type: "line",
@@ -378,22 +431,25 @@ export const CHART_CONFIG = {
   },
   reth_sync_state_provider_total_storage_fetch_latency_avg: {
     type: "line",
-    title: "Validator Storage Load Latency",
-    description: "Average latency for storage slot loads during validation",
+    title: "Storage Load Latency",
+    description:
+      "Process-wide average latency for storage slot loads during validation",
     unit: "s",
     aliases: ["reth_sync_state_provider_total_storage_fetch_latency"],
   },
   reth_sync_state_provider_total_code_fetch_latency_avg: {
     type: "line",
-    title: "Validator Code Load Latency",
-    description: "Average latency for bytecode loads during validation",
+    title: "Code Load Latency",
+    description:
+      "Process-wide average latency for bytecode loads during validation",
     unit: "s",
     aliases: ["reth_sync_state_provider_total_code_fetch_latency"],
   },
   reth_sync_state_provider_total_account_fetch_latency_avg: {
     type: "line",
-    title: "Validator Account Load Latency",
-    description: "Average latency for account loads during validation",
+    title: "Account Load Latency",
+    description:
+      "Process-wide average latency for account loads during validation",
     unit: "s",
     aliases: ["reth_sync_state_provider_total_account_fetch_latency"],
   },
@@ -404,8 +460,11 @@ const CHART_CONFIG_ORDER: (keyof typeof CHART_CONFIG)[] = [
   "latency/new_payload",
   "latency/update_fork_choice",
   "latency/send_txs",
+  "gas/per_second",
+  "transactions/per_second",
   "gas/per_block",
   "transactions/per_block",
+  "benchmark/prometheus_blocks_per_scrape",
   "chain/inserts.50-percentile",
   "chain/account/reads.50-percentile",
   "chain/storage/reads.50-percentile",
@@ -420,6 +479,17 @@ const CHART_CONFIG_ORDER: (keyof typeof CHART_CONFIG)[] = [
   "chain/storage/commits.50-percentile",
   "chain/snapshot/commits.50-percentile",
   "chain/triedb/commits.50-percentile",
+  "reth_consensus_engine_beacon_block_insert_total_duration_avg",
+  "reth_consensus_engine_beacon_new_payload_latency_avg",
+  "reth_consensus_engine_persistence_save_blocks_duration_seconds_avg",
+  "reth_sync_execution_execution_duration_avg",
+  "reth_sync_block_validation_state_root_duration_avg",
+  "reth_base_builder_total_block_built_duration_avg",
+  "reth_base_builder_state_root_calculation_duration_avg",
+  "reth_base_builder_payload_transaction_simulation_duration_avg",
+  "reth_base_builder_tx_simulation_duration_avg",
+  "reth_transaction_pool_pending_pool_transactions",
+  "reth_transaction_pool_total_transactions",
   "reth_base_builder_state_root_calculation_duration_quantile_0_5",
   "reth_base_builder_state_root_calculation_duration_quantile_0_9",
   "reth_base_builder_state_root_calculation_duration_quantile_0_99",

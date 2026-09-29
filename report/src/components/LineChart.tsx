@@ -47,6 +47,9 @@ interface TooltipData {
  */
 const MAX_TICKS = 10;
 
+const sampleX = (data: MetricData): number =>
+  data.ElapsedMilliseconds ?? data.BlockNumber;
+
 const LineChart: React.FC<LineChartProps> = ({
   series,
   thresholdKey,
@@ -55,7 +58,7 @@ const LineChart: React.FC<LineChartProps> = ({
   description,
   unit,
   xAxisDomain,
-  xAxisLabel = "Block Number",
+  xAxisLabel = "Elapsed Time (ms)",
   thresholds,
 }) => {
   // Generate a unique ID for this chart
@@ -111,7 +114,7 @@ const LineChart: React.FC<LineChartProps> = ({
   );
 
   // Create scales outside the render function to avoid recreation
-  const blockNumbers = validData.map((d) => d.BlockNumber);
+  const blockNumbers = validData.map(sampleX);
   const minBlock = xAxisDomain
     ? xAxisDomain[0]
     : blockNumbers.length
@@ -156,7 +159,7 @@ const LineChart: React.FC<LineChartProps> = ({
         if (!s.data.length) return;
 
         // Find the closest point in the series data
-        const bisect = d3.bisector((d: MetricData) => d.BlockNumber).left;
+        const bisect = d3.bisector(sampleX).left;
         const index = bisect(s.data, xValue);
 
         // Handle edge cases
@@ -165,8 +168,8 @@ const LineChart: React.FC<LineChartProps> = ({
             ? s.data[s.data.length - 1]
             : index <= 0
               ? s.data[0]
-              : Math.abs(s.data[index].BlockNumber - xValue) <
-                  Math.abs(s.data[index - 1].BlockNumber - xValue)
+              : Math.abs(sampleX(s.data[index]) - xValue) <
+                  Math.abs(sampleX(s.data[index - 1]) - xValue)
                 ? s.data[index]
                 : s.data[index - 1];
 
@@ -178,7 +181,7 @@ const LineChart: React.FC<LineChartProps> = ({
         if (value === undefined || isNaN(value)) return;
 
         const color = s.color || d3.schemeCategory10[i % 10];
-        const xPos = x(point.BlockNumber);
+        const xPos = x(sampleX(point));
         const yPos = y(value);
 
         // Skip if position is invalid
@@ -568,7 +571,7 @@ const LineChart: React.FC<LineChartProps> = ({
                 const val = d.ExecutionMetrics[metricKey];
                 return val !== undefined && !isNaN(val);
               })
-              .x((d) => x(d.BlockNumber))
+              .x((d) => x(sampleX(d)))
               .y((d) => {
                 const val = d.ExecutionMetrics[metricKey];
                 return y(val);
@@ -589,7 +592,7 @@ const LineChart: React.FC<LineChartProps> = ({
               .enter()
               .append("circle")
               .attr("class", `dot-${i}`)
-              .attr("cx", (d) => x(d.BlockNumber))
+              .attr("cx", (d) => x(sampleX(d)))
               .attr("cy", (d) => y(d.ExecutionMetrics[metricKey]))
               .attr("r", 4)
               .style("fill", color)
