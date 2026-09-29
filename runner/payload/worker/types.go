@@ -32,3 +32,8 @@ type CompletionWorker interface {
 	Done() <-chan struct{}
 	Err() error
 }
+
+// MeasurementCompletionWorker signals when measured load generation ends, before final draining.
+type MeasurementCompletionWorker interface {
+	MeasurementDone() <-chan struct{}
+}
