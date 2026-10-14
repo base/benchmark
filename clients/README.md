@@ -5,11 +5,11 @@ This directory contains scripts to build client binaries for blockchain nodes.
 ## Available Scripts
 
 ### build-reth.sh
-Builds the reth binary from the Paradigm reth repository using Cargo.
+Builds the op-reth binary from the Ethereum Optimism monorepo using Cargo.
 
 **Default Configuration:**
-- Repository: `https://github.com/paradigmxyz/reth/`
-- Version: `main`
+- Repository: `https://github.com/ethereum-optimism/optimism/`
+- Version: `develop`
 - Build tool: `cargo`
 
 ### build-geth.sh
@@ -25,7 +25,7 @@ Builds the base-reth-node and base-builder binaries from the base repository usi
 
 **Default Configuration:**
 - Repository: `https://github.com/base/base`
-- Version: `main`
+- Version: `develop`
 - Build tool: `cargo`
 
 ## Usage
