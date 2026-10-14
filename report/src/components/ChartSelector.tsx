@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { BenchmarkRuns } from "../types";
+import { BenchmarkRun, BenchmarkRuns } from "../types";
 import { isEqual } from "lodash";
 import {
   camelToTitleCase,
@@ -47,10 +47,26 @@ const ChartSelector = ({
 
   const runsWithRoles = useMemo(
     () =>
-      benchmarkRuns.runs.flatMap((r) => [
-        { ...r, testConfig: { ...r.testConfig, role: "sequencer" } },
-        { ...r, testConfig: { ...r.testConfig, role: "validator" } },
-      ]),
+      benchmarkRuns.runs.flatMap((r) => {
+        // Only expose a role variant when that role actually produced metrics.
+        // Sequencer-only runs have no metrics-validator.json, and fetching a
+        // missing role 404s and rejects the whole chart batch, so emitting a
+        // phantom validator variant would blank the charts entirely.
+        const variants: BenchmarkRun[] = [];
+        if (r.result?.sequencerMetrics) {
+          variants.push({
+            ...r,
+            testConfig: { ...r.testConfig, role: "sequencer" },
+          });
+        }
+        if (r.result?.validatorMetrics) {
+          variants.push({
+            ...r,
+            testConfig: { ...r.testConfig, role: "validator" },
+          });
+        }
+        return variants;
+      }),
     [benchmarkRuns.runs],
   );
 
@@ -59,6 +75,7 @@ const ChartSelector = ({
     filterOptions,
     matchedRuns,
     filterSelections,
+    byMetric,
     setFilters,
     setByMetric,
     role,
@@ -69,7 +86,7 @@ const ChartSelector = ({
   useEffect(() => {
     let colorMap: ((val: number) => string) | undefined = undefined;
 
-    if (filterSelections.byMetric === "GasLimit" && matchedRuns.length > 0) {
+    if (byMetric === "GasLimit" && matchedRuns.length > 0) {
       const gasLimits = matchedRuns.map((r) => Number(r.testConfig.GasLimit));
       const min = Math.min(...gasLimits);
       const max = Math.max(...gasLimits);
@@ -87,9 +104,9 @@ const ChartSelector = ({
 
         let seriesName: string;
         let color: string | undefined = undefined;
-        const byMetricValue = run.testConfig[filterSelections.byMetric];
+        const byMetricValue = run.testConfig[byMetric];
 
-        if (filterSelections.byMetric === "GasLimit") {
+        if (byMetric === "GasLimit") {
           const gasLimitNum = Number(byMetricValue);
           seriesName = formatValue(gasLimitNum, "gas");
           color = colorMap?.(gasLimitNum);
@@ -119,7 +136,7 @@ const ChartSelector = ({
       lastSentDataRef.current = dataToSend;
       onChangeDataQuery({ data: dataToSend, role });
     }
-  }, [matchedRuns, filterSelections.byMetric, role, onChangeDataQuery]);
+  }, [matchedRuns, byMetric, role, onChangeDataQuery]);
 
   return (
     <div className="flex items-start">
@@ -127,7 +144,7 @@ const ChartSelector = ({
         <div>
           <div className="text-sm text-slate-500 mb-1">Show Line Per</div>
           <Select
-            value={filterSelections.byMetric}
+            value={byMetric}
             onChange={(e) => setByMetric(e.target.value)}
           >
             {Object.keys(variables).map((k) => (
@@ -139,7 +156,7 @@ const ChartSelector = ({
         </div>
         {Object.entries(filterOptions)
           .sort((a, b) => a[0].localeCompare(b[0]))
-          .filter(([k]) => k !== filterSelections.byMetric)
+          .filter(([k]) => k !== byMetric)
           .map(([key, availableValues]) => {
             const currentValue =
               filterSelections.params[key] ?? availableValues[0];
