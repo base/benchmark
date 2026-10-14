@@ -6,7 +6,10 @@ import (
 	"math/big"
 	"testing"
 
+	benchtypes "github.com/base/base-bench/runner/network/types"
+	"github.com/base/base-bench/runner/payload/simulator/simulatorstats"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/stretchr/testify/require"
 )
 
@@ -98,4 +101,71 @@ func TestMineAndConfirmNoBatchingWouldTimeout(t *testing.T) {
 var _ interface {
 	Setup(ctx context.Context) error
 	SendTxs(ctx context.Context, pendingTxs int) (int, error)
+	OnBlockBuilt(gasUsed uint64, userTxsIncluded int)
 } = (*simulatorPayloadWorker)(nil)
+
+func newRecalibrationWorker(t *testing.T, gasLimit uint64, numCallsPerBlock uint64, callsPerBlock string) *simulatorPayloadWorker {
+	t.Helper()
+	return &simulatorPayloadWorker{
+		log:              log.New(),
+		params:           benchtypes.RunParams{GasLimit: gasLimit},
+		numCallsPerBlock: numCallsPerBlock,
+		payloadParams:    &simulatorstats.Stats{CallsPerBlock: callsPerBlock},
+	}
+}
+
+func TestOnBlockBuilt_RaisesNumCallsWhenUnderfilled(t *testing.T) {
+	w := newRecalibrationWorker(t, 25_000_000, 46, "fill")
+	w.OnBlockBuilt(16_800_000, 46) // observed: 365k gas/tx
+
+	require.True(t, w.recalibrated)
+	// (25M - 1M) / 365k = 65
+	require.Equal(t, uint64(65), w.numCallsPerBlock)
+}
+
+func TestOnBlockBuilt_RespectsUserSpecifiedCap(t *testing.T) {
+	w := newRecalibrationWorker(t, 25_000_000, 46, "50")
+	w.OnBlockBuilt(16_800_000, 46) // raw recalibration would be 65, capped to 50
+
+	require.True(t, w.recalibrated)
+	require.Equal(t, uint64(50), w.numCallsPerBlock)
+}
+
+func TestOnBlockBuilt_LowersNumCallsWhenOvertargeting(t *testing.T) {
+	w := newRecalibrationWorker(t, 250_000_000, 100, "100")
+	w.OnBlockBuilt(248_000_000, 68) // observed: 3.65M gas/tx
+
+	require.True(t, w.recalibrated)
+	// (250M - 1M) / 3.65M = 68, capped at user-specified 100, so 68.
+	require.Equal(t, uint64(68), w.numCallsPerBlock)
+}
+
+func TestOnBlockBuilt_NoopOnSubsequentBlocks(t *testing.T) {
+	w := newRecalibrationWorker(t, 25_000_000, 46, "fill")
+
+	w.OnBlockBuilt(16_800_000, 46)
+	firstRecalibration := w.numCallsPerBlock
+	require.Equal(t, uint64(65), firstRecalibration)
+
+	w.OnBlockBuilt(1_000_000, 1) // would suggest ~24 — must NOT apply
+	require.Equal(t, firstRecalibration, w.numCallsPerBlock)
+}
+
+func TestOnBlockBuilt_GuardsAgainstZeroInputs(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		gasUsed           uint64
+		userTxsIncluded   int
+	}{
+		{"zero gas", 0, 46},
+		{"zero txs", 16_800_000, 0},
+		{"negative txs", 16_800_000, -1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := newRecalibrationWorker(t, 25_000_000, 46, "fill")
+			w.OnBlockBuilt(tc.gasUsed, tc.userTxsIncluded)
+			require.False(t, w.recalibrated, "must not consume the one-shot recalibration on degenerate input")
+			require.Equal(t, uint64(46), w.numCallsPerBlock)
+		})
+	}
+}
