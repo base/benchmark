@@ -411,6 +411,20 @@ export const CHART_CONFIG = {
       "Average gas used by validity-predicate transactions per block",
     unit: "gas",
   },
+  reth_txpool_validity_admitted_outcome_added: {
+    type: "line",
+    title: "Txpool Validity Admissions",
+    description:
+      "Validity transactions admitted to the builder's pool per block as new entries; compared with validity txs included per block it shows whether the validity lane is draining or backing up",
+    unit: "count",
+  },
+  reth_txpool_validity_admitted_outcome_replaced: {
+    type: "line",
+    title: "Txpool Validity Replacements",
+    description:
+      "Validity transactions admitted per block that replaced an existing same-sender/nonce pool entry",
+    unit: "count",
+  },
   reth_base_builder_validity_candidate_handling_duration_avg: {
     type: "line",
     title: "Builder Validity Candidate Handling",
