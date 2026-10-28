@@ -512,6 +512,29 @@ export const CHART_CONFIG = {
         "Parked validity transactions per block that stayed resting after a rescan",
       unit: "count",
     },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_rescan_budget_exhausted:
+    {
+      type: "line",
+      title: "Builder Resting Rescan: Budget Exhausted",
+      description:
+        "Parked validity transactions per block left unevaluated on rescan because the predicate evaluation budget was exhausted",
+      unit: "count",
+    },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_rescan_read_error:
+    {
+      type: "line",
+      title: "Builder Resting Rescan: Read Error",
+      description:
+        "Parked validity transactions per block whose rescan failed to read predicate state",
+      unit: "count",
+    },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_unsupported: {
+    type: "line",
+    title: "Builder Predicate Evaluations: Unsupported",
+    description:
+      "Validity transactions per block rejected unevaluated because a predicate kind is unsupported by the native builder",
+    unit: "count",
+  },
   reth_base_builder_predicate_accounts_loaded_total_avg: {
     type: "line",
     title: "Builder Predicate Account Reads",
