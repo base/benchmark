@@ -397,6 +397,221 @@ export const CHART_CONFIG = {
     unit: "s",
     aliases: ["reth_sync_state_provider_total_account_fetch_latency"],
   },
+  reth_base_builder_txs_included_per_block_flow_validity_avg: {
+    type: "line",
+    title: "Builder Validity Txs Included Per Block",
+    description:
+      "Average number of validity-predicate transactions from the pool included per block",
+    unit: "count",
+  },
+  reth_base_builder_tx_gas_used_per_block_flow_validity_avg: {
+    type: "line",
+    title: "Builder Validity Gas Per Block",
+    description:
+      "Average gas used by validity-predicate transactions per block",
+    unit: "gas",
+  },
+  reth_base_builder_validity_candidate_handling_duration_avg: {
+    type: "line",
+    title: "Builder Validity Candidate Handling",
+    description:
+      "Average time per flashblock spent iterating validity transactions, from yield to the predicate gate decision, including resting transactions parked in the iterator",
+    unit: "s",
+  },
+  reth_base_builder_validity_predicate_eval_duration_per_block_avg: {
+    type: "line",
+    title: "Builder Predicate Evaluation Time",
+    description:
+      "Average total validity-predicate evaluation time per build, inclusive of state loads",
+    unit: "s",
+  },
+  reth_base_builder_validity_predicate_rescan_duration_avg: {
+    type: "line",
+    title: "Builder Resting Predicate Rescan",
+    description:
+      "Average time spent rescanning parked validity predicates per build",
+    unit: "s",
+  },
+  reth_base_builder_validity_predicate_candidates_evaluated_per_build_avg: {
+    type: "line",
+    title: "Builder Validity Candidates Evaluated",
+    description:
+      "Average number of validity transactions whose predicates were evaluated in the primary scan per build",
+    unit: "count",
+  },
+  reth_base_builder_validity_predicate_candidates_deferred_per_build_avg: {
+    type: "line",
+    title: "Builder Validity Candidates Deferred",
+    description:
+      "Average number of validity transactions deferred without evaluation after the predicate time budget was exhausted per build",
+    unit: "count",
+  },
+  reth_base_builder_validity_predicate_evaluation_coverage_per_build_avg: {
+    type: "line",
+    title: "Builder Validity Evaluation Coverage",
+    description:
+      "Fraction (0-1) of primary-scan validity candidates evaluated per build; below 1 means the predicate time budget cut evaluation short",
+  },
+  reth_base_builder_validity_predicate_eval_cutoff_builds_total: {
+    type: "line",
+    title: "Builder Predicate Budget Cutoffs",
+    description:
+      "Builds per block that deferred at least one validity transaction after exhausting the predicate evaluation budget",
+    unit: "count",
+  },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_matched: {
+    type: "line",
+    title: "Builder Predicate Evaluations: Matched",
+    description:
+      "Validity predicate evaluations per block whose predicates all matched",
+    unit: "count",
+  },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_not_satisfied:
+    {
+      type: "line",
+      title: "Builder Predicate Evaluations: Not Satisfied",
+      description:
+        "Validity predicate evaluations per block where a predicate did not match, leaving the transaction resting",
+      unit: "count",
+    },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_budget_exhausted:
+    {
+      type: "line",
+      title: "Builder Predicate Evaluations: Budget Exhausted",
+      description:
+        "Validity transactions per block skipped because the predicate evaluation time budget was exhausted",
+      unit: "count",
+    },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_expired: {
+    type: "line",
+    title: "Builder Predicate Evaluations: Expired",
+    description:
+      "Validity transactions per block dropped because a block-number or flashblock-index predicate can no longer be satisfied",
+    unit: "count",
+  },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_read_error: {
+    type: "line",
+    title: "Builder Predicate Evaluations: Read Error",
+    description:
+      "Validity predicate evaluations per block that failed to read predicate state",
+    unit: "count",
+  },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_rescan_matched:
+    {
+      type: "line",
+      title: "Builder Resting Rescan: Matched",
+      description:
+        "Parked validity transactions per block whose predicates matched when rescanned after state changed",
+      unit: "count",
+    },
+  reth_base_builder_validity_predicate_evaluations_total_outcome_rescan_not_satisfied:
+    {
+      type: "line",
+      title: "Builder Resting Rescan: Not Satisfied",
+      description:
+        "Parked validity transactions per block that stayed resting after a rescan",
+      unit: "count",
+    },
+  reth_base_builder_predicate_accounts_loaded_total_avg: {
+    type: "line",
+    title: "Builder Predicate Account Reads",
+    description:
+      "Average accounts read while evaluating validity predicates per block, counting every read",
+    unit: "count",
+  },
+  reth_base_builder_predicate_accounts_loaded_unique_avg: {
+    type: "line",
+    title: "Builder Predicate Unique Account Reads",
+    description:
+      "Average distinct accounts read while evaluating validity predicates per block",
+    unit: "count",
+  },
+  reth_base_builder_predicate_slots_loaded_total_avg: {
+    type: "line",
+    title: "Builder Predicate Storage Reads",
+    description:
+      "Average storage slots read while evaluating validity predicates per block, counting re-reads",
+    unit: "count",
+  },
+  reth_base_builder_predicate_slots_loaded_unique_avg: {
+    type: "line",
+    title: "Builder Predicate Unique Storage Reads",
+    description:
+      "Average distinct storage slots read while evaluating validity predicates per block",
+    unit: "count",
+  },
+  reth_base_builder_resting_predicate_parked_total: {
+    type: "line",
+    title: "Builder Resting Predicates Parked",
+    description:
+      "Resting validity transactions per block parked in the transaction iterator without reaching the build loop",
+    unit: "count",
+  },
+  reth_base_builder_resting_predicate_carried_avg: {
+    type: "line",
+    title: "Builder Resting Predicates Carried",
+    description:
+      "Average resting validity transactions carried into a block build from the previous block",
+    unit: "count",
+  },
+  reth_base_builder_resting_predicate_carried_parked_total: {
+    type: "line",
+    title: "Builder Carried Resting Predicates Parked",
+    description:
+      "Of the parked resting validity transactions per block, those carried over from an earlier block",
+    unit: "count",
+  },
+  reth_base_builder_resting_predicate_carry_released_total_reason_pre_block_state:
+    {
+      type: "line",
+      title: "Builder Resting Released: State Changed",
+      description:
+        "Carried resting validity transactions per block released at block start because watched state changed",
+      unit: "count",
+    },
+  reth_base_builder_resting_predicate_carry_released_total_reason_block_number:
+    {
+      type: "line",
+      title: "Builder Resting Released: Block Number",
+      description:
+        "Carried resting validity transactions per block released at block start by a block-number predicate",
+      unit: "count",
+    },
+  reth_base_builder_resting_predicate_carry_released_total_reason_unseen: {
+    type: "line",
+    title: "Builder Resting Released: Unseen",
+    description:
+      "Carried resting validity transactions per block released at block start because the pool no longer yielded them",
+    unit: "count",
+  },
+  reth_base_builder_resting_predicate_carry_resets_total: {
+    type: "line",
+    title: "Builder Resting Carry Resets",
+    description:
+      "Block builds that discarded carried resting validity transactions because the parent was not the last block the builder finished",
+    unit: "count",
+  },
+  reth_base_builder_resting_predicate_shadow_mismatches_total: {
+    type: "line",
+    title: "Builder Resting Shadow Mismatches",
+    description:
+      "Resting validity transactions per block whose predicates matched when evaluated in shadow mode, indicating the resting index disagreed with evaluation",
+    unit: "count",
+  },
+  reth_base_builder_predicate_bucket_depth_avg: {
+    type: "line",
+    title: "Builder Predicate Bucket Depth",
+    description:
+      "Average depth of validity-predicate index buckets, sampled once per build",
+    unit: "count",
+  },
+  reth_base_builder_predicate_bucket_wakeups_avg: {
+    type: "line",
+    title: "Builder Predicate Bucket Wakeups",
+    description:
+      "Average number of validity-predicate index buckets woken per build",
+    unit: "count",
+  },
 } satisfies Record<string, ChartConfig>;
 
 const CHART_CONFIG_ORDER: (keyof typeof CHART_CONFIG)[] = [
