@@ -191,8 +191,8 @@ on-the-wire shape.
 
 The set of metric keys inside `ExecutionMetrics` is open. The
 frontend has a registry of "known" metrics with units and labels at
-`report/src/metricDefinitions.ts`; anything not listed there is not
-charted.
+`report/src/metricDefinitions.ts`; the report charts only metrics
+listed there.
 
 ## Comparison groups (automatic)
 
