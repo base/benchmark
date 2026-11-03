@@ -1,4 +1,4 @@
-import { ChartConfig } from "./types"; // Import from types.ts
+import { ChartConfig } from "./types";
 export const CHART_CONFIG = {
   "latency/send_txs": {
     type: "line",
@@ -32,7 +32,6 @@ export const CHART_CONFIG = {
     unit: "ns",
   },
   "chain/account/reads.50-percentile": {
-    // Added
     type: "line",
     title: "Account Reads",
     description:
@@ -47,7 +46,6 @@ export const CHART_CONFIG = {
     unit: "ns",
   },
   "chain/execution.50-percentile": {
-    // Added
     type: "line",
     title: "Execution (EVM)",
     description:
@@ -70,7 +68,7 @@ export const CHART_CONFIG = {
   },
   "chain/storage/updates.50-percentile": {
     type: "line",
-    title: "Storage Updates", // Renamed from 'Storage Writes' for consistency
+    title: "Storage Updates",
     description:
       "Shows the median time taken for updating storage during state validation",
     unit: "ns",
@@ -83,7 +81,6 @@ export const CHART_CONFIG = {
     unit: "ns",
   },
   "chain/crossvalidation.50-percentile": {
-    // Added
     type: "line",
     title: "Cross Validation",
     description:
@@ -705,7 +702,6 @@ export const SORTED_CHART_CONFIG: [string, ChartConfig][] = Object.entries(
   const aIndex = CHART_CONFIG_ORDER.indexOf(a[0] as keyof typeof CHART_CONFIG);
   const bIndex = CHART_CONFIG_ORDER.indexOf(b[0] as keyof typeof CHART_CONFIG);
 
-  // if both doesn't exist, sort it last (infinity)
   if (aIndex === -1 && bIndex === -1) {
     return 0;
   }
