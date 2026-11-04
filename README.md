@@ -2,6 +2,10 @@
 
 # Base Benchmark
 
+> [!WARNING]
+> ## Archived
+> This repository is archived because the benchmark runner is now [`base bench`](https://github.com/base/base) in the [Base monorepo](https://github.com/base/base), and benchmark-results visualization is now maintained in [`base/ui`](https://github.com/base/ui).
+
 Base Benchmark is a performance testing framework for Ethereum execution clients. Compare client performance, identify bottlenecks, and ensure reliability before deployment.
 
 <!-- Badge row 1 - status -->
