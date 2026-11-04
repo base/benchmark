@@ -74,7 +74,7 @@ Public results are available at the following links:
 
 - **Go:** Version 1.21 or later. Install from [go.dev](https://go.dev/dl/)
 - **Foundry:** For smart contract compilation. See [installation guide](https://book.getfoundry.sh/getting-started/installation)
-- **Node.js:** Version 18+ for the interactive dashboard. Install from [nodejs.org](https://nodejs.org/)
+- **Node.js:** Version 24 LTS for the interactive dashboard. Install from [nodejs.org](https://nodejs.org/)
 
 ## Getting Started
 
@@ -123,11 +123,11 @@ To see available options:
 
 ```bash
 cd report/
-npm install
-npm run dev
+corepack yarn install --immutable
+corepack yarn dev
 ```
 
-Open your browser to the URL shown (typically `http://localhost:5173`).
+Open your browser to the URL shown (typically `http://localhost:3000`).
 
 ## Available Benchmarks
 

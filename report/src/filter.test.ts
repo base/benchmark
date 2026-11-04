@@ -6,6 +6,8 @@ import { BenchmarkRun } from "./types";
 const sampleRuns: BenchmarkRun[] = [
   {
     sourceFile: "test1.json",
+    id: "test1",
+    createdAt: "",
     testName: "A",
     testDescription: "Desc A",
     outputDir: "/tmp/a",
@@ -14,6 +16,8 @@ const sampleRuns: BenchmarkRun[] = [
   },
   {
     sourceFile: "test2.json",
+    id: "test2",
+    createdAt: "",
     testName: "B",
     testDescription: "Desc B",
     outputDir: "/tmp/b",
@@ -22,6 +26,8 @@ const sampleRuns: BenchmarkRun[] = [
   },
   {
     sourceFile: "test3.json",
+    id: "test3",
+    createdAt: "",
     testName: "C",
     testDescription: "Desc C",
     outputDir: "/tmp/c",
@@ -30,6 +36,8 @@ const sampleRuns: BenchmarkRun[] = [
   },
   {
     sourceFile: "test4.json",
+    id: "test4",
+    createdAt: "",
     testName: "D",
     testDescription: "Desc D",
     outputDir: "/tmp/d",
@@ -38,6 +46,8 @@ const sampleRuns: BenchmarkRun[] = [
   },
   {
     sourceFile: "test5.json",
+    id: "test5",
+    createdAt: "",
     testName: "E",
     testDescription: "Desc E",
     outputDir: "/tmp/e",
@@ -74,6 +84,7 @@ describe("BenchmarkVariables", () => {
     const versionedRuns: BenchmarkRun[] = [
       {
         sourceFile: "v1-old.json",
+        id: "v1-old",
         testName: "old v1",
         testDescription: "",
         outputDir: "/tmp/v1-old",
@@ -83,6 +94,7 @@ describe("BenchmarkVariables", () => {
       },
       {
         sourceFile: "v2.json",
+        id: "v2",
         testName: "v2",
         testDescription: "",
         outputDir: "/tmp/v2",
@@ -92,6 +104,7 @@ describe("BenchmarkVariables", () => {
       },
       {
         sourceFile: "v1-latest.json",
+        id: "v1-latest",
         testName: "latest v1",
         testDescription: "",
         outputDir: "/tmp/v1-latest",
@@ -101,6 +114,7 @@ describe("BenchmarkVariables", () => {
       },
       {
         sourceFile: "unknown.json",
+        id: "unknown",
         testName: "unknown",
         testDescription: "",
         outputDir: "/tmp/unknown",
@@ -178,6 +192,8 @@ describe("BenchmarkVariables", () => {
     const singleVarRuns: BenchmarkRun[] = [
       {
         sourceFile: "f1",
+        id: "f1",
+        createdAt: "",
         testName: "T1",
         testDescription: "",
         outputDir: "",
@@ -186,6 +202,8 @@ describe("BenchmarkVariables", () => {
       },
       {
         sourceFile: "f2",
+        id: "f2",
+        createdAt: "",
         testName: "T2",
         testDescription: "",
         outputDir: "",
@@ -211,6 +229,8 @@ describe("BenchmarkVariables", () => {
     const sparseRuns: BenchmarkRun[] = [
       {
         sourceFile: "s1",
+        id: "s1",
+        createdAt: "",
         testName: "S1",
         testDescription: "",
         outputDir: "",
@@ -219,6 +239,8 @@ describe("BenchmarkVariables", () => {
       },
       {
         sourceFile: "s2",
+        id: "s2",
+        createdAt: "",
         testName: "S2",
         testDescription: "",
         outputDir: "",
@@ -227,6 +249,8 @@ describe("BenchmarkVariables", () => {
       },
       {
         sourceFile: "s3",
+        id: "s3",
+        createdAt: "",
         testName: "S3",
         testDescription: "",
         outputDir: "",
