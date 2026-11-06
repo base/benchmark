@@ -1,5 +1,7 @@
 export interface MetricData {
   BlockNumber: number;
+  Timestamp?: string | number;
+  ElapsedMilliseconds?: number;
   ExecutionMetrics: {
     [key: string]: number;
   };

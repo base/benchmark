@@ -62,10 +62,34 @@ function RunComparison() {
     }
 
     return dataPerFile.map((data, index): DataSeries => {
-      const { name, color } = selection.data[index];
+      const { name, color, blockTimeMilliseconds } = selection.data[index];
+      const timestamps = data.map((sample) => {
+        if (typeof sample.Timestamp === "number") {
+          return sample.Timestamp;
+        }
+        if (typeof sample.Timestamp === "string") {
+          const timestamp = Date.parse(sample.Timestamp);
+          return Number.isNaN(timestamp) ? undefined : timestamp;
+        }
+        return undefined;
+      });
+      const firstTimestamp = timestamps[0];
+      const useTimestamps =
+        firstTimestamp !== undefined &&
+        timestamps.every((timestamp) => timestamp !== undefined);
+      const firstBlockNumber = data[0]?.BlockNumber ?? 0;
+      const blockInterval =
+        Number.isFinite(blockTimeMilliseconds) && blockTimeMilliseconds > 0
+          ? blockTimeMilliseconds
+          : 1;
       return {
         name,
-        data,
+        data: data.map((sample, sampleIndex) => ({
+          ...sample,
+          ElapsedMilliseconds: useTimestamps
+            ? (timestamps[sampleIndex] as number) - firstTimestamp
+            : (sample.BlockNumber - firstBlockNumber) * blockInterval,
+        })),
         color,
         thresholds: selection.data[index].thresholds,
       };

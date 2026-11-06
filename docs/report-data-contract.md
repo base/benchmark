@@ -177,11 +177,17 @@ under a directory whose name matches `runs[].outputDir`:
 
 ```json
 [
-  {"BlockNumber": 1, "ExecutionMetrics": {"latency/get_payload": 4500000, ...}},
-  {"BlockNumber": 2, "ExecutionMetrics": {...}},
+  {"BlockNumber": 1, "Timestamp": 1785272940200, "ExecutionMetrics": {"latency/get_payload": 4500000, ...}},
+  {"BlockNumber": 2, "Timestamp": 1785272940400, "ExecutionMetrics": {...}},
   ...
 ]
 ```
+
+`Timestamp` is optional and may be either Unix milliseconds or an ISO 8601
+string. Producers should include it when the block format supports
+sub-second timestamps. Comparison charts normalize each series to elapsed
+milliseconds from its first sample. For older data without timestamps, the
+charts use the run's `BlockTimeMilliseconds` and relative block number.
 
 One file per role (`metrics-sequencer.json`, `metrics-validator.json`).
 The report-api serves them directly via

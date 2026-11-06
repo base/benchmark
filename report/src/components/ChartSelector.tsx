@@ -15,6 +15,7 @@ export interface SelectedData {
   outputDir: string;
   role: string;
   name: string;
+  blockTimeMilliseconds: number;
   color?: string;
   thresholds?: {
     warning?: Record<string, number>;
@@ -106,6 +107,7 @@ const ChartSelector = ({
           outputDir: run.outputDir,
           role: String(role),
           name: seriesName,
+          blockTimeMilliseconds: Number(run.testConfig.BlockTimeMilliseconds),
           thresholds: run.thresholds,
         };
         if (color !== undefined) {
