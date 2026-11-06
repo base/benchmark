@@ -32,3 +32,11 @@ type CompletionWorker interface {
 	Done() <-chan struct{}
 	Err() error
 }
+
+// BlockObserver lets a worker observe each non-setup block's on-chain outcome.
+// The sequencer calls OnBlockBuilt after every benchmark block. Workers use it
+// to refine per-tx assumptions (e.g. recalibrate numCallsPerBlock from
+// observed gas-per-call when the setup-time gas estimate was inaccurate).
+type BlockObserver interface {
+	OnBlockBuilt(gasUsed uint64, userTxsIncluded int)
+}
